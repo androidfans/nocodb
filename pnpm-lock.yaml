@@ -44,6 +44,7 @@ overrides:
   vite@>=6.1.0 <6.1.3: '>=6.1.3'
   vite@>=6.1.0 <6.1.5: '>=6.1.5'
   '@babel/helpers@<7.26.10': '>=7.26.10'
+  uuid: '>=11.1.0'
   vite@>=6.0.0 <=6.1.5: '>=6.1.6'
   vite@>=6.1.0 <6.1.4: '>=6.1.4'
   '@75lb/deep-merge@<=1.1.1': '>=1.1.2'
@@ -438,7 +439,7 @@ importers:
         specifier: ^4.7.1
         version: 4.7.1
       uuid:
-        specifier: ^11.1.0
+        specifier: '>=11.1.0'
         version: 11.1.0
       v3-infinite-loading:
         specifier: ^1.3.2
@@ -1244,7 +1245,7 @@ importers:
         specifier: ^0.16.0
         version: 0.16.0(zod@3.25.76)
       uuid:
-        specifier: ^11.1.0
+        specifier: '>=11.1.0'
         version: 11.1.0
       validator:
         specifier: ^13.15.22
@@ -1437,7 +1438,7 @@ importers:
         specifier: ^1.4.1
         version: 1.4.1
       uuid:
-        specifier: ^11.1.0
+        specifier: '>=11.1.0'
         version: 11.1.0
       validator:
         specifier: ^13.15.22
@@ -17802,27 +17803,8 @@ packages:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
 
-  uuid@10.0.0:
-    resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
-    hasBin: true
-
   uuid@11.1.0:
     resolution: {integrity: sha512-0/A9rDy9P7cJ+8w1c9WD9V//9Wj15Ce2MPz8Ri6032usz+NfePxx5AcN3bN+r6ZL6jEo066/yNYB3tn4pQEx+A==}
-    hasBin: true
-
-  uuid@3.4.0:
-    resolution: {integrity: sha512-HjSDRw6gZE5JMggctHBcjVak08+KEVhSIiDzFnT9S9aegmp85S/bReBVTb4QTFaRNptJ9kuYaNhnbNEOkbKb/A==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
-    hasBin: true
-
-  uuid@8.3.2:
-    resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
-    hasBin: true
-
-  uuid@9.0.1:
-    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
-    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   v3-infinite-loading@1.3.2:
@@ -18977,7 +18959,7 @@ snapshots:
       '@aws-sdk/util-utf8-browser': 3.6.1
       lodash: 4.17.23
       tslib: 1.14.1
-      uuid: 3.4.0
+      uuid: 11.1.0
     transitivePeerDependencies:
       - encoding
       - react-native
@@ -18991,7 +18973,7 @@ snapshots:
       '@aws-amplify/pubsub': 5.6.4(encoding@0.1.13)(react-native@0.83.1(@babel/core@7.27.3)(react@19.1.0))
       graphql: 15.8.0
       tslib: 1.14.1
-      uuid: 3.4.0
+      uuid: 11.1.0
       zen-observable-ts: 0.8.19
     transitivePeerDependencies:
       - debug
@@ -19065,7 +19047,7 @@ snapshots:
       idb: 5.0.6
       immer: 9.0.6
       ulid: 2.3.0
-      uuid: 3.4.0
+      uuid: 11.1.0
       zen-observable-ts: 0.8.19
       zen-push: 0.2.1
     transitivePeerDependencies:
@@ -19105,7 +19087,7 @@ snapshots:
       '@aws-amplify/core': 5.8.14(encoding@0.1.13)(react-native@0.83.1(@babel/core@7.27.3)(react@19.1.0))
       '@aws-amplify/rtn-push-notification': 1.1.15
       lodash: 4.17.23
-      uuid: 3.4.0
+      uuid: 11.1.0
     transitivePeerDependencies:
       - encoding
       - react-native
@@ -19123,7 +19105,7 @@ snapshots:
       '@aws-sdk/util-utf8-node': 3.6.1
       buffer: 4.9.2
       tslib: 1.14.1
-      uuid: 3.4.0
+      uuid: 11.1.0
     transitivePeerDependencies:
       - encoding
       - react-native
@@ -19137,7 +19119,7 @@ snapshots:
       graphql: 15.8.0
       tslib: 1.14.1
       url: 0.11.0
-      uuid: 3.4.0
+      uuid: 11.1.0
       zen-observable-ts: 0.8.19
     transitivePeerDependencies:
       - encoding
@@ -19427,7 +19409,7 @@ snapshots:
       '@aws-sdk/util-utf8-browser': 3.6.1
       '@aws-sdk/util-utf8-node': 3.6.1
       tslib: 2.8.1
-      uuid: 3.4.0
+      uuid: 11.1.0
     transitivePeerDependencies:
       - react-native
 
@@ -20257,7 +20239,7 @@ snapshots:
       '@aws-sdk/util-utf8-browser': 3.6.1
       '@aws-sdk/util-utf8-node': 3.6.1
       tslib: 2.8.1
-      uuid: 3.4.0
+      uuid: 11.1.0
     transitivePeerDependencies:
       - react-native
 
@@ -21016,7 +20998,7 @@ snapshots:
       '@aws-sdk/types': 3.186.0
       '@aws-sdk/util-middleware': 3.186.0
       tslib: 2.8.1
-      uuid: 8.3.2
+      uuid: 11.1.0
 
   '@aws-sdk/middleware-retry@3.6.1(react-native@0.83.1(@babel/core@7.27.3)(react@19.1.0))':
     dependencies:
@@ -21025,7 +21007,7 @@ snapshots:
       '@aws-sdk/types': 3.6.1
       react-native-get-random-values: 1.11.0(react-native@0.83.1(@babel/core@7.27.3)(react@19.1.0))
       tslib: 1.14.1
-      uuid: 3.4.0
+      uuid: 11.1.0
     transitivePeerDependencies:
       - react-native
 
@@ -21877,7 +21859,7 @@ snapshots:
     dependencies:
       '@azure/msal-common': 14.16.1
       jsonwebtoken: 9.0.2
-      uuid: 8.3.2
+      uuid: 11.1.0
 
   '@azure/storage-blob@12.26.0':
     dependencies:
@@ -22350,7 +22332,7 @@ snapshots:
       openid-client: 5.7.1
       proxy-agent: 6.5.0
       thrift: 0.16.0
-      uuid: 9.0.1
+      uuid: 11.1.0
       winston: 3.17.0
     optionalDependencies:
       lz4: 0.6.5
@@ -22688,7 +22670,7 @@ snapshots:
       p-limit: 3.1.0
       retry-request: 7.0.2(encoding@0.1.13)
       teeny-request: 9.0.0(encoding@0.1.13)
-      uuid: 8.3.2
+      uuid: 11.1.0
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -23586,7 +23568,7 @@ snapshots:
       tar: 6.2.1
       temp-dir: 1.0.0
       upath: 2.0.1
-      uuid: 10.0.0
+      uuid: 11.1.0
       validate-npm-package-license: 3.0.4
       validate-npm-package-name: 5.0.1
       wide-align: 1.1.5
@@ -26379,7 +26361,7 @@ snapshots:
       '@smithy/util-middleware': 4.0.3
       '@smithy/util-retry': 4.0.4
       tslib: 2.8.1
-      uuid: 9.0.1
+      uuid: 11.1.0
 
   '@smithy/middleware-retry@4.4.18':
     dependencies:
@@ -29416,7 +29398,7 @@ snapshots:
       lodash: 4.17.23
       msgpackr: 1.11.4
       semver: 7.7.2
-      uuid: 8.3.2
+      uuid: 11.1.0
     transitivePeerDependencies:
       - supports-color
 
@@ -31640,7 +31622,7 @@ snapshots:
       saxes: 5.0.1
       tmp: 0.2.3
       unzipper: 0.10.14
-      uuid: 8.3.2
+      uuid: 11.1.0
 
   execa@5.0.0:
     dependencies:
@@ -32235,7 +32217,7 @@ snapshots:
       https-proxy-agent: 7.0.6
       is-stream: 2.0.1
       node-fetch: 2.7.0(encoding@0.1.13)
-      uuid: 9.0.1
+      uuid: 11.1.0
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -34300,7 +34282,7 @@ snapshots:
       temp-dir: 1.0.0
       typescript: 5.8.3
       upath: 2.0.1
-      uuid: 10.0.0
+      uuid: 11.1.0
       validate-npm-package-license: 3.0.4
       validate-npm-package-name: 5.0.1
       wide-align: 1.1.5
@@ -37249,7 +37231,7 @@ snapshots:
       safe-buffer: 5.2.1
       socks-proxy-agent: 8.0.5
       stream-length: 1.0.2
-      uuid: 8.3.2
+      uuid: 11.1.0
     transitivePeerDependencies:
       - supports-color
 
@@ -38639,7 +38621,7 @@ snapshots:
       open: 7.4.2
       simple-lru-cache: 0.0.2
       toml: 3.0.0
-      uuid: 8.3.2
+      uuid: 11.1.0
       winston: 3.17.0
     transitivePeerDependencies:
       - aws-crt
@@ -38691,7 +38673,7 @@ snapshots:
   sockjs@0.3.24:
     dependencies:
       faye-websocket: 0.11.4
-      uuid: 8.3.2
+      uuid: 11.1.0
       websocket-driver: 0.7.4
 
   socks-proxy-agent@6.2.1:
@@ -39258,7 +39240,7 @@ snapshots:
       https-proxy-agent: 5.0.1
       node-fetch: 2.7.0(encoding@0.1.13)
       stream-events: 1.0.5
-      uuid: 9.0.1
+      uuid: 11.1.0
     transitivePeerDependencies:
       - encoding
       - supports-color
@@ -40096,15 +40078,7 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
-  uuid@10.0.0: {}
-
   uuid@11.1.0: {}
-
-  uuid@3.4.0: {}
-
-  uuid@8.3.2: {}
-
-  uuid@9.0.1: {}
 
   v3-infinite-loading@1.3.2: {}
 
