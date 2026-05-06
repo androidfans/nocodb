@@ -35,6 +35,7 @@
     "mail": "email dev --dir src/services/mail/templates --port 8001"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "@ai-sdk/amazon-bedrock": "^4.0.3",
     "@ai-sdk/anthropic": "^3.0.1",
     "@ai-sdk/azure": "^3.0.1",

@@ -4,7 +4,7 @@ const nodeExternals = require('webpack-node-externals');
 const { TsCheckerRspackPlugin } = require('ts-checker-rspack-plugin');
 
 module.exports = {
-  entry: './src/index.ts',
+  entry: './src/run/docker.ts',
   module: {
     rules: [
       {
@@ -83,11 +83,6 @@ module.exports = {
     }),
     new rspack.CopyRspackPlugin({
       patterns: [{ from: 'src/public', to: 'public' }],
-    }),
-    new TsCheckerRspackPlugin({
-      typescript: {
-        configFile: resolve('tsconfig.json'),
-      },
     }),
   ],
   target: 'node',

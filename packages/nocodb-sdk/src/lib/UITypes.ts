@@ -480,7 +480,7 @@ export function isHiddenCol(
   if (
     col.uidt === UITypes.Order ||
     col.uidt === UITypes.Meta ||
-    col.uidt === UITypes.Deleted
+    col.uidt === UITypes.Deleted as any
   ) {
     return true;
   }
