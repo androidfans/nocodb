@@ -8,6 +8,8 @@ export function useViewSorts(view: Ref<ViewType | undefined>, reloadData?: () =>
 
   const { $api, $e, $eventBus } = useNuxtApp()
 
+  const viewsStore = useViewsStore()
+
   const { isSharedBase } = storeToRefs(useBase())
 
   const { hasPersonalViewPermission } = usePersonalViewPermissions(view)
@@ -46,6 +48,13 @@ export function useViewSorts(view: Ref<ViewType | undefined>, reloadData?: () =>
         return
       }
       if (!view?.value || !meta.value) return
+
+      const cached = viewsStore.viewInitCache
+      if (cached && cached._viewId === view?.value?.id && cached.sorts) {
+        sorts.value = (cached.sorts.list ?? []) as SortType[]
+        viewsStore.viewInitCache = { ...cached, sorts: null }
+        return
+      }
 
       sorts.value = (
         await $api.internal.getOperation(meta.value.fk_workspace_id!, meta.value.base_id!, {

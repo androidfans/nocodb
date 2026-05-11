@@ -733,6 +733,12 @@ export function useInfiniteData(args: {
             },
           )
 
+      if (typeof response?.pageInfo?.totalRows === 'number') {
+        const dataCache = getDataCache(path)
+        dataCache.totalRows.value = response.pageInfo.totalRows
+        dataCache.actualTotalRows.value = response.pageInfo.totalRows
+      }
+
       const data = formatData(
         response.list,
         response.pageInfo,

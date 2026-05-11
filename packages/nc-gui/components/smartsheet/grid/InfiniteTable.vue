@@ -257,7 +257,9 @@ const fetchChunk = async (chunkId: number, isInitialLoad = false) => {
   const offset = chunkId * CHUNK_SIZE
   const limit = isInitialLoad ? INITIAL_LOAD_SIZE : CHUNK_SIZE
 
-  if (offset >= totalRows.value) {
+  // On first paint, totalRows can still be 0 before async count/list settles.
+  // Allow chunk 0 fetch so the first data request is not blocked by count.
+  if (offset >= totalRows.value && !(offset === 0 && totalRows.value === 0)) {
     return
   }
 
@@ -2040,15 +2042,23 @@ watch(
           }
         }
         try {
-          // Sync the count
-          await syncCount(undefined, false, false)
+          // Reset current cache first to avoid showing stale rows while switching views.
+          clearCache(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)
+
+          // Start count sync in background; do not block first chunk rendering.
+          syncCount(undefined, false, false).catch((e) => console.warn('[syncCount]', e))
+
+          // Kick off first chunk immediately to avoid waiting on slice/layout timing.
+          const initialChunkPromise = fetchChunk(0, true).catch(() => {})
+
           // Calculate the slices and load the view aggregate and data
           calculateSlices()
 
           if (rowSlice.end === 0) {
-            rowSlice.end = Math.min(100, totalRows.value)
+            // Keep a bootstrap window even when totalRows is still unknown (0).
+            rowSlice.end = totalRows.value > 0 ? Math.min(100, totalRows.value) : 100
           }
-          await Promise.allSettled([loadViewAggregate(), updateVisibleRows()])
+          await Promise.allSettled([loadViewAggregate(), initialChunkPromise, updateVisibleRows()])
         } catch (e) {
           if (!axios.isCancel(e)) {
             console.log(e)

@@ -27,7 +27,7 @@ const [useProvideSmartsheetStore, useSmartsheetStore] = useInjectionState(
 
     const { isUIAllowed } = useRoles()
 
-    const { activeView: view, activeNestedFilters, activeSorts, views } = storeToRefs(useViewsStore())
+    const { activeView: view, activeNestedFilters, activeSorts, views, viewInitCache } = storeToRefs(useViewsStore())
 
     const baseStore = useBase()
 
@@ -203,6 +203,13 @@ const [useProvideSmartsheetStore, useSmartsheetStore] = useInjectionState(
       const key = getViewColumnsKey(baseId, viewId)
 
       if (viewColumnsMap[key]) return viewColumnsMap[key]
+
+      const cached = viewInitCache.value
+      if (cached && cached._viewId === viewId && cached.viewColumns) {
+        viewColumnsMap[key] = cached.viewColumns.list ?? []
+        viewInitCache.value = { ...cached, viewColumns: null }
+        return viewColumnsMap[key]
+      }
 
       if (pendingRequests.has(key)) {
         return pendingRequests.get(key)

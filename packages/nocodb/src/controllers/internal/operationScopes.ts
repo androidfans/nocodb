@@ -24,6 +24,7 @@ export const OPERATION_SCOPES = {
   attachmentDownload: 'base',
 
   // UI Get Operations
+  viewInit: 'base',
   tableGet: 'base',
   columnsHash: 'base',
   viewList: 'base',

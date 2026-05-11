@@ -112,15 +112,24 @@ const [useProvideViewColumns, useViewColumns] = useInjectionState(
 
       let order = 1
 
-      const data =
-        ((isPublic
-          ? meta.value?.columns
-          : (
+      let data: any[]
+      if (isPublic) {
+        data = (meta.value?.columns as any[]) ?? []
+      } else {
+        const cached = viewStore.viewInitCache
+        if (cached && cached._viewId === view.value.id && cached.viewColumns) {
+          data = cached.viewColumns.list ?? []
+          viewStore.viewInitCache = { ...cached, viewColumns: null }
+        } else {
+          data =
+            (
               await $api.internal.getOperation(meta.value!.fk_workspace_id!, meta.value!.base_id!, {
                 operation: 'viewColumnList',
                 viewId: view.value.id,
               })
-            ).list) as any[]) ?? []
+            ).list ?? []
+        }
+      }
 
       const fieldById = data.reduce<Record<string, any>>((acc, curr) => {
         // If hide column api is in progress and we try to load columns before that then we need to assign local visibility state

@@ -43,7 +43,9 @@ export function useDataFetch({
     const offset = chunkId * CHUNK_SIZE
     const limit = isInitialLoad ? INITIAL_LOAD_SIZE : CHUNK_SIZE
 
-    if (offset >= totalRows.value) return
+    // On first paint, totalRows can still be 0 before async count/list settles.
+    // Allow chunk 0 fetch so first data request is not blocked by count.
+    if (offset >= totalRows.value && !(offset === 0 && totalRows.value === 0)) return
 
     if (
       !isAlreadyShownUpgradeModal.value &&

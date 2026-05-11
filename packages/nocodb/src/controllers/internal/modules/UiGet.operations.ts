@@ -5,9 +5,12 @@ import type {
   InternalApiModule,
   InternalGETResponseType,
 } from '~/utils/internal-type';
+import { UITypes } from 'nocodb-sdk';
 import { DataTableService } from '~/services/data-table.service';
 import { PagedResponseImpl } from '~/helpers/PagedResponse';
 import { TablesService } from '~/services/tables.service';
+import Model from '~/models/Model';
+import View from '~/models/View';
 import { ColumnsService } from '~/services/columns.service';
 import { ViewsService } from '~/services/views.service';
 import { ViewColumnsService } from '~/services/view-columns.service';
@@ -42,6 +45,7 @@ export class UiGetOperations
     protected extensionsService: ExtensionsService,
   ) {}
   operations = [
+    'viewInit' as const,
     'nestedDataList' as const,
     'tableGet' as const,
     'columnsHash' as const,
@@ -88,6 +92,91 @@ export class UiGetOperations
     },
   ): InternalGETResponseType {
     switch (operation) {
+      case 'viewInit': {
+        const viewId = req.query.viewId as string;
+        let tableId = req.query.tableId as string | undefined;
+
+        if (!tableId) {
+          const viewObj = await View.get(context, viewId);
+          if (viewObj) tableId = viewObj.fk_model_id;
+        }
+        if (!tableId) return NcError.notFound('Table not found for view');
+
+        const [tableMeta, viewColumns, filters, sorts, viewList] = await Promise.all([
+          this.tablesService.getTableWithAccessibleViews(context, {
+            tableId,
+            user: req.user,
+          }),
+          this.viewColumnsService.columnList(context, { viewId }),
+          this.filtersService.filterList(context, { viewId }),
+          this.sortsService.sortList(context, { viewId }),
+          this.viewsService.viewList(context, {
+            tableId,
+            user: req.user,
+          }),
+        ]);
+
+        const relatedTableIds = new Set<string>();
+        const columnsById = new Map(
+          (tableMeta.columns ?? []).map((c: any) => [c.id, c]),
+        );
+        for (const col of tableMeta.columns ?? []) {
+          const opts = (col as any).colOptions;
+          if (!opts) continue;
+          if (
+            col.uidt === UITypes.LinkToAnotherRecord ||
+            col.uidt === UITypes.Links
+          ) {
+            if (opts.fk_related_model_id && opts.fk_related_model_id !== tableId) {
+              relatedTableIds.add(opts.fk_related_model_id);
+            }
+          } else if (
+            col.uidt === UITypes.Lookup ||
+            col.uidt === UITypes.Rollup
+          ) {
+            const relationCol = columnsById.get(opts.fk_relation_column_id);
+            const relId = relationCol?.colOptions?.fk_related_model_id;
+            if (relId && relId !== tableId) {
+              relatedTableIds.add(relId);
+            }
+          }
+        }
+
+        const relatedMetas: Record<string, any> = {};
+        await Promise.all(
+          [...relatedTableIds].map(async (id) => {
+            const m = await Model.getWithInfo(context, { id });
+            if (m) {
+              relatedMetas[id] = m;
+              for (const col of m.columns ?? []) {
+                const opts = (col as any).colOptions;
+                if (!opts) continue;
+                if (
+                  (col.uidt === UITypes.LinkToAnotherRecord ||
+                    col.uidt === UITypes.Links) &&
+                  opts.fk_related_model_id &&
+                  opts.fk_related_model_id !== tableId &&
+                  !relatedTableIds.has(opts.fk_related_model_id)
+                ) {
+                  const deepMeta = await Model.getWithInfo(context, {
+                    id: opts.fk_related_model_id,
+                  });
+                  if (deepMeta) relatedMetas[opts.fk_related_model_id] = deepMeta;
+                }
+              }
+            }
+          }),
+        );
+
+        return {
+          tableMeta,
+          viewList: new PagedResponseImpl(viewList),
+          viewColumns: new PagedResponseImpl(viewColumns),
+          filters: new PagedResponseImpl(filters),
+          sorts: new PagedResponseImpl(sorts),
+          relatedMetas,
+        };
+      }
       case 'nestedDataList':
         context.cache = true;
         return await this.dataTableService.nestedDataList(context, {

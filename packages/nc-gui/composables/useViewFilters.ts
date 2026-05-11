@@ -69,6 +69,8 @@ export function useViewFilters(
 
   const { $api, $e, $eventBus } = useNuxtApp()
 
+  const viewsStore = useViewsStore()
+
   const { hasPersonalViewPermission } = usePersonalViewPermissions(view)
 
   const { getMeta, getMetaByKey } = useMetas()
@@ -513,12 +515,18 @@ export function useViewFilters(
               return
             }
 
-            filters.value = (
-              await $api.internal.getOperation(apiWorkspaceId.value!, apiBaseId.value!, {
-                operation: 'filterList',
-                viewId: view.value!.id!,
-              })
-            ).list as ColumnFilterType[]
+            const cached = viewsStore.viewInitCache
+            if (cached && cached._viewId === view.value!.id && cached.filters) {
+              filters.value = (cached.filters.list ?? []) as ColumnFilterType[]
+              viewsStore.viewInitCache = { ...cached, filters: null }
+            } else {
+              filters.value = (
+                await $api.internal.getOperation(apiWorkspaceId.value!, apiBaseId.value!, {
+                  operation: 'filterList',
+                  viewId: view.value!.id!,
+                })
+              ).list as ColumnFilterType[]
+            }
 
             if (loadAllFilters) {
               allFilters.value = [...filters.value] as FilterType[]

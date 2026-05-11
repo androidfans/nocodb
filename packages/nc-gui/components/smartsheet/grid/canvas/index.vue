@@ -274,6 +274,7 @@ let selectedRowInfo: { index: number | null | undefined; isSelectionStarted: boo
 let colAutoScrollTimerId: any = null
 
 const {
+  fetchChunk,
   isGroupBy,
   rowSlice,
   colSlice,
@@ -2681,9 +2682,18 @@ watch(
           await syncGroupCount(undefined, true)
           calculateSlices()
         } else {
-          await syncCount()
+          // Fire first chunk early; do not block initial rows on count.
+          syncCount(undefined).catch((e) => console.warn('[syncCount]', e))
+          const initialChunkPromise = fetchChunk(0, true).catch(() => {})
+
+          // Keep a bootstrap viewport even when totalRows is still unknown (0).
+          if (rowSlice.value.end <= rowSlice.value.start) {
+            rowSlice.value = { start: 0, end: 100 }
+          }
+
           calculateSlices()
           updateVisibleRows()
+          await initialChunkPromise
         }
         await loadViewAggregate()
       }

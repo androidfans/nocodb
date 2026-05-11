@@ -50,7 +50,7 @@ export const useViewsStore = defineStore('viewsStore', () => {
 
   const bases = useBases()
 
-  const { getMeta } = useMetas()
+  const { getMeta, setMeta } = useMetas()
 
   const tablesStore = useTablesStore()
 
@@ -96,6 +96,26 @@ export const useViewsStore = defineStore('viewsStore', () => {
   const preFillFormSearchParams = ref('')
 
   const activeViewRowColorInfo = ref<RowColoringInfo>(defaultRowColorInfo)
+
+  const viewInitCache = ref<{ _viewId: string; viewColumns: any; filters: any; sorts: any } | null>(null)
+
+  // Fire viewInit eagerly on store init — no need to wait for tables/activeTableId
+  const viewInitPrefetchPromise = ref<Promise<any> | null>(null)
+  ;(() => {
+    // In route params, viewId is actually tableId; viewTitle is the real view ID
+    const viewId = router.currentRoute.value.params.viewTitle as string | undefined
+    const tableId = router.currentRoute.value.params.viewId as string | undefined
+    const baseId = router.currentRoute.value.params.baseId as string | undefined
+    const wsId = router.currentRoute.value.params.typeOrId as string | undefined
+    if (viewId && baseId && wsId) {
+      viewInitPrefetchPromise.value = $api.internal
+        .getOperation(wsId, baseId, { operation: 'viewInit', viewId, tableId })
+        .catch((e: any) => {
+          console.warn('[viewInit prefetch] failed', e)
+          return null
+        })
+    }
+  })()
 
   // Computed properties
   const isPublic = computed(() => route.value.meta?.public)
@@ -1329,7 +1349,61 @@ export const useViewsStore = defineStore('viewsStore', () => {
       try {
         if (tablesStore.activeTable) tablesStore.activeTable.isViewsLoading = true
 
-        await loadViews()
+        // In route params, viewTitle is the actual view ID (viewId is tableId)
+        const viewIdFromRoute = route.value.params.viewTitle as string | undefined
+
+        if (viewInitPrefetchPromise.value) {
+          // Consume the eagerly-fired viewInit prefetch
+          try {
+            const initData = await viewInitPrefetchPromise.value
+            viewInitPrefetchPromise.value = null
+
+            if (initData) {
+              if (initData.tableMeta) {
+                await setMeta(initData.tableMeta)
+              }
+              if (initData.relatedMetas) {
+                for (const m of Object.values(initData.relatedMetas)) {
+                  await setMeta(m)
+                }
+              }
+
+              // Resolve the real viewId — viewTitle from route could be a slug
+              const resolvedViewId = initData.viewList?.list?.find(
+                (v: any) => v.id === viewIdFromRoute || v.title === viewIdFromRoute,
+              )?.id || viewIdFromRoute
+
+              viewInitCache.value = {
+                _viewId: resolvedViewId!,
+                viewColumns: initData.viewColumns,
+                filters: initData.filters,
+                sorts: initData.sorts,
+              }
+
+              // Use viewList from viewInit to set viewsByTable directly, skipping loadViews.
+              // Use tableMeta.base_id for correct key (handles cross-base).
+              if (initData.viewList?.list) {
+                const tableBaseId = initData.tableMeta?.base_id || newProjectId
+                const key = getViewsKey(tableBaseId, newId)
+                viewsByTable.value.set(
+                  key,
+                  (initData.viewList.list as ViewType[]).sort((a, b) => a.order! - b.order!),
+                )
+                isViewsLoading.value = false
+              } else {
+                await loadViews()
+              }
+            } else {
+              await loadViews()
+            }
+          } catch (e) {
+            console.warn('[viewInit] consume failed', e)
+            viewInitCache.value = null
+            await loadViews()
+          }
+        } else {
+          await loadViews()
+        }
       } catch (e) {
         console.error(e)
       } finally {
@@ -1470,6 +1544,7 @@ export const useViewsStore = defineStore('viewsStore', () => {
     isListViewEnabled,
     blockListView,
     showUpgradeToUseListView,
+    viewInitCache,
   }
 })
 
