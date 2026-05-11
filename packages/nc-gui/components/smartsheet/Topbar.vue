@@ -1,5 +1,9 @@
 <script lang="ts" setup>
 const route = useRoute()
+const TAB_SPLIT_PERCENT_DEFAULT = 40
+const TAB_SPLIT_PERCENT_MIN = 20
+const TAB_SPLIT_PERCENT_MAX = 80
+const TAB_SPLIT_STORAGE_KEY = 'nc:smartsheet:topbar:tab-split:v1'
 
 const { isUIAllowed } = useRoles()
 
@@ -10,6 +14,7 @@ const { activeScriptId } = storeToRefs(useScriptStore())
 const { activeDashboardId, isEditingDashboard } = storeToRefs(useDashboardStore())
 
 const { activeWorkflowId, activeWorkflowHasDraftChanges } = storeToRefs(useWorkflowStore())
+const { activeTable } = storeToRefs(useTablesStore())
 
 const isPublic = inject(IsPublicInj, ref(false))
 
@@ -29,15 +34,94 @@ const { isEEFeatureBlocked, blockExtensions, showUpgradeToUseExtensions } = useE
 
 const isSharedBase = computed(() => route.params.typeOrId === 'base')
 
-const topbarBreadcrumbItemWidth = computed(() => {
-  if (!isSharedBase.value && !isMobileMode.value) {
-    return 'calc(\(100% - 167px - 24px\) / 2)'
-  } else if (isMobileMode.value) {
-    return 'calc(75% - 12px)'
-  } else {
-    return 'calc(\(100% - 12px\) / 2)'
-  }
+const showTabSections = computed(
+  () => !isPublic.value && !activeScriptId.value && !activeDashboardId.value && !activeWorkflowId.value && !isMobileMode.value,
+)
+
+const tabSplitPercent = ref(TAB_SPLIT_PERCENT_DEFAULT)
+const isDraggingSplit = ref(false)
+const tabSplitAreaRef = ref<HTMLElement>()
+const isTabSplitInitialized = ref(false)
+
+const normalizeTabSplitPercent = (value: unknown) => {
+  const num = Number(value)
+  if (!Number.isFinite(num)) return TAB_SPLIT_PERCENT_DEFAULT
+  return Math.min(TAB_SPLIT_PERCENT_MAX, Math.max(TAB_SPLIT_PERCENT_MIN, num))
+}
+
+const tabSplitStorageScope = computed(() => {
+  const typeOrId = String(route.params.typeOrId ?? '')
+  const baseId = String(route.params.baseId ?? '')
+  const sourceId = String(activeTable.value?.source_id ?? '')
+  return [typeOrId, baseId, sourceId].join(':')
 })
+
+const tabSectionStyle = computed(() => {
+  if (!showTabSections.value) return undefined
+  return { width: `${tabSplitPercent.value}%` }
+})
+
+const getTabSplitStorage = () => {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(TAB_SPLIT_STORAGE_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return {}
+    return parsed as Record<string, unknown>
+  } catch {
+    return {}
+  }
+}
+
+const setTabSplitStorage = (next: Record<string, unknown>) => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(TAB_SPLIT_STORAGE_KEY, JSON.stringify(next))
+  } catch {
+    // no-op: localStorage can fail in private mode / quota exceeded
+  }
+}
+
+watch(
+  tabSplitStorageScope,
+  (scope) => {
+    tabSplitPercent.value = normalizeTabSplitPercent(getTabSplitStorage()[scope])
+    isTabSplitInitialized.value = true
+  },
+  { immediate: true },
+)
+
+const persistTabSplitPercent = () => {
+  if (!isTabSplitInitialized.value) return
+  const next = getTabSplitStorage()
+  next[tabSplitStorageScope.value] = normalizeTabSplitPercent(tabSplitPercent.value)
+  setTabSplitStorage(next)
+}
+
+const onSplitDragStart = (e: MouseEvent) => {
+  e.preventDefault()
+  isDraggingSplit.value = true
+
+  const onMove = (ev: MouseEvent) => {
+    const splitAreaEl = tabSplitAreaRef.value
+    if (!splitAreaEl) return
+    const rect = splitAreaEl.getBoundingClientRect()
+    const pct = ((ev.clientX - rect.left) / rect.width) * 100
+    tabSplitPercent.value = normalizeTabSplitPercent(pct)
+  }
+
+  const onUp = () => {
+    isDraggingSplit.value = false
+    persistTabSplitPercent()
+    document.removeEventListener('mousemove', onMove)
+    document.removeEventListener('mouseup', onUp)
+  }
+
+  document.addEventListener('mousemove', onMove)
+  document.addEventListener('mouseup', onUp)
+  onMove(e)
+}
 </script>
 
 <template>
@@ -52,27 +136,34 @@ const topbarBreadcrumbItemWidth = computed(() => {
       <a-skeleton-input :active="true" class="!w-44 !h-4 ml-2 !rounded overflow-hidden" />
     </template>
     <template v-else>
-      <div
-        class="flex items-center gap-3 md:min-w-[300px]"
-        :style="{
-          width: topbarBreadcrumbItemWidth,
-        }"
-      >
+      <div class="flex items-center gap-0 flex-1 min-w-0">
         <GeneralOpenLeftSidebarBtn />
-        <LazySmartsheetToolbarViewInfo v-if="!isPublic && !activeScriptId && !activeDashboardId && !activeWorkflowId" />
-        <LazySmartsheetTopbarScriptInfo v-if="!isPublic && activeScriptId" />
-        <LazySmartsheetTopbarDashboardInfo v-if="!isPublic && activeDashboardId" />
-        <LazySmartsheetTopbarWorkflowInfo v-if="!isPublic && activeWorkflowId" />
+        <div ref="tabSplitAreaRef" class="flex items-center min-w-0 flex-1">
+          <!-- Table tabs section -->
+          <div class="flex items-center gap-1 min-w-0 overflow-hidden flex-shrink-0" :style="tabSectionStyle">
+            <LazySmartsheetToolbarViewInfo v-if="!isPublic && !activeScriptId && !activeDashboardId && !activeWorkflowId" />
+            <LazySmartsheetTopbarScriptInfo v-if="!isPublic && activeScriptId" />
+            <LazySmartsheetTopbarDashboardInfo v-if="!isPublic && activeDashboardId" />
+            <LazySmartsheetTopbarWorkflowInfo v-if="!isPublic && activeWorkflowId" />
+          </div>
+          <!-- Draggable divider -->
+          <div
+            v-if="showTabSections"
+            class="nc-tab-split-handle"
+            :class="{ 'nc-tab-split-handle-active': isDraggingSplit }"
+            @mousedown="onSplitDragStart"
+          >
+            <div class="nc-tab-split-line" />
+          </div>
+          <!-- View tabs section -->
+          <SmartsheetTopbarViewTabList v-if="showTabSections" class="flex-1 min-w-0" />
+        </div>
       </div>
-
-      <div v-if="!isSharedBase && !isMobileMode && !activeScriptId && !activeDashboardId && !activeWorkflowId">
-        <SmartsheetTopbarSelectMode />
-      </div>
-      <div v-else-if="activeDashboardId || activeWorkflowId">
+      <div v-if="activeDashboardId || activeWorkflowId">
         <SmartsheetTopbarEditingState />
       </div>
 
-      <div class="flex items-center justify-end gap-2 flex-1">
+      <div class="flex items-center justify-end gap-2">
         <GeneralApiLoader v-if="!isMobileMode && !activeScriptId && !activeDashboardId" />
 
         <!-- Variable Setup Warning -->
@@ -161,6 +252,11 @@ const topbarBreadcrumbItemWidth = computed(() => {
 
         <DashboardMiniSidebarTheme v-if="isSharedBase" placement="bottom" render-as-btn button-class="h-8 w-8" />
 
+        <SmartsheetTopbarSelectMode
+          v-if="!isSharedBase && !isMobileMode && !activeScriptId && !activeDashboardId && !activeWorkflowId"
+          class="mr-1"
+        />
+
         <LazySmartsheetTopbarShareProject v-if="!activeScriptId && !activeWorkflowId" />
 
         <div v-if="isSharedBase">
@@ -177,5 +273,18 @@ const topbarBreadcrumbItemWidth = computed(() => {
 <style scoped>
 .nc-table-toolbar-mobile {
   @apply flex-wrap h-auto py-2;
+}
+
+.nc-tab-split-handle {
+  @apply flex items-center justify-center w-3 flex-shrink-0 cursor-col-resize self-stretch mx-0.5;
+}
+
+.nc-tab-split-line {
+  @apply w-px h-4 bg-nc-border-gray-medium rounded transition-colors duration-150;
+}
+
+.nc-tab-split-handle:hover .nc-tab-split-line,
+.nc-tab-split-handle-active .nc-tab-split-line {
+  @apply bg-nc-content-gray-subtle2 w-0.5;
 }
 </style>

@@ -1,71 +1,113 @@
 <script setup lang="ts">
-import { ViewLockType } from 'nocodb-sdk'
+import type { TableType } from 'nocodb-sdk'
+import type { SortableEvent } from 'sortablejs'
+import Sortable from 'sortablejs'
 
-const { t } = useI18n()
+const { isUIAllowed } = useRoles()
 
-const { isMobileMode, user } = useGlobal()
+const { $api } = useNuxtApp()
 
-const { activeView, openedViewsTab } = storeToRefs(useViewsStore())
+const { isMobileMode } = useGlobal()
 
-const { basesUser } = storeToRefs(useBases())
 const { base, isSharedBase } = storeToRefs(useBase())
 
-const { activeTable } = storeToRefs(useTablesStore())
+const tablesStore = useTablesStore()
+const { activeTable, activeTables } = storeToRefs(tablesStore)
+const { openTable } = tablesStore
 
 const { isLeftSidebarOpen } = storeToRefs(useSidebarStore())
 
-const isViewOwner = computed(() => {
-  return activeView.value?.owned_by === user.value?.id
+const filteredTables = computed(() => {
+  return activeTables.value.filter((t: TableType) => t?.source_id === activeTable.value?.source_id) || []
 })
 
-const idUserMap = computed(() => {
-  return (basesUser.value.get(base.value?.id) || []).reduce((acc, user) => {
-    acc[user.id] = user
-    acc[user.email] = user
-    return acc
-  }, {} as Record<string, any>)
-})
+const tableListRef = ref<HTMLElement>()
+let sortable: Sortable | undefined
 
-const viewModeInfo = computed(() => {
-  switch (activeView.value?.lock_type) {
-    case ViewLockType.Collaborative:
-      return t(viewLockIcons[ViewLockType.Collaborative]?.title)
-    case ViewLockType.Personal:
-      return `${t(viewLockIcons[ViewLockType.Personal]?.title)} ${
-        isViewOwner.value
-          ? `(${t('general.you')})`
-          : activeView.value?.owned_by && idUserMap.value[activeView.value.owned_by]
-          ? `(${idUserMap.value[activeView.value.owned_by]?.display_name || idUserMap.value[activeView.value.owned_by]?.email})`
-          : ''
-      }`
-    case ViewLockType.Locked:
-      if (!activeView.value?.meta?.lockedByUserId || idUserMap.value[activeView.value?.meta?.lockedByUserId]) {
-        return t(viewLockIcons[ViewLockType.Locked]?.title)
+const handleNavigateToTable = (table: TableType) => {
+  if (!table?.id || table.id === activeTable.value?.id) return
+  openTable(table)
+}
+
+function computeNewOrder(evt: SortableEvent, newIndex: number): number | null {
+  const children: HTMLCollection = evt.to.children
+  if (children.length <= 1) return 1
+
+  const itemBeforeEl = children[newIndex - 1] as HTMLElement | undefined
+  const itemAfterEl = children[newIndex + 1] as HTMLElement | undefined
+
+  const itemBefore = itemBeforeEl && filteredTables.value.find((t) => t.id === itemBeforeEl.dataset.id)
+  const itemAfter = itemAfterEl && filteredTables.value.find((t) => t.id === itemAfterEl.dataset.id)
+
+  if (children.length - 1 === newIndex) {
+    return (itemBefore?.order ?? 0) + 1
+  } else if (newIndex === 0) {
+    return (itemAfter?.order ?? 1) / 2
+  } else {
+    return ((itemBefore?.order ?? 0) + (itemAfter?.order ?? 0)) / 2
+  }
+}
+
+const initSortable = (el: HTMLElement) => {
+  if (isMobileMode.value) return
+  if (sortable) sortable.destroy()
+
+  sortable = Sortable.create(el, {
+    direction: 'horizontal',
+    ghostClass: 'nc-table-tab-ghost',
+    animation: 150,
+    revertOnSpill: true,
+    onEnd: async (evt) => {
+      const { newIndex = 0, oldIndex = 0 } = evt
+      if (newIndex === oldIndex) return
+
+      const itemEl = evt.item as HTMLElement
+      const currentItem = filteredTables.value.find((t) => t.id === itemEl.dataset.id)
+      if (!currentItem?.id) return
+
+      const newOrder = computeNewOrder(evt, newIndex)
+      if (newOrder == null) return
+      currentItem.order = newOrder
+
+      const sourceId = currentItem.source_id
+      const offset = activeTables.value.findIndex((t) => t?.source_id === sourceId)
+      if (offset !== -1) {
+        activeTables.value.splice(newIndex + offset, 0, ...activeTables.value.splice(oldIndex + offset, 1))
       }
 
-      return t('title.lockedByUser', {
-        user:
-          idUserMap.value[activeView.value?.meta?.lockedByUserId]?.id === user.value?.id
-            ? t('general.you')
-            : idUserMap.value[activeView.value?.meta?.lockedByUserId]?.display_name ||
-              idUserMap.value[activeView.value?.meta?.lockedByUserId]?.email,
-      })
+      try {
+        await $api.internal.postOperation(
+          currentItem.fk_workspace_id!,
+          currentItem.base_id!,
+          {
+            operation: 'tableReorder',
+            tableId: currentItem.id,
+          },
+          {
+            order: currentItem.order,
+          },
+        )
+      } catch (e: any) {
+        message.error(await extractSdkResponseErrorMsg(e))
+      }
+    },
+    ...getDraggableAutoScrollOptions({ scrollSensitivity: 50 }),
+  })
+}
 
-    default:
-      return t(viewLockIcons[ViewLockType.Collaborative]?.title)
+watchEffect(() => {
+  if (tableListRef.value && isUIAllowed('viewCreateOrEdit')) {
+    initSortable(tableListRef.value)
   }
+})
+
+onBeforeUnmount(() => {
+  if (sortable) sortable.destroy()
 })
 </script>
 
 <template>
-  <div
-    class="flex flex-row items-center border-nc-border-gray-extralight transition-all duration-100 select-none"
-    :class="{
-      'text-base w-[calc(100%_-_52px)]': isMobileMode,
-      'w-[calc(100%_-_44px)]': !isMobileMode && !isLeftSidebarOpen,
-      'w-full': !isMobileMode && isLeftSidebarOpen,
-    }"
-  >
+  <div class="flex flex-row items-center border-nc-border-gray-extralight transition-all duration-100 select-none min-w-0 w-full">
     <template v-if="!isMobileMode">
       <SmartsheetTopbarProjectListDropdown v-if="activeTable">
         <template #default="{ isOpen }">
@@ -128,179 +170,59 @@ const viewModeInfo = computed(() => {
 
       <GeneralIcon icon="ncSlash1" class="nc-breadcrumb-divider" />
 
-      <SmartsheetTopbarTableListDropdown v-if="activeTable">
-        <template #default="{ isOpen }">
-          <div
-            class="rounded-lg h-8 px-2 text-nc-content-inverted-secondary font-weight-500 hover:(bg-nc-bg-gray-light text-nc-content-gray-emphasis) flex items-center gap-1 cursor-pointer"
-            :class="{
-              'max-w-full': isMobileMode,
-              'max-w-none': isSharedBase && !isMobileMode,
-            }"
-          >
-            <LazyGeneralEmojiPicker v-if="isMobileMode" :emoji="activeTable?.meta?.icon" readonly size="xsmall" class="mr-1">
-              <template #default>
-                <GeneralIcon
-                  icon="table"
-                  class="min-w-5"
-                  :class="{
-                    '!text-nc-content-gray-muted': !isMobileMode,
-                    '!text-nc-content-inverted-secondary': isMobileMode,
-                  }"
-                />
-              </template>
-            </LazyGeneralEmojiPicker>
-
-            <NcTooltip class="truncate nc-active-table-title max-w-full !leading-5" show-on-truncate-only :disabled="isOpen">
-              <template #title>
-                {{ activeTable?.title }}
-              </template>
-              <span
-                class="text-ellipsis"
-                :style="{
-                  wordBreak: 'keep-all',
-                  whiteSpace: 'nowrap',
-                  display: 'inline',
-                }"
-              >
-                {{ activeTable?.title }}
-              </span>
-            </NcTooltip>
-            <GeneralIcon
-              icon="chevronDown"
-              class="!text-current opacity-70 flex-none transform transition-transform duration-25 w-3.5 h-3.5"
-              :class="{ '!rotate-180': isOpen }"
-            />
-          </div>
-        </template>
-      </SmartsheetTopbarTableListDropdown>
-
-      <GeneralIcon icon="ncSlash1" class="nc-breadcrumb-divider" />
-    </template>
-
-    <!-- <SmartsheetToolbarOpenedViewAction /> -->
-
-    <SmartsheetTopbarViewListDropdown>
-      <template #default="{ isOpen }">
-        <NcTooltip
-          :tooltip-style="{ width: '240px', zIndex: '1049' }"
-          :overlay-inner-style="{ width: '240px' }"
-          trigger="hover"
-          placement="bottom"
-          class="flex"
-          :disabled="isOpen"
-          :mouse-enter-delay="0.5"
-          :class="{
-            'max-w-full': isMobileMode,
-            'max-w-1/2': !isSharedBase && !isMobileMode,
-            'max-w-none': isSharedBase && !isMobileMode,
-          }"
+      <div ref="tableListRef" class="nc-table-tab-list">
+        <div
+          v-for="table in filteredTables"
+          :key="table.id"
+          :data-id="table.id"
+          class="nc-table-tab-item"
+          :class="{ 'nc-table-tab-active': table.id === activeTable?.id }"
+          @click="handleNavigateToTable(table)"
         >
-          <template #title>
-            <div class="flex flex-col gap-3">
-              <div>
-                <div
-                  class="text-[10px] leading-[14px] text-nc-content-brand-hover dark:text-nc-content-gray-muted uppercase mb-1"
-                >
-                  {{ $t('labels.viewName') }}
-                </div>
-                <div class="text-small leading-[18px]">
-                  {{ activeView?.title }}
-                </div>
-              </div>
-
-              <div v-if="activeView?.created_by && idUserMap[activeView?.created_by]">
-                <div
-                  class="text-[10px] leading-[14px] text-nc-content-brand-hover dark:text-nc-content-gray-muted uppercase mb-1"
-                >
-                  {{ $t('labels.createdBy') }}
-                </div>
-                <div class="text-xs">
-                  {{
-                    idUserMap[activeView?.created_by]?.id === user?.id
-                      ? $t('general.you')
-                      : idUserMap[activeView?.created_by]?.display_name || idUserMap[activeView?.created_by]?.email
-                  }}
-                </div>
-              </div>
-              <div>
-                <div
-                  class="text-[10px] leading-[14px] text-nc-content-brand-hover dark:text-nc-content-gray-muted uppercase mb-1"
-                >
-                  {{ $t('labels.viewMode') }}
-                </div>
-                <div class="text-xs flex items-start gap-2">
-                  {{ viewModeInfo }}
-                </div>
-              </div>
-            </div>
-          </template>
-          <div
-            class="rounded-lg h-8 px-2 text-nc-content-gray font-semibold hover:(bg-nc-bg-gray-light text-nc-content-gray-emphasis) flex items-center gap-1 cursor-pointer"
-            :class="{
-              'max-w-full': !isSharedBase || isMobileMode,
-              'max-w-none': isSharedBase && !isMobileMode,
-            }"
-          >
-            <LazyGeneralEmojiPicker v-if="isMobileMode" :emoji="activeView?.meta?.icon" readonly size="xsmall" class="mr-1">
-              <template #default>
-                <GeneralViewIcon :meta="{ type: activeView?.type }" class="min-w-4.5 text-lg flex" />
-              </template>
-            </LazyGeneralEmojiPicker>
-
-            <NcTooltip class="truncate nc-active-view-title max-w-full !leading-5" show-on-truncate-only disabled>
-              <template #title>
-                {{ activeView?.title }}
-              </template>
-              <span
-                class="text-ellipsis"
-                :style="{
-                  wordBreak: 'keep-all',
-                  whiteSpace: 'nowrap',
-                  display: 'inline',
-                }"
-              >
-                {{ activeView?.title }}
-              </span>
-            </NcTooltip>
-
-            <template v-if="[ViewLockType.Locked, ViewLockType.Personal].includes(activeView?.lock_type)">
-              <div
-                v-if="activeView?.lock_type === ViewLockType.Personal && activeView.owned_by && idUserMap[activeView.owned_by]"
-                class="flex items-center justify-center mx-0.5"
-              >
-                <GeneralUserIcon
-                  :user="idUserMap[activeView.owned_by]"
-                  :initials-length="1"
-                  size="auto"
-                  class="flex-none !h-[14px] !min-h-[14px]"
-                  :class="{
-                    '!text-[8px]': !parseProp(idUserMap[activeView.owned_by]?.meta).iconType,
-                    '!text-tiny': parseProp(idUserMap[activeView.owned_by]?.meta).iconType,
-                  }"
-                />
-              </div>
-
-              <component
-                :is="viewLockIcons[activeView.lock_type].icon"
-                v-else
-                class="flex-none w-3.5 h-3.5 mx-0.5"
-                :class="{
-                  'text-nc-brand-400': activeView?.lock_type === ViewLockType.Personal && isViewOwner,
-                  'text-nc-content-gray-disabled': !(activeView?.lock_type === ViewLockType.Personal && isViewOwner),
-                }"
+          <LazyGeneralEmojiPicker :emoji="table?.meta?.icon" readonly size="xsmall">
+            <template #default>
+              <GeneralTableIcon
+                size="xsmall"
+                :meta="{ meta: {}, synced: table?.synced }"
+                class="!mx-0 min-w-4 !text-gray-500 flex-shrink-0"
               />
             </template>
-
-            <GeneralIcon
-              icon="chevronDown"
-              class="!text-current opacity-70 flex-none transform transition-transform duration-25 w-3.5 h-3.5"
-              :class="{ '!rotate-180': isOpen }"
-            />
-          </div>
-        </NcTooltip>
-      </template>
-    </SmartsheetTopbarViewListDropdown>
-
-    <LazySmartsheetToolbarReload v-if="openedViewsTab === 'view' && !isMobileMode" />
+          </LazyGeneralEmojiPicker>
+          <NcTooltip class="truncate nc-table-tab-title" show-on-truncate-only>
+            <template #title>{{ table?.title }}</template>
+            {{ table?.title }}
+          </NcTooltip>
+        </div>
+      </div>
+    </template>
   </div>
 </template>
+
+<style scoped lang="scss">
+.nc-table-tab-list {
+  @apply flex items-center gap-0.5 overflow-x-auto min-w-0 flex-1 py-1;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.nc-table-tab-item {
+  @apply flex items-center gap-1.5 px-2 py-1 rounded-md cursor-pointer select-none whitespace-nowrap
+    text-sm text-nc-content-gray-subtle2 hover:bg-nc-bg-gray-light hover:text-nc-content-gray-emphasis
+    transition-colors duration-150 flex-shrink-0;
+}
+
+.nc-table-tab-active {
+  @apply bg-nc-bg-gray-light text-nc-content-gray-emphasis font-semibold;
+}
+
+.nc-table-tab-ghost {
+  @apply opacity-50;
+}
+
+.nc-table-tab-title {
+  @apply max-w-32;
+}
+</style>
