@@ -323,6 +323,23 @@ export function useInfiniteData(args: {
 
   const getChunkIndex = (rowIndex: number) => Math.floor(rowIndex / CHUNK_SIZE)
 
+  const getCurrentDataContextKey = () => {
+    if (isPublic?.value) return 'public'
+    const routeTableId = router.currentRoute.value.params.viewId as string | undefined
+    return `${meta.value?.id ?? ''}:${viewMeta.value?.id ?? ''}:${routeTableId ?? ''}`
+  }
+
+  const isCurrentDataContextValid = () => {
+    if (isPublic?.value) return true
+    const currentMeta = meta.value
+    const currentView = viewMeta.value
+    if (!currentMeta?.id || !currentView?.id) return false
+    if (currentView?.fk_model_id && currentView.fk_model_id !== currentMeta.id) return false
+    const routeTableId = router.currentRoute.value.params.viewId as string | undefined
+    if (routeTableId && routeTableId !== currentMeta.id) return false
+    return true
+  }
+
   const _fetchChunk = async (chunkId: number, path: Array<number> = [], forceFetch = false) => {
     const dataCache = getDataCache(path)
 
@@ -352,6 +369,7 @@ export function useInfiniteData(args: {
     chunkId: number
     path: Array<number>
     forceFetch: boolean
+    contextKey: string
     resolve: (value: any) => void
     reject: (error: any) => void
   }> = []
@@ -432,11 +450,25 @@ export function useInfiniteData(args: {
     const batch = [...pendingChunkRequests]
     pendingChunkRequests = []
 
+    const currentContextKey = getCurrentDataContextKey()
+    const validBatch = batch.filter((request) => {
+      const isValid = request.contextKey === currentContextKey && isCurrentDataContextValid()
+      if (!isValid) {
+        const dataCache = getDataCache(request.path)
+        dataCache.chunkStates.value[request.chunkId] = undefined
+        request.resolve(undefined)
+      }
+      return isValid
+    })
+
+    if (!validBatch.length) return
+    const processingContextKey = currentContextKey
+
     try {
       const bulkRequests = []
 
-      for (let i = 0; i < batch.length; i++) {
-        const req = batch[i]
+      for (let i = 0; i < validBatch.length; i++) {
+        const req = validBatch[i]
         const where = await callbacks?.getWhereFilter?.(req.path)
         const filterArrJson = (await callbacks?.getWhereFilterArr?.(req.path)) ?? []
         bulkRequests.push({
@@ -451,6 +483,16 @@ export function useInfiniteData(args: {
             ? { filterArrJson: stringifyFilterOrSortArr(filterArrJson) }
             : { filterArrJson: stringifyFilterOrSortArr([...(nestedFilters.value ?? []), ...filterArrJson]) }),
         })
+      }
+
+      // Context can change while awaiting filters/sorts; abort stale batch before network request.
+      if (processingContextKey !== getCurrentDataContextKey() || !isCurrentDataContextValid()) {
+        for (const request of validBatch) {
+          const dataCache = getDataCache(request.path)
+          dataCache.chunkStates.value[request.chunkId] = undefined
+          request.resolve(undefined)
+        }
+        return
       }
 
       const bulkResponse = !isPublic?.value
@@ -470,7 +512,7 @@ export function useInfiniteData(args: {
       const allFormattedRows: Array<{ rows: Array<Row>; path: Array<number> }> = []
       const processedChunks: Array<{ request: any; rows: Array<Row>; dataCache: any }> = []
 
-      for (const request of batch) {
+      for (const request of validBatch) {
         try {
           const alias = `chunk_${request.chunkId}_${request.path.join('_')}`
           const chunkData = bulkResponse[alias]
@@ -526,7 +568,7 @@ export function useInfiniteData(args: {
     } catch (error) {
       console.error('Bulk chunk request failed, falling back to individual requests:', error)
 
-      const promises = batch.map((request) =>
+      const promises = validBatch.map((request) =>
         fetchChunkIndividually(request.chunkId, request.path)
           .then(() => request.resolve(undefined))
           .catch((err) => request.reject(err)),
@@ -540,8 +582,12 @@ export function useInfiniteData(args: {
     const dataCache = getDataCache(path)
 
     if (dataCache.chunkStates.value[chunkId] && !forceFetch) return
+    if (!isCurrentDataContextValid()) return
 
-    const existingRequest = pendingChunkRequests.find((req) => req.chunkId === chunkId && req.path.join(',') === path.join(','))
+    const contextKey = getCurrentDataContextKey()
+    const existingRequest = pendingChunkRequests.find(
+      (req) => req.chunkId === chunkId && req.path.join(',') === path.join(',') && req.contextKey === contextKey,
+    )
 
     if (existingRequest && !forceFetch) {
       return new Promise<void>((resolve, reject) => {
@@ -565,6 +611,7 @@ export function useInfiniteData(args: {
         chunkId,
         path,
         forceFetch,
+        contextKey,
         resolve,
         reject,
       })
@@ -677,6 +724,7 @@ export function useInfiniteData(args: {
     path: Array<number> = [],
   ): Promise<Row[]> {
     if ((!base?.value?.id || !meta.value?.id || !viewMeta.value?.id) && !isPublic?.value) return []
+    if (!isCurrentDataContextValid()) return []
 
     const whereFilter = await callbacks?.getWhereFilter?.(path)
     const jsonWhereFilterArr = (await callbacks?.getWhereFilterArr?.(path)) ?? []
