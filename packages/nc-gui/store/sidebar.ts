@@ -52,9 +52,15 @@ export const useSidebarStore = defineStore('sidebarStore', () => {
 
   const isRightSidebarOpen = ref(true)
 
+  const sanitizeSidebarSize = (value: unknown, fallback: number) => {
+    const parsed = Number(value)
+    if (!Number.isFinite(parsed) || parsed < 0) return fallback
+    return parsed
+  }
+
   const leftSideBarSize = ref({
-    old: _leftSidebarSize.value?.old ?? INITIAL_LEFT_SIDEBAR_WIDTH,
-    current: isViewPortMobile() ? 0 : _leftSidebarSize.value?.current ?? INITIAL_LEFT_SIDEBAR_WIDTH,
+    old: sanitizeSidebarSize(_leftSidebarSize.value?.old, INITIAL_LEFT_SIDEBAR_WIDTH),
+    current: isViewPortMobile() ? 0 : sanitizeSidebarSize(_leftSidebarSize.value?.current, INITIAL_LEFT_SIDEBAR_WIDTH),
   })
 
   const leftSidebarWidthPercent = ref((leftSideBarSize.value.current / width.value) * 100)
@@ -68,7 +74,11 @@ export const useSidebarStore = defineStore('sidebarStore', () => {
       return isLeftSidebarOpen.value ? 100 : 0
     }
 
-    return leftSidebarWidthPercent.value
+    if (!Number.isFinite(leftSidebarWidthPercent.value)) {
+      return isLeftSidebarOpen.value ? 100 : 0
+    }
+
+    return Math.min(100, Math.max(0, leftSidebarWidthPercent.value))
   })
 
   const leftSidebarWidth = computed(() => {

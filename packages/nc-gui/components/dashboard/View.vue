@@ -45,6 +45,7 @@ const { isDrawerOpen: isSandboxDrawerOpen } = useSandboxChangelog()
 const { isRtl } = useRtl()
 
 const isChatToggling = ref(false)
+const { isMounted } = useIsMounted()
 
 const currentSidebarSize = computed({
   get: () => sideBarSize.value.current,
@@ -54,12 +55,17 @@ const currentSidebarSize = computed({
   },
 })
 
+const toSafePercent = (value: number, fallback = 0) => {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(100, Math.max(0, value))
+}
+
 const mobileNormalizedContentSize = computed(() => {
   if (isMobileMode.value) {
     return isLeftSidebarOpen.value ? 0 : 100
   }
 
-  return 100 - leftSidebarWidthPercent.value
+  return toSafePercent(100 - leftSidebarWidthPercent.value, isLeftSidebarOpen.value ? 0 : 100)
 })
 
 const isMiniSidebarVisible = computed(() => {
@@ -74,7 +80,8 @@ const isMiniSidebarVisible = computed(() => {
 })
 
 watch(currentSidebarSize, () => {
-  leftSidebarWidthPercent.value = (currentSidebarSize.value / viewportWidth.value) * 100
+  if (viewportWidth.value <= 0 || !Number.isFinite(currentSidebarSize.value)) return
+  leftSidebarWidthPercent.value = toSafePercent((currentSidebarSize.value / viewportWidth.value) * 100)
   setLeftSidebarSize({ current: currentSidebarSize.value, old: sideBarSize.value.old })
 })
 
@@ -171,7 +178,9 @@ function onWindowResize(e?: any): void {
     currentSidebarSize.value = sideBarSize.value.old
   }
 
-  leftSidebarWidthPercent.value = (currentSidebarSize.value / viewportWidth.value) * 100
+  if (viewportWidth.value > 0 && Number.isFinite(currentSidebarSize.value)) {
+    leftSidebarWidthPercent.value = toSafePercent((currentSidebarSize.value / viewportWidth.value) * 100)
+  }
 
   if (e && normalizedWidth.value < sidebarWidth.value) {
     onResize(leftSidebarWidthPercent.value)
@@ -208,8 +217,11 @@ watch(sidebarState, () => {
 
 function onResize(widthPercent: any) {
   if (isMobileMode.value) return
+  const normalizedWidthPercent = Number(widthPercent)
+  if (!Number.isFinite(normalizedWidthPercent) || viewportWidth.value <= 0) return
 
-  const width = (widthPercent * viewportWidth.value) / 100
+  const width = (normalizedWidthPercent * viewportWidth.value) / 100
+  if (!Number.isFinite(width)) return
 
   const fontSize = parseFloat(getComputedStyle(document.documentElement).fontSize)
 
@@ -278,6 +290,7 @@ watch([isChatPanelExpanded, isSandboxDrawerOpen], () => {
     >
       <DashboardTopbar v-if="showTopbar" :workspace-id="workspaceId" />
       <Splitpanes
+        v-if="isMounted"
         class="nc-sidebar-content-resizable-wrapper h-full"
         :class="{
           'sidebar-closed': !isLeftSidebarOpen,
@@ -285,7 +298,7 @@ watch([isChatPanelExpanded, isSandboxDrawerOpen], () => {
         }"
         :rtl="isRtl"
         @ready="() => onWindowResize()"
-        @resize="(event: any) => onResize(event[0].size)"
+        @resize="(event: Array<{ size?: number }> | undefined) => onResize(event?.[0]?.size)"
       >
         <Pane
           min-size="15%"
@@ -326,6 +339,9 @@ watch([isChatPanelExpanded, isSandboxDrawerOpen], () => {
           <slot name="content" />
         </Pane>
       </Splitpanes>
+      <div v-else class="h-full w-full">
+        <slot name="content" />
+      </div>
     </div>
   </div>
 </template>

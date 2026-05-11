@@ -194,11 +194,16 @@ const { isPanelExpanded, extensionPanelSize } = useExtensions()
 
 const { isPanelExpanded: isActionPanelExpanded, actionPanelSize } = useActionPane()
 
+const clampPercent = (value: number, fallback: number) => {
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(100, Math.max(0, value))
+}
+
 const contentSize = computed(() => {
   if (isPanelExpanded.value && extensionPanelSize.value) {
-    return 100 - extensionPanelSize.value
+    return clampPercent(100 - extensionPanelSize.value, 100)
   } else if (isActionPanelExpanded.value && actionPanelSize.value) {
-    return 100 - actionPanelSize.value
+    return clampPercent(100 - actionPanelSize.value, 100)
   } else {
     return 100
   }
@@ -208,7 +213,9 @@ const contentMaxSize = computed(() => {
   if (!isPanelExpanded.value && !isActionPanelExpanded.value) {
     return 100
   } else {
-    return ((windowSize.value - leftSidebarWidth.value - 300) / (windowSize.value - leftSidebarWidth.value)) * 100
+    const denominator = windowSize.value - leftSidebarWidth.value
+    if (!Number.isFinite(denominator) || denominator <= 0) return 100
+    return clampPercent(((windowSize.value - leftSidebarWidth.value - 300) / denominator) * 100, 100)
   }
 })
 
@@ -223,9 +230,10 @@ const onResize = () => {
 
 const onResized = (sizes: { min: number; max: number; size: number }[]) => {
   if (sizes.length === 2) {
-    if (!sizes[1]?.size) return
-    if (isPanelExpanded.value) extensionPanelSize.value = sizes[1]!.size
-    if (isActionPanelExpanded.value) actionPanelSize.value = sizes[1]!.size
+    const nextSize = Number(sizes[1]?.size)
+    if (!Number.isFinite(nextSize)) return
+    if (isPanelExpanded.value) extensionPanelSize.value = clampPercent(nextSize, extensionPanelSize.value)
+    if (isActionPanelExpanded.value) actionPanelSize.value = clampPercent(nextSize, actionPanelSize.value)
   }
 }
 
@@ -335,8 +343,8 @@ watch(isViewsLoading, async () => {
               </Transition>
             </div>
           </Pane>
-          <LazyExtensionsPane v-if="isPanelExpanded" ref="extensionPaneRef" />
-          <LazyActionsPane v-if="isActionPanelExpanded" ref="actionPaneRef" />
+          <LazyExtensionsPane ref="extensionPaneRef" />
+          <LazyActionsPane ref="actionPaneRef" />
         </Splitpanes>
         <div v-else class="flex items-center justify-center h-full w-full">
           <a-spin size="large" />
