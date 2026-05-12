@@ -5,18 +5,20 @@ import type { RenderRectangleProps } from '../utils/types'
 export const MultiSelectCellRenderer: CellRenderer = {
   render: (ctx, props) => {
     const { column, x: _x, y: _y, width: _width, height, pv, padding, isDark, getColor } = props
+    const tagConfig = props.tag || {}
     let x = _x + padding
     let y = _y
-    let width = _width - padding * 2
-    const tagPadding = 8
+    const width = _width - padding * 2
+    // 判定是否越界时改用固定右边界，不再叠加多次 padding 扣减，
+    // 这是修复“MultiSelect 明明还有空间却过早出现省略”的关键。
+    const rightBoundary = _x + _width - padding
+    const tagPadding = tagConfig.tagPaddingX ?? 8
     const tagSpacingY = 4
-    const tagSpacingX = 8
+    const tagSpacingX = tagConfig.tagSpacing ?? 8
     const tagHeight = 22
     const topPadding = 4
     const defaultColor = '#666'
     const ellipsisWidth = 15
-
-    width = width - padding * 2
 
     const selectedOptions = MultiSelectCellRenderer.getSelectedOptions(props)
 
@@ -37,7 +39,7 @@ export const MultiSelectCellRenderer: CellRenderer = {
       })
 
       // Check if the tag fits in the current row
-      if (x + optionWidth + tagPadding * 2 > _x + _width - padding * 2) {
+      if (x + optionWidth + tagPadding * 2 > rightBoundary) {
         // Check if there is space for `...` on the same line
 
         if (y + tagHeight * 2 + tagSpacingY > _y + height || count === 0 || line >= rowHeightTruncateLines(height, true)) {
@@ -139,14 +141,14 @@ export const MultiSelectCellRenderer: CellRenderer = {
 
     let x = _x + padding
     let y = _y
-    let width = _width - padding * 2
+    const width = _width - padding * 2
+    // hover 命中与 render 必须共享同一套边界规则，否则 tooltip 热区会错位。
+    const rightBoundary = _x + _width - padding
     const tagPadding = 8
     const tagSpacingY = 4
     const tagSpacingX = 8
     const tagHeight = 20
     const topPadding = 6
-
-    width = width - padding * 2
 
     const selectedOptions = MultiSelectCellRenderer.getSelectedOptions({ column: column.columnObj, value })
 
@@ -165,7 +167,7 @@ export const MultiSelectCellRenderer: CellRenderer = {
       })
 
       // Check if the tag fits in the current row
-      if (x + optionWidth + tagPadding * 2 > _x + _width - padding * 2) {
+      if (x + optionWidth + tagPadding * 2 > rightBoundary) {
         // Check if there is space for `...` on the same line
 
         if (y + tagHeight * 2 + tagSpacingY > _y + height || count === 0 || line >= rowHeightTruncateLines(height, true)) {
