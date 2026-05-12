@@ -47,6 +47,14 @@ const meta = inject(MetaInj)!
 
 const column = toRef(props, 'column')
 
+const { gridViewCols } = useViewColumnsOrThrow()
+
+const displayHeaderTitle = computed(() => {
+  const columnId = column.value?.id
+  const label = columnId ? gridViewCols.value?.[columnId]?.label : ''
+  return (label || '').trim() || column.value?.title || ''
+})
+
 const { isUIAllowed, isMetaReadOnly } = useRoles()
 
 const { isAllowed } = usePermissions()
@@ -230,15 +238,15 @@ const onClick = (e: Event) => {
         show-on-truncate-only
         :disabled="isExpandedForm && !isExpandedBulkUpdateForm ? editColumnDropdown || isDropDownOpen : false"
       >
-        <template #title> {{ column.title }} </template>
+        <template #title> {{ displayHeaderTitle }} </template>
 
         <span
-          :data-test-id="column.title"
+          :data-test-id="displayHeaderTitle"
           :class="{
             'select-none': isExpandedForm && !isExpandedBulkUpdateForm,
           }"
         >
-          {{ column.title }}
+          {{ displayHeaderTitle }}
         </span>
       </NcTooltip>
 

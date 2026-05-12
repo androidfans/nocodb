@@ -5299,6 +5299,11 @@ export interface GridColumnType {
    * @example 200px
    */
   width?: string;
+  /**
+   * Display label for this column in the current view
+   * @example My Column
+   */
+  label?: StringOrNullType;
   /** Column Help Text */
   help?: StringOrNullType;
   /** Group By */

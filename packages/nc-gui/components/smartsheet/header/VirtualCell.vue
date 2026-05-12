@@ -29,6 +29,14 @@ const { t } = useI18n()
 
 const column = toRef(props, 'column')
 
+const { gridViewCols } = useViewColumnsOrThrow()
+
+const displayHeaderTitle = computed(() => {
+  const columnId = column.value?.id
+  const label = columnId ? gridViewCols.value?.[columnId]?.label : ''
+  return (label || '').trim() || column.value?.title || ''
+})
+
 const { base: activeBase, tables } = storeToRefs(useBase())
 
 const isExternalSource = computed(() =>
@@ -278,12 +286,12 @@ const onClick = (e: Event) => {
           </template>
         </template>
         <span
-          :data-test-id="column.title"
+          :data-test-id="displayHeaderTitle"
           :class="{
             'select-none': isExpandedForm && !isExpandedBulkUpdateForm,
           }"
         >
-          {{ column.title }}
+          {{ displayHeaderTitle }}
         </span>
       </NcTooltip>
 

@@ -16,6 +16,7 @@ export default class GridViewColumn implements GridColumnType {
   show: BoolType;
   order: number;
   width?: string;
+  label?: string;
 
   fk_view_id: string;
   fk_column_id: string;
@@ -116,6 +117,7 @@ export default class GridViewColumn implements GridColumnType {
       'base_id',
       'source_id',
       'order',
+      'label',
       'width',
       'group_by',
       'group_by_order',
@@ -185,6 +187,7 @@ export default class GridViewColumn implements GridColumnType {
     const updateObj = extractProps(body, [
       'order',
       'show',
+      'label',
       'width',
       'group_by',
       'group_by_order',

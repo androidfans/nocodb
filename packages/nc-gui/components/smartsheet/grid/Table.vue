@@ -128,6 +128,12 @@ const {
   resizingColOldWith,
 } = useViewColumnsOrThrow()
 
+const getHeaderTitle = (column?: ColumnType | null) => {
+  if (!column?.id) return column?.title || ''
+  const label = gridViewCols.value?.[column.id]?.label
+  return (label || '').trim() || column.title || ''
+}
+
 const { isExpandedFormCommentMode } = storeToRefs(useConfigStore())
 
 const {
@@ -1990,7 +1996,7 @@ onKeyStroke('ArrowDown', onDown)
                   v-if="fields?.[0]?.id"
                   v-xc-ver-resize
                   :data-col="fields[0].id"
-                  :data-title="fields[0].title"
+                  :data-title="getHeaderTitle(fields[0])"
                   :style="{
                     'min-width': gridViewCols[fields[0].id]?.width || '180px',
                     'max-width': gridViewCols[fields[0].id]?.width || '180px',
@@ -2037,7 +2043,7 @@ onKeyStroke('ArrowDown', onDown)
                   :key="col.id"
                   v-xc-ver-resize
                   :data-col="col.id"
-                  :data-title="col.title"
+                  :data-title="getHeaderTitle(col)"
                   :style="{
                     'min-width': gridViewCols[col.id]?.width || '180px',
                     'max-width': gridViewCols[col.id]?.width || '180px',

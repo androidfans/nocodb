@@ -97,6 +97,7 @@ export class GridColumnsService {
     const viewColumn = extractProps(param.grid, [
       'order',
       'show',
+      'label',
       'width',
       'group_by',
       'group_by_order',

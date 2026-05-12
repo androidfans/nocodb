@@ -143,6 +143,12 @@ const {
   resizingColOldWith,
 } = useViewColumnsOrThrow()
 
+const getHeaderTitle = (column?: ColumnType | null) => {
+  if (!column?.id) return column?.title || ''
+  const label = gridViewCols.value?.[column.id]?.label
+  return (label || '').trim() || column.title || ''
+}
+
 const { isExpandedFormCommentMode } = storeToRefs(useConfigStore())
 
 const { paste } = usePaste()
@@ -2350,7 +2356,7 @@ const headerFilteredOrSortedClass = (colId: string) => {
                     isPlaywright
                       ? {
                           'data-col': fields[0].id,
-                          'data-title': fields[0].title,
+                          'data-title': getHeaderTitle(fields[0]),
                         }
                       : {}
                   "
@@ -2402,7 +2408,7 @@ const headerFilteredOrSortedClass = (colId: string) => {
                     isPlaywright
                       ? {
                           'data-col': col.id,
-                          'data-title': col.title,
+                          'data-title': getHeaderTitle(col),
                         }
                       : {}
                   "

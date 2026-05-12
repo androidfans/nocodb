@@ -426,6 +426,8 @@ const saveSubmitted = async () => {
 
   if (!saved) return
 
+  await saveHeaderDisplayName()
+
   // add delay to complete minimize transition
   setTimeout(() => {
     advancedOptions.value = false
@@ -602,6 +604,53 @@ const isFieldsTab = computed(() => {
   return openedViewsTab.value === 'field'
 })
 
+let viewColumnsStore: ReturnType<typeof useViewColumnsOrThrow> | null = null
+try {
+  viewColumnsStore = useViewColumnsOrThrow()
+} catch {
+  // EditOrAdd is reused in places without view-columns context.
+}
+
+const gridViewCols = viewColumnsStore?.gridViewCols
+const updateGridViewColumn = viewColumnsStore?.updateGridViewColumn
+
+const headerLabelInput = ref('')
+const initialHeaderLabel = ref('')
+
+const canEditHeaderDisplayName = computed(() => {
+  if (!isEdit.value || readOnly.value) return false
+  const colId = column.value?.id
+  return !!colId && !!gridViewCols?.value?.[colId] && !!updateGridViewColumn
+})
+
+const syncHeaderDisplayNameState = () => {
+  const colId = column.value?.id
+  if (!colId || !gridViewCols?.value?.[colId]) {
+    headerLabelInput.value = ''
+    initialHeaderLabel.value = ''
+    return
+  }
+  const label = (gridViewCols.value[colId].label || '').trim()
+  headerLabelInput.value = label
+  initialHeaderLabel.value = label
+}
+
+async function saveHeaderDisplayName() {
+  if (!canEditHeaderDisplayName.value || !column.value?.id || !updateGridViewColumn || !gridViewCols?.value?.[column.value.id]) {
+    return
+  }
+
+  const nextLabel = headerLabelInput.value.trim()
+  if (nextLabel === initialHeaderLabel.value) return
+
+  try {
+    await updateGridViewColumn(column.value.id, { label: nextLabel || null })
+    initialHeaderLabel.value = nextLabel
+  } catch (e) {
+    message.error((await extractSdkResponseErrorMsg(e)) || 'Failed to update header display name')
+  }
+}
+
 const onDropdownChange = (value: boolean) => {
   if (value) {
     isColumnTypeOpen.value = value
@@ -612,6 +661,14 @@ const onDropdownChange = (value: boolean) => {
     }, 100)
   }
 }
+
+watch(
+  [() => column.value?.id, () => (column.value?.id ? gridViewCols?.value?.[column.value.id]?.label : undefined)],
+  () => {
+    syncHeaderDisplayNameState()
+  },
+  { immediate: true },
+)
 
 const handleResetHoverEffect = () => {
   if (!showHoverEffectOnSelectedType.value) return
@@ -1203,6 +1260,19 @@ const unique = computed({
             @input="onAlter(8)"
           />
         </NcTooltip>
+      </a-form-item>
+      <a-form-item
+        v-if="canEditHeaderDisplayName && !isFieldsTab && (aiAutoSuggestMode ? formState.uidt : true)"
+        :required="false"
+        class="!mb-0"
+      >
+        <div class="text-xs text-nc-content-gray-subtle2 mb-1">Header Display Name</div>
+        <a-input
+          v-model:value="headerLabelInput"
+          class="nc-column-name-input nc-input-shadow !rounded-lg"
+          placeholder="Leave empty to use field name"
+          :disabled="saving"
+        />
       </a-form-item>
 
       <div class="flex items-center gap-1 empty:hidden">
