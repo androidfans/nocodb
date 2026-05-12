@@ -67,7 +67,7 @@ export const BelongsToCellRenderer: CellRenderer = {
         relatedTableMeta: undefined,
         readonly: true,
         height: rowHeightInPx['1']!,
-        padding: 10,
+        padding: 7,
         textColor: getColor(themeV4Colors.brand['500']),
         tag: {
           renderAsTag: true,
@@ -75,7 +75,6 @@ export const BelongsToCellRenderer: CellRenderer = {
           tagHeight: 24,
           // 单独控制左右内边距，让胶囊视觉更贴近边界但不至于贴边到难读。
           tagPaddingX: 6,
-          tagPaddingRight: 12,
         },
         meta: relatedTableMeta,
         x: x + 4,
