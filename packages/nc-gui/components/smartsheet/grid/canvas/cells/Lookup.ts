@@ -217,7 +217,7 @@ export const LookupCellRenderer: CellRenderer = {
         tagPaddingX: isCompactLookupTag ? 2 : 8,
         tagPaddingLeft: isCompactLookupTag ? 3 : undefined,
         tagPaddingRight: isCompactLookupTag ? 1 : undefined,
-        tagSpacing: isCompactLookupTag ? 4 : 4,
+        tagSpacing: isCompactLookupTag ? 6 : 4,
       },
       meta: relatedTableMeta,
       textAlign: isAttachment(lookupColumn) ? 'center' : props.textAlign,
