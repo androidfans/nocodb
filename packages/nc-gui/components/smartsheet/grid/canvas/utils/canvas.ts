@@ -1381,6 +1381,10 @@ export const renderTagLabel = (
   } = props
   const {
     tagPaddingX = 8,
+    // 向后兼容：未传左右独立 padding 时继续沿用旧的 tagPaddingX 语义。
+    // 这样新逻辑可以精确调边距，同时不影响其它老渲染器。
+    tagPaddingLeft = tagPaddingX,
+    tagPaddingRight = tagPaddingX,
     tagPaddingY = 0,
     tagHeight = 20,
     tagRadius = 6,
@@ -1391,7 +1395,8 @@ export const renderTagLabel = (
     tagBorderWidth,
   } = props.tag || {}
 
-  const maxWidth = width - padding * 2 - tagPaddingX * 2
+  // 文本可用宽度改为左右分开计算，避免“右边距看起来比左边大很多”的系统性偏差。
+  const maxWidth = width - padding * 2 - tagPaddingLeft - tagPaddingRight
 
   const initialY = rowHeightInPx['1'] === height ? y + height / 2 - tagHeight / 2 : y + padding - 4
 
@@ -1399,7 +1404,7 @@ export const renderTagLabel = (
     renderTag(ctx, {
       x: x + tagSpacing,
       y: initialY,
-      width: textWidth + tagPaddingX * 2,
+      width: textWidth + tagPaddingLeft + tagPaddingRight,
       height: tagHeight,
       radius: tagRadius,
       fillStyle: tagBgColor,
@@ -1410,7 +1415,7 @@ export const renderTagLabel = (
 
   if (renderAsMarkdown) {
     const { width: textWidth } = renderMarkdown(ctx, {
-      x: x + tagSpacing + tagPaddingX,
+      x: x + tagSpacing + tagPaddingLeft,
       y: initialY + tagPaddingY,
       text,
       maxWidth,
@@ -1429,7 +1434,7 @@ export const renderTagLabel = (
     _renderTag(textWidth)
 
     renderMarkdown(ctx, {
-      x: x + tagSpacing + tagPaddingX,
+      x: x + tagSpacing + tagPaddingLeft,
       y: initialY + tagPaddingY,
       text,
       maxWidth,
@@ -1445,12 +1450,12 @@ export const renderTagLabel = (
     })
 
     return {
-      x: x + tagSpacing + textWidth + tagPaddingX * 2,
+      x: x + tagSpacing + textWidth + tagPaddingLeft + tagPaddingRight,
       y: initialY + tagHeight,
     }
   } else {
     const { text: truncatedText, width: textWidth } = renderSingleLineText(ctx, {
-      x: x + tagSpacing + tagPaddingX,
+      x: x + tagSpacing + tagPaddingLeft,
       y,
       text,
       maxWidth,
@@ -1461,7 +1466,7 @@ export const renderTagLabel = (
     _renderTag(textWidth)
 
     renderSingleLineText(ctx, {
-      x: x + tagSpacing + tagPaddingX,
+      x: x + tagSpacing + tagPaddingLeft,
       y: initialY + tagPaddingY,
       text: truncatedText,
       maxWidth,
@@ -1472,7 +1477,7 @@ export const renderTagLabel = (
     })
 
     return {
-      x: x + tagSpacing + textWidth + tagPaddingX * 2,
+      x: x + tagSpacing + textWidth + tagPaddingLeft + tagPaddingRight,
       y: initialY + tagHeight,
     }
   }

@@ -467,6 +467,10 @@ interface CellRendererOptions {
   tag?: {
     renderAsTag?: boolean
     tagPaddingX?: number
+    // 允许左右独立控制，解决胶囊类字段（LTAR/Lookup 时间/长文本）右侧留白过大的问题。
+    // 不传时会在 renderTagLabel 中回退到 tagPaddingX，保持向后兼容。
+    tagPaddingLeft?: number
+    tagPaddingRight?: number
     tagPaddingY?: number
     tagHeight?: number
     tagRadius?: number
