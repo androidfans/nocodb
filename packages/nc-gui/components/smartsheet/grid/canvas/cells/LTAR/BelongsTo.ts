@@ -43,9 +43,9 @@ export const BelongsToCellRenderer: CellRenderer = {
     let returnData
 
     if (isValidValue(value)) {
-      // 选中态右侧有操作按钮（+ / 展开），这里预留 24px，避免按钮与 chip 文字互相挤压。
-      // 之前预留过大导致“右边距明显大于左边距”的视觉问题。
-      const cellWidth = width - (!readonly && selected ? 24 : 0)
+      // Match Vue layout: chips container = 100% - 16px (plus button),
+      // inside chips: tag + x-circle(~14px) + gap(2px) = reserve 32px total when selected.
+      const cellWidth = width - (!readonly && selected ? 32 : 0)
 
       const cellValue =
         value && !Array.isArray(value) && typeof value === 'object'
@@ -111,13 +111,16 @@ export const BelongsToCellRenderer: CellRenderer = {
       }
 
       if (selected && !readonly) {
+        // x-circle right after the tag, matching Vue's closeThick ml-0.5
+        const xCircleX = returnData.x + 3
+        const btnY = y + 10
         spriteLoader.renderIcon(ctx, {
-          x: returnData.x + 2,
-          y: y + (rowHeightInPx['1'] === height ? 8 : 10),
+          x: xCircleX,
+          y: btnY,
           icon: 'ncXCircle',
-          size: 16,
+          size: 15,
           color: isBoxHovered(
-            { x: returnData.x + 2, y: y + (rowHeightInPx['1'] === height ? 8 : 10), height: 16, width: 16 },
+            { x: xCircleX, y: btnY, height: 15, width: 15 },
             mousePosition,
           )
             ? getColor(themeV4Colors.gray['500'])
@@ -126,7 +129,7 @@ export const BelongsToCellRenderer: CellRenderer = {
 
         if (
           isBoxHovered(
-            { x: returnData.x + 2, y: y + (rowHeightInPx['1'] === height ? 8 : 10), height: 16, width: 16 },
+            { x: xCircleX, y: btnY, height: 15, width: 15 },
             mousePosition,
           )
         ) {
@@ -136,15 +139,16 @@ export const BelongsToCellRenderer: CellRenderer = {
     }
 
     if (selected && !readonly) {
+      const btnY = y + 9
       spriteLoader.renderIcon(ctx, {
         x: x + width - 26,
-        y: y + 7,
+        y: btnY,
         icon: 'ncPlus',
         size: 16,
         color: getColor(themeVariables.content['nc-content-gray'].subtle),
       })
 
-      if (isBoxHovered({ x: x + width - 26, y: y + 7, width: 16, height: 16 }, mousePosition)) {
+      if (isBoxHovered({ x: x + width - 26, y: btnY, width: 16, height: 16 }, mousePosition)) {
         setCursor('pointer')
       }
     }
@@ -184,10 +188,11 @@ export const BelongsToCellRenderer: CellRenderer = {
      */
     const isClickedOnPlusIcon = isBoxHovered({ x: x + width - 26, y: y + 8, height: size, width: size }, mousePosition)
 
+    const xCircleX = cellRenderStore?.x ? cellRenderStore.x + 2 : null
     const isClickedOnXCircleIcon =
-      cellRenderStore?.x &&
+      xCircleX != null &&
       selected &&
-      isBoxHovered({ x: cellRenderStore.x + 2, y: y + 7, height: size, width: size }, mousePosition)
+      isBoxHovered({ x: xCircleX, y: y + 7, height: size, width: size }, mousePosition)
 
     if (isClickedOnPlusIcon || isClickedOnXCircleIcon) {
       makeCellEditable(row, column)

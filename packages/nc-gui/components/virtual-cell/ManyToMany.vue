@@ -230,7 +230,7 @@ onUnmounted(() => {
   <LazyVirtualCellComponentsLinkRecordDropdown v-model:is-open="isOpen">
     <div class="nc-cell-field flex items-center gap-1 w-full chips-wrapper min-h-6.5 relative">
       <div
-        class="chips flex items-center img-container flex-1 hm-items min-w-0 overflow-y-auto overflow-x-hidden"
+        class="chips flex items-center img-container flex-1 hm-items min-w-0 overflow-y-auto overflow-x-hidden py-0.5"
         :class="{ 'flex-wrap': rowHeight !== 1 }"
         :style="{ maxHeight: `${rowHeightInPx[rowHeight]}px` }"
       >
