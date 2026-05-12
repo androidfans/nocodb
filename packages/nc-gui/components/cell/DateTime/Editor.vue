@@ -471,6 +471,15 @@ const cellValue = computed(
     '',
 )
 
+// 编辑态原来使用固定宽度 + 较大 gap，会导致“日期和时间之间空隙突然变大”。
+// 这里把输入框尺寸绑定到当前文本长度（或格式长度作为兜底），让分隔间距在浏览态/编辑态保持一致，
+// 避免进入编辑后布局跳变，同时保留原有 placeholder 可读性。
+const dateCellValue = computed(() => localState.value?.format(dateFormat.value) ?? '')
+
+const dateInputSize = computed(() => Math.max(1, dateCellValue.value.length || dateFormat.value.length))
+
+const timeInputSize = computed(() => Math.max(1, cellValue.value.length || timeFormat.value.length))
+
 const currentDate = ($event) => {
   open.value = false
   emit('currentDate', $event)
@@ -508,15 +517,16 @@ const minimizeMaxWidth = computed(() => {
       :class="[`nc-${randomClass}`, { 'nc-null': modelValue === null && showNull }]"
       :overlay-class-name="`${randomClass} nc-picker-datetime ${open ? 'active' : ''} !min-w-[0] overflow-hidden`"
     >
+      <!-- 减小 Date 与 Time 的视觉间距，并让容器占满可用宽度，避免编辑态在窄列里提前挤压 -->
       <div
         :title="localState?.format(dateTimeFormat)"
-        class="nc-date-picker ant-picker-input flex items-center relative gap-2 !truncate !w-auto"
+        class="nc-date-picker ant-picker-input flex items-center relative gap-1 !truncate !w-full"
         :class="{
           'max-w-[calc(100%_-_70px)]': minimizeMaxWidth,
         }"
       >
         <div
-          class="flex rounded-md box-border w-[60%] max-w-[110px]"
+          class="flex min-w-0 w-fit rounded-md box-border max-w-[110px]"
           :class="{
             'py-0': isForm,
             'py-0.5': !isForm && !isColDisabled,
@@ -526,9 +536,10 @@ const minimizeMaxWidth = computed(() => {
           <input
             v-if="!rawReadOnly"
             ref="datePickerRef"
-            :value="localState?.format(dateFormat) ?? ''"
+            :value="dateCellValue"
+            :size="dateInputSize"
             :placeholder="typeof placeholder === 'string' ? placeholder : placeholder?.date"
-            class="nc-date-input w-full !truncate border-transparent outline-none !text-current !bg-transparent !focus:(border-none ring-transparent)"
+            class="nc-date-input w-auto max-w-full min-w-0 !truncate border-transparent outline-none !text-current !bg-transparent !focus:(border-none ring-transparent)"
             :readonly="isColDisabled || !!isMobileMode"
             @focus="onFocus(true)"
             @blur="onBlur($event, true)"
@@ -543,7 +554,7 @@ const minimizeMaxWidth = computed(() => {
           </template>
         </div>
         <div
-          class="rounded-md box-border"
+          class="rounded-md box-border shrink-0"
           :class="[
             `${timeCellMaxWidth}`,
             {
@@ -557,6 +568,7 @@ const minimizeMaxWidth = computed(() => {
             v-if="!rawReadOnly"
             ref="timePickerRef"
             :value="cellValue"
+            :size="timeInputSize"
             :placeholder="typeof placeholder === 'string' ? placeholder : placeholder?.time"
             class="nc-time-input w-full !truncate border-transparent outline-none !text-current !bg-transparent !focus:(border-none ring-transparent)"
             :readonly="isColDisabled || !!isMobileMode"
