@@ -1,6 +1,11 @@
 import { UITypes } from 'nocodb-sdk'
 
 export const COLUMN_HEADER_HEIGHT_IN_PX = 32
+export const COLUMN_HEADER_HEIGHT_LEVEL_TO_PX: Record<number, number> = {
+  0: 32,
+  1: 40,
+  2: 48,
+}
 export const CELL_BOTTOM_BORDER_IN_PX = 1
 export const MAX_SELECTED_ROWS = 100
 export const ADD_NEW_COLUMN_WIDTH = 60

@@ -10,7 +10,16 @@ import {
   isVirtualCol,
   ncHasProperties,
 } from 'nocodb-sdk'
-import type { ButtonType, ColumnType, FormulaType, LinkToAnotherRecordType, TableType, UserType, ViewType } from 'nocodb-sdk'
+import type {
+  ButtonType,
+  ColumnType,
+  FormulaType,
+  GridType,
+  LinkToAnotherRecordType,
+  TableType,
+  UserType,
+  ViewType,
+} from 'nocodb-sdk'
 import type { WritableComputedRef } from '@vue/reactivity'
 import { SpriteLoader } from '../loaders/SpriteLoader'
 import { ImageWindowLoader } from '../loaders/ImageLoader'
@@ -20,6 +29,7 @@ import { clearTextCache } from '../utils/canvas'
 import {
   CELL_BOTTOM_BORDER_IN_PX,
   COLUMN_HEADER_HEIGHT_IN_PX,
+  COLUMN_HEADER_HEIGHT_LEVEL_TO_PX,
   EDIT_INTERACTABLE,
   ROW_COLOR_BORDER_WIDTH,
   ROW_META_COLUMN_WIDTH,
@@ -331,7 +341,15 @@ export function useCanvasTable({
 
   const partialRowHeight = computed(() => scrollTop.value % rowHeight.value)
 
-  const headerRowHeight = computed(() => (isMobileMode.value ? 40 : COLUMN_HEADER_HEIGHT_IN_PX))
+  const headerRowHeight = computed(() => {
+    if (isMobileMode.value) return 40
+    const viewMeta = parseProp((view.value?.view as GridType | undefined)?.meta) || {}
+    const headerHeightLevel = Math.max(0, Math.min(2, Number(viewMeta?.header_row_height) || 0))
+    return COLUMN_HEADER_HEIGHT_LEVEL_TO_PX[headerHeightLevel] ?? COLUMN_HEADER_HEIGHT_IN_PX
+  })
+
+  // Header wrapping is automatic when header height is above default.
+  const headerWrapEnabled = computed(() => headerRowHeight.value > COLUMN_HEADER_HEIGHT_IN_PX)
 
   const isAiFillMode = computed(
     () => (isMac() ? !!metaKey?.value : !!ctrlKey?.value) && isAiFeaturesEnabled && isFeatureEnabled(FEATURE_FLAG.AI_FILL_HANDLE),
@@ -459,6 +477,7 @@ export function useCanvasTable({
           id: f.id,
           grid_column_id: gridViewCol.id,
           title: f.title,
+          displayTitle: (gridViewCol.label || '').trim() || f.title,
           uidt: f.uidt,
           width: gridViewCol.width,
           fixed: isMobileMode.value
@@ -895,6 +914,7 @@ export function useCanvasTable({
     rowSlice,
     rowHeight,
     headerRowHeight,
+    headerWrapEnabled,
     activeCell,
     dragOver,
     hoverRow,
@@ -1527,6 +1547,11 @@ export function useCanvasTable({
   }
 
   watch(rowHeight, () => {
+    clearTextCache()
+    triggerRefreshCanvas()
+  })
+
+  watch(headerRowHeight, () => {
     clearTextCache()
     triggerRefreshCanvas()
   })

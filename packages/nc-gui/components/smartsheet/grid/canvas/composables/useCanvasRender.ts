@@ -28,6 +28,7 @@ import type { TableMetaLoader } from '../loaders/TableMetaLoader'
 import {
   ADD_NEW_COLUMN_WIDTH,
   AGGREGATION_HEIGHT,
+  COLUMN_HEADER_HEIGHT_IN_PX,
   GROUP_EXPANDED_BOTTOM_PADDING,
   GROUP_HEADER_HEIGHT,
   GROUP_PADDING,
@@ -60,6 +61,7 @@ export function useCanvasRender({
   rowSlice,
   rowHeight,
   headerRowHeight,
+  headerWrapEnabled,
   activeCell,
   dragOver,
   hoverRow,
@@ -115,6 +117,7 @@ export function useCanvasRender({
   height: Ref<number>
   rowHeight: Ref<number>
   headerRowHeight: Ref<number>
+  headerWrapEnabled: Ref<boolean>
   columns: ComputedRef<CanvasGridColumn[]>
   colSlice: Ref<{ start: number; end: number }>
   rowSlice: Ref<{ start: number; end: number }>
@@ -401,13 +404,39 @@ export function useCanvasRender({
 
       const isRequired = column.virtual ? isVirtualColRequired(colObj, meta.value?.columns || []) : colObj?.rqd && !colObj?.cdf
 
+      const headerTitle = column.displayTitle || column.title || ''
       const availableTextWidth = width - (26 + iconSpace + (isRequired ? 4 : 0))
-      const truncatedText = truncateText(ctx, column.title!, availableTextWidth)
-      ctx.fillText(truncatedText, xOffset + 26 - _scrollLeft, _headerRowHeight / 2)
+      const truncatedText = truncateText(ctx, headerTitle, availableTextWidth)
+      const headerTextX = xOffset + 26 - _scrollLeft
+      const headerTextY = _headerRowHeight / 2
+      const shouldWrapHeaderText =
+        headerWrapEnabled.value &&
+        _headerRowHeight > COLUMN_HEADER_HEIGHT_IN_PX &&
+        ctx.measureText(headerTitle).width > availableTextWidth
+      if (shouldWrapHeaderText) {
+        const lineHeight = 16
+        const maxLines = Math.max(1, Math.floor((_headerRowHeight - 8) / lineHeight))
+        ctx.save()
+        renderMultiLineText(ctx, {
+          x: headerTextX,
+          y: 0,
+          text: headerTitle,
+          maxWidth: availableTextWidth,
+          height: _headerRowHeight,
+          maxLines,
+          lineHeight,
+          fontFamily: '600 12px Inter',
+          fillStyle: getColor(themeV4Colors.gray['500'], themeV4Colors.gray['600']),
+          py: 4,
+        })
+        ctx.restore()
+      } else {
+        ctx.fillText(truncatedText, headerTextX, headerTextY)
+      }
       if (isRequired) {
         ctx.save()
         ctx.fillStyle = getColor(themeV4Colors.red['500'])
-        ctx.fillText('*', xOffset + 28 - _scrollLeft + ctx.measureText(truncatedText).width, _headerRowHeight / 2)
+        ctx.fillText('*', xOffset + 28 - _scrollLeft + ctx.measureText(truncatedText).width, headerTextY)
         ctx.restore()
       }
 
@@ -648,9 +677,10 @@ export function useCanvasRender({
 
         const isRequired = column.virtual ? isVirtualColRequired(colObj, meta.value?.columns || []) : colObj?.rqd && !colObj?.cdf
 
+        const headerTitle = column.displayTitle || column.title || ''
         const availableTextWidth = width - (26 + iconSpace + (isRequired ? 4 : 0))
 
-        const truncatedText = truncateText(ctx, column.title!, availableTextWidth)
+        const truncatedText = truncateText(ctx, headerTitle, availableTextWidth)
         const x = xOffset + (column.uidt ? 26 : 10)
         const y = _headerRowHeight / 2
 
@@ -679,7 +709,30 @@ export function useCanvasRender({
             ctx.fillText(truncatedText, x, y)
           }
         } else {
-          ctx.fillText(truncatedText, x, y)
+          const shouldWrapHeaderText =
+            headerWrapEnabled.value &&
+            _headerRowHeight > COLUMN_HEADER_HEIGHT_IN_PX &&
+            ctx.measureText(headerTitle).width > availableTextWidth
+          if (shouldWrapHeaderText) {
+            const lineHeight = 16
+            const maxLines = Math.max(1, Math.floor((_headerRowHeight - 8) / lineHeight))
+            ctx.save()
+            renderMultiLineText(ctx, {
+              x,
+              y: 0,
+              text: headerTitle,
+              maxWidth: availableTextWidth,
+              height: _headerRowHeight,
+              maxLines,
+              lineHeight,
+              fontFamily: '600 12px Inter',
+              fillStyle: getColor(themeV4Colors.gray['500'], themeV4Colors.gray['600']),
+              py: 4,
+            })
+            ctx.restore()
+          } else {
+            ctx.fillText(truncatedText, x, y)
+          }
 
           if (isRequired) {
             ctx.save()

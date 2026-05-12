@@ -20,6 +20,21 @@ const rowHeightOptions: { icon: keyof typeof iconMap; heightClass: string }[] = 
   },
 ]
 
+const headerHeightOptions: { icon: keyof typeof iconMap; heightClass: string }[] = [
+  {
+    icon: 'heightShort',
+    heightClass: 'short',
+  },
+  {
+    icon: 'heightMedium',
+    heightClass: 'medium',
+  },
+  {
+    icon: 'heightTall',
+    heightClass: 'tall',
+  },
+]
+
 const { isSharedBase } = storeToRefs(useBase())
 
 const viewStore = useViewsStore()
@@ -93,6 +108,62 @@ const updateRowHeight = async (rh: number, undo = false) => {
   }
 }
 
+const currentGridMeta = computed<Record<string, any>>(() => {
+  if (isList.value) return {}
+  return parseProp((view.value?.view as GridType | undefined)?.meta) || {}
+})
+
+const currentHeaderHeight = computed(() => {
+  if (isList.value) return 0
+  return currentGridMeta.value?.header_row_height ?? 0
+})
+
+const updateGridMeta = async (updates: Record<string, any>) => {
+  if (isLocked.value || !view.value?.id || isList.value) return
+
+  const payload = {
+    ...currentGridMeta.value,
+    ...updates,
+  }
+
+  const skipNetworkCall = isPublic.value || isSharedBase.value || !canUpdateViewMeta.value
+
+  // Optimistic update: apply immediately in store so canvas can reflect height changes without waiting for network roundtrip.
+  await updateViewMeta(
+    view.value.id,
+    ViewTypes.GRID,
+    {
+      meta: payload,
+    },
+    {
+      skipNetworkCall: true,
+    },
+  )
+
+  if (!skipNetworkCall) {
+    await updateViewMeta(
+      view.value.id,
+      ViewTypes.GRID,
+      {
+        meta: payload,
+      },
+      {
+        skipNetworkCall: false,
+      },
+    )
+  }
+}
+
+const updateHeaderHeight = async (hh: number) => {
+  if (hh === currentHeaderHeight.value) return
+  try {
+    // Header wrapping is automatic once header height is above default.
+    await updateGridMeta({ header_row_height: hh })
+  } catch (e: any) {
+    message.error((await extractSdkResponseErrorMsg(e)) || 'There was an error while updating header height!')
+  }
+}
+
 const _wrapHeaders = computed({
   get: () => {
     if (!isList.value || !listViewStore?.selectedLevel.value) return false
@@ -157,6 +228,27 @@ useMenuCloseOnEsc(open)
               class="text-primary w-4 h-4"
             />
           </div>
+
+          <template v-if="!isList">
+            <div class="border-t border-nc-border-gray-medium my-1" />
+            <div class="text-xs text-nc-content-gray-muted px-3 pt-2 pb-1 select-none">Header Height</div>
+            <div
+              v-for="(item, i) of headerHeightOptions"
+              :key="`header-height-${i}`"
+              class="nc-row-height-option"
+              :class="{
+                'hover:bg-nc-bg-gray-light cursor-pointer': !isLocked,
+                'cursor-not-allowed': isLocked,
+              }"
+              @click="updateHeaderHeight(i)"
+            >
+              <div class="flex items-center gap-2">
+                <GeneralIcon :icon="item.icon" class="nc-row-height-icon" />
+                {{ $t(`objects.heightClass.${item.heightClass}`) }}
+              </div>
+              <component :is="iconMap.check" v-if="currentHeaderHeight === i" class="text-primary w-4 h-4" />
+            </div>
+          </template>
         </div>
         <!--        <template v-if="isList">
           <div class="border-t border-nc-border-gray-medium">

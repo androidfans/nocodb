@@ -77,6 +77,7 @@ interface Field {
   italic: boolean | number
   underline: boolean | number
   title: string
+  label?: string
   fk_column_id?: string
   fk_level_id?: string
   system?: boolean
@@ -654,6 +655,7 @@ interface CanvasGridColumn {
   id: string
   grid_column_id: string
   title: string
+  displayTitle?: string
   width: string
   uidt: keyof typeof UITypes | null
   fixed: boolean
