@@ -220,6 +220,7 @@ onBeforeUnmount(() => {
 
 .nc-view-tab-list {
   @apply flex items-center gap-0.5 overflow-x-auto min-w-0 flex-1 py-1;
+  overscroll-behavior-x: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
   &::-webkit-scrollbar {
