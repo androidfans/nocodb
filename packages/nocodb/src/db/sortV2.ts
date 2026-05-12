@@ -2,7 +2,7 @@ import { isAIPromptCol, isBtLikeV2Junction, UITypes } from 'nocodb-sdk';
 import type { Knex } from 'knex';
 import type { ButtonColumn, FormulaColumn, RollupColumn } from '~/models';
 import type { IBaseModelSqlV2 } from '~/db/IBaseModelSqlV2';
-import { Base, BaseUser, Sort } from '~/models';
+import { Base, BaseUser, LinksColumn, Sort } from '~/models';
 import { NcError } from '~/helpers/catchError';
 import formulaQueryBuilderv2 from '~/db/formulav2/formulaQueryBuilderv2';
 import genRollupSelectv2 from '~/db/genRollupSelectv2';
@@ -118,7 +118,6 @@ export default async function sortV2(
         }
         break;
       case UITypes.Lookup:
-      case UITypes.LinkToAnotherRecord:
         {
           const rootAlias = alias;
           {
@@ -130,6 +129,35 @@ export default async function sortV2(
             });
 
             qb.orderBy(selectQb?.builder, sort.direction || 'asc', nulls);
+          }
+        }
+        break;
+      case UITypes.LinkToAnotherRecord:
+        {
+          // V2 MO/OO: single-record semantics — sort by display value.
+          if (isBtLikeV2Junction(column)) {
+            const selectQb = await generateLookupSelectQuery({
+              baseModelSqlv2,
+              column,
+              alias,
+              model,
+            });
+            qb.orderBy(selectQb?.builder, sort.direction || 'asc', nulls);
+          } else {
+            // V2 OM/HM/MM: multi-record semantics — sort by count (rollup-like),
+            // not by json_agg(display_value)::text.
+            const ltarOptions = await column.getColOptions(context);
+            const linksLikeOptions = new LinksColumn(ltarOptions as any);
+            const builder = (
+              await genRollupSelectv2({
+                baseModelSqlv2,
+                knex,
+                columnOptions: linksLikeOptions,
+                alias,
+              })
+            ).builder;
+
+            qb.orderBy(builder, sort.direction || 'asc', nulls);
           }
         }
         break;
