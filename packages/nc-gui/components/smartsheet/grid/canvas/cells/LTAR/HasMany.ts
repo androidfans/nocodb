@@ -54,7 +54,6 @@ export const HasManyCellRenderer: CellRenderer = {
 
     let currentX = initialX
     let currentY = y + (rowHeightInPx['1'] === height ? 0 : 2)
-    let currentWidth = initialWidth
     // 渲染器返回的 point.x 偶发会略保守，给一个很小的补偿以减少视觉缝隙。
     const chipEndCompensation = 4
 
@@ -105,147 +104,187 @@ export const HasManyCellRenderer: CellRenderer = {
     }
 
     const maxLines = rowHeightTruncateLines(height, true)
-    let line = 1
-    let flag = false
-    let count = 1
     // 保证最差情况下仍能至少看见一个字符，避免 chip 被压成纯色块。
-    const minChipTextSafeWidth = 30
+    const minChipTextSafeWidth = 72
+    const chipSpacing = 2
+    const measureMaxWidth = Math.max(initialWidth, 1200)
+    const chipIdealWidths = cells.map((cell) => {
+      const p = measureCellRenderer({
+        ...renderProps,
+        value: cell.value,
+        x: 0,
+        y: 0,
+        width: measureMaxWidth,
+      })
+      return Math.max(minChipTextSafeWidth, p?.x ?? minChipTextSafeWidth)
+    })
+    const flexShrinkWidths = (idealWidths: number[], containerWidth: number, minWidth: number) => {
+      if (!idealWidths.length) return []
 
-    for (let i = 0; i < cells.length; i++) {
-      const cell = cells[i]!
-      const hasRemainingCells = i < cells.length - 1
-      const getLineLayout = () => {
-        // 最后一行且后面还有数据时，预留 ... 宽度，防止 ... 与最后一个 chip 重叠。
-        const reserveEllipsisWidth = line >= maxLines && hasRemainingCells ? ellipsisWidth + 1 : 0
-        const chipRightBoundary = rightBoundary - reserveEllipsisWidth
-        const availableWidth = Math.max(0, chipRightBoundary - currentX)
-        return { chipRightBoundary, availableWidth }
-      }
-      let { chipRightBoundary, availableWidth } = getLineLayout()
+      const widths = [...idealWidths]
+      let total = widths.reduce((acc, w) => acc + w, 0)
+      if (total <= containerWidth) return widths
 
-      if (line >= maxLines && hasRemainingCells && availableWidth <= minChipTextSafeWidth) {
-        flag = true
-        break
-      }
+      let overflow = total - containerWidth
+      const frozen = new Array(widths.length).fill(false)
 
-      if (currentX > initialX) {
-        const measurePoint = measureCellRenderer({
-          ...renderProps,
-          value: cell.value,
-          x: 0,
-          y: 0,
-          width: availableWidth,
-        })
-        const measuredWidth = Math.max(0, (measurePoint?.x ?? 0) - 0)
+      while (overflow > 0.1) {
+        let activeWeight = 0
+        for (let i = 0; i < widths.length; i++) {
+          if (!frozen[i]) activeWeight += widths[i]!
+        }
+        if (activeWeight <= 0) break
 
-        if (measuredWidth > availableWidth) {
-          if (line + 1 > maxLines) {
-            flag = true
-            break
-          }
+        let consumed = 0
+        for (let i = 0; i < widths.length; i++) {
+          if (frozen[i]) continue
+          const current = widths[i]!
+          const shrink = overflow * (current / activeWeight)
+          const next = Math.max(minWidth, current - shrink)
+          consumed += current - next
+          widths[i] = next
+        }
 
-          currentX = initialX
-          currentWidth = initialWidth
-          currentY += 28
-          line += 1
-          ;({ chipRightBoundary, availableWidth } = getLineLayout())
+        overflow -= consumed
+        if (consumed <= 0.1) break
 
-          if (line >= maxLines && hasRemainingCells && availableWidth <= minChipTextSafeWidth) {
-            flag = true
-            break
+        for (let i = 0; i < widths.length; i++) {
+          if (!frozen[i] && widths[i]! <= minWidth + 0.1) {
+            frozen[i] = true
+            widths[i] = minWidth
           }
         }
       }
 
-      const point = cellRenderer({
-        ...renderProps,
-        value: cell.value,
-        x: currentX,
-        y: currentY,
-        width: availableWidth,
-      })
+      total = widths.reduce((acc, w) => acc + w, 0)
+      if (total > containerWidth) {
+        let extra = total - containerWidth
+        for (let i = widths.length - 1; i >= 0 && extra > 0; i--) {
+          const current = widths[i]!
+          if (current <= minWidth) continue
+          const reducible = current - minWidth
+          const cut = Math.min(reducible, extra)
+          widths[i] = current - cut
+          extra -= cut
+        }
+      }
 
-      if (point?.x) {
-        // 再次限制到 chipRightBoundary 内，确保不会把事件命中区和视觉渲染推到单元格外。
-        const boundedPointX = Math.min(point.x + chipEndCompensation, chipRightBoundary)
-        // Add rendered chip info in return data
+      return widths
+    }
+
+    let flag = false
+    let hasHiddenItems = false
+    let cellIndex = 0
+
+    for (let line = 1; line <= maxLines && cellIndex < cells.length; line++) {
+      const isLastLine = line === maxLines
+      const remainingLines = maxLines - line + 1
+      const lineY = y + (rowHeightInPx['1'] === height ? 0 : 2) + (line - 1) * 28
+      const remaining = cells.length - cellIndex
+
+      let reserveEllipsisWidth = 0
+      const maxChipsPerLine = Math.max(1, Math.floor((initialWidth + chipSpacing) / (minChipTextSafeWidth + chipSpacing)))
+      let lineCellsCount = 1
+
+      if (isLastLine) {
+        const lastLineCapacityNoEllipsis = Math.max(
+          1,
+          Math.floor((initialWidth + chipSpacing) / (minChipTextSafeWidth + chipSpacing)),
+        )
+        if (remaining > lastLineCapacityNoEllipsis) {
+          reserveEllipsisWidth = ellipsisWidth + 1
+        }
+        const lastLineCapacity = Math.max(
+          1,
+          Math.floor((Math.max(0, initialWidth - reserveEllipsisWidth) + chipSpacing) / (minChipTextSafeWidth + chipSpacing)),
+        )
+        lineCellsCount = Math.min(remaining, lastLineCapacity)
+      } else {
+        // 非最后一行：在“容量上限”基础上，用 balance 软阈值控制分行，避免所有 chip 挤在第一行。
+        const maxCountByFeasibility = Math.max(1, remaining - (remainingLines - 1))
+        const hardLimit = Math.max(1, Math.min(maxChipsPerLine, maxCountByFeasibility))
+        // 平衡下限：尽量把剩余 chip 均摊到剩余行，避免出现 1-1-4 这类“前瘦后胖”分布。
+        const balancedMinCount = Math.max(1, Math.min(hardLimit, Math.ceil(remaining / remainingLines)))
+        const remainingIdealTotal = chipIdealWidths
+          .slice(cellIndex)
+          .reduce((acc, w, idx) => acc + w + (idx > 0 ? chipSpacing : 0), 0)
+        const softLineWidth =
+          remainingLines > 1
+            ? Math.max(minChipTextSafeWidth, Math.min(initialWidth, remainingIdealTotal / remainingLines))
+            : initialWidth
+
+        let lineIdealWidth = 0
+        let count = 0
+        while (count < hardLimit) {
+          const w = chipIdealWidths[cellIndex + count]!
+          const nextWidth = lineIdealWidth + (count > 0 ? chipSpacing : 0) + w
+          if (count > 0 && nextWidth > softLineWidth) break
+          lineIdealWidth = nextWidth
+          count++
+        }
+        lineCellsCount = Math.max(balancedMinCount, count)
+      }
+
+      const chipRightBoundary = rightBoundary - reserveEllipsisWidth
+      const availableLineWidth = Math.max(minChipTextSafeWidth, chipRightBoundary - initialX)
+      const lineIdealWidths = chipIdealWidths.slice(cellIndex, cellIndex + lineCellsCount)
+      const lineAssignedWidths = flexShrinkWidths(lineIdealWidths, availableLineWidth, minChipTextSafeWidth)
+
+      currentX = initialX
+      currentY = lineY
+
+      for (let j = 0; j < lineCellsCount; j++) {
+        const cell = cells[cellIndex + j]!
+        const widthCap = Math.max(minChipTextSafeWidth, lineAssignedWidths[j] ?? minChipTextSafeWidth)
+        const point = cellRenderer({
+          ...renderProps,
+          value: cell.value,
+          x: currentX,
+          y: currentY,
+          width: widthCap,
+        })
+
+        const cellRightBoundary = Math.min(chipRightBoundary, currentX + widthCap)
+        const boundedPointX = point?.x
+          ? Math.min(point.x + chipEndCompensation, cellRightBoundary)
+          : Math.min(currentX + widthCap, cellRightBoundary)
+
         returnData.push({
           oldX: currentX + 4,
           oldY: currentY + 4,
           x: boundedPointX,
-          y: point.y,
+          y: point?.y ?? currentY + 24,
           width: boundedPointX - (currentX + 4),
-          height: point.y ? point.y - (currentY + 4) : 24,
+          height: point?.y ? point.y - (currentY + 4) : 24,
           value: cell.item,
         })
 
-        // Show cursor pointer on hover over chip item
         if (
           !readonly &&
           selected &&
           isBoxHovered(
-            { x: currentX, y: currentY, width: boundedPointX - currentX, height: point.y ? point.y - currentY : 24 },
+            { x: currentX, y: currentY, width: boundedPointX - currentX, height: point?.y ? point.y - currentY : 24 },
             mousePosition,
           )
         ) {
           setCursor('pointer')
         }
 
-        const shouldMoveToNextLine = point?.nextLine || boundedPointX >= chipRightBoundary
-
-        if (shouldMoveToNextLine) {
-          if (line + 1 > maxLines) {
-            currentX = boundedPointX
-            flag = true
-            break
-          }
-
-          currentX = initialX
-          currentWidth = initialWidth
-          currentY = point?.y && y !== point?.y && point?.y - y >= 28 ? point?.y : currentY + 28
-          line += 1
-        } else {
-          currentWidth = Math.max(0, rightBoundary - boundedPointX)
-          currentX = boundedPointX
-        }
-      } else {
-        // Add rendered chip info in return data
-        returnData.push({
-          oldX: currentX + 4,
-          oldY: currentY + 4,
-          x: currentX + currentWidth,
-          y: currentY + 24,
-          width: currentWidth,
-          height: 24,
-          value: cell.item,
-        })
-
-        // Show cursor pointer on hover over chip item
-        if (!readonly && selected && isBoxHovered({ x: currentX, y: currentY, width: currentWidth, height: 24 }, mousePosition)) {
-          setCursor('pointer')
-        }
-
-        if (line + 1 > maxLines) {
-          break
-        }
-
-        currentX = initialX
-        currentY = currentY + 28
-
-        currentWidth = initialWidth
-        line += 1
+        currentX = boundedPointX
       }
 
-      if (line > maxLines) {
+      cellIndex += lineCellsCount
+
+      if (isLastLine && cellIndex < cells.length) {
+        flag = true
+        hasHiddenItems = true
         break
       }
-
-      count++
     }
 
     Object.assign(cellRenderStore, { ltar: returnData })
 
-    if (flag && count < cells.length) {
+    if (flag && hasHiddenItems) {
       // ... 固定贴右边界绘制，而不是跟随当前 x，避免右侧留下不必要空白。
       const ellipsisX = rightBoundary
       renderSingleLineText(ctx, {
