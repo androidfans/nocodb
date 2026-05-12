@@ -48,12 +48,18 @@ const { isUIAllowed } = useRoles()
 
 const { state, isNew, removeLTARRef } = useSmartsheetRowStoreOrThrow()
 
-const { relatedTableMeta, loadRelatedTableMeta, relatedTableDisplayValueProp, unlink, meta } = useProvideLTARStore(
-  column as Ref<Required<ColumnType>>,
-  row,
-  isNew,
-  reloadRowTrigger.trigger,
-)
+const {
+  relatedTableMeta,
+  loadRelatedTableMeta,
+  relatedTableDisplayValueProp,
+  unlink,
+  meta,
+  // 为了解决 many link 二次打开面板内容错乱，需要在入口侧显式控制缓存生命周期。
+  loadChildrenList,
+  loadChildrenExcludedList,
+  resetChildrenCache,
+  resetExcludedCache,
+} = useProvideLTARStore(column as Ref<Required<ColumnType>>, row, isNew, reloadRowTrigger.trigger)
 
 await loadRelatedTableMeta()
 
@@ -105,6 +111,10 @@ const onAttachLinkedRecord = () => {
 const openChildList = () => {
   if (isUnderLookup.value) return
 
+  // 展开“已关联”面板前重置 children 缓存，避免沿用上一次筛选/分页状态。
+  resetChildrenCache()
+  loadChildrenList(true, isNew.value ? state.value : undefined)
+
   childListDlg.value = true
   listItemsDlg.value = false
 
@@ -114,6 +124,14 @@ const openChildList = () => {
 
 const openListDlg = () => {
   if (!hasEditPermission.value) return
+
+  // 两套缓存都要重置，否则 children 侧残留上次状态会导致 linked/unlinked 不同步。
+  resetChildrenCache()
+  resetExcludedCache()
+  if (!isForm.value) {
+    loadChildrenList(true, isNew.value ? state.value : undefined)
+  }
+  loadChildrenExcludedList(isNew.value ? state.value : undefined, true)
 
   listItemsDlg.value = true
   childListDlg.value = false
@@ -154,7 +172,13 @@ const active = inject(ActiveCellInj, ref(false))
 function onCellClick(e: Event) {
   if (e.type !== 'click') return
   if (isExpandedForm.value || isForm.value || active.value) {
-    openChildList()
+    // 可编辑用户点空白时默认进入“可关联列表”，行为对齐 + 按钮；
+    // 只读用户保持查看“已关联列表”，避免误触发编辑流。
+    if (hasEditPermission.value) {
+      openListDlg()
+    } else {
+      openChildList()
+    }
   }
 }
 
@@ -226,9 +250,10 @@ onUnmounted(() => {
         </template>
       </div>
 
+      <!-- 将编辑态操作按钮固定到 chip 的视觉中线附近，减少进入编辑态时的跳动感 -->
       <div
         v-if="!isUnderLookup || isForm"
-        class="flex justify-end gap-[2px] min-h-4 items-center absolute right-0 top-0 bottom-0 many-to-many-actions"
+        class="flex justify-end gap-[2px] min-h-4 items-center absolute right-0 top-[6px] many-to-many-actions"
         :class="{ active }"
         @click.stop
       >

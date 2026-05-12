@@ -131,7 +131,13 @@ const props = defineProps<{
   clearGroupCache: (startIndex: number, endIndex: number, parentGroup?: CanvasGroup) => void
 }>()
 
-const emits = defineEmits(['bulkUpdateDlg', 'update:selectedAllRecords', 'update:selectedAllRecordsSkipPks'])
+const emits = defineEmits([
+  'bulkUpdateDlg',
+  // 父层确实会监听该事件；不声明会在开发态触发 Extraneous non-emits warning。
+  'toggleOptimisedQuery',
+  'update:selectedAllRecords',
+  'update:selectedAllRecordsSkipPks',
+])
 
 provide(IsCanvasInjectionInj, true)
 

@@ -49,12 +49,17 @@ const { isUIAllowed } = useRoles()
 
 const { state, isNew, removeLTARRef } = useSmartsheetRowStoreOrThrow()
 
-const { relatedTableMeta, loadRelatedTableMeta, relatedTableDisplayValueProp, unlink } = useProvideLTARStore(
-  column as Ref<Required<ColumnType>>,
-  row,
-  isNew,
-  reloadRowTrigger.trigger,
-)
+const {
+  relatedTableMeta,
+  loadRelatedTableMeta,
+  relatedTableDisplayValueProp,
+  unlink,
+  // 显式拿到列表/排除列表的加载与重置能力，用于修复弹窗二次打开时数据上下文错乱。
+  loadChildrenList,
+  loadChildrenExcludedList,
+  resetChildrenCache,
+  resetExcludedCache,
+} = useProvideLTARStore(column as Ref<Required<ColumnType>>, row, isNew, reloadRowTrigger.trigger)
 
 await loadRelatedTableMeta()
 
@@ -108,6 +113,10 @@ const onAttachLinkedRecord = () => {
 const openChildList = () => {
   if (isUnderLookup.value) return
 
+  // 每次打开“已关联列表”前先清缓存，避免沿用上一次弹窗状态导致内容不刷新。
+  resetChildrenCache()
+  loadChildrenList(true, isNew.value ? state.value : undefined)
+
   childListDlg.value = true
   listItemsDlg.value = false
 
@@ -117,6 +126,14 @@ const openChildList = () => {
 
 const openListDlg = () => {
   if (!hasEditPermission.value) return
+
+  // 两套缓存都要重置，否则 children 侧残留上次状态会导致 linked/unlinked 不同步。
+  resetChildrenCache()
+  resetExcludedCache()
+  if (!isForm.value) {
+    loadChildrenList(true, isNew.value ? state.value : undefined)
+  }
+  loadChildrenExcludedList(isNew.value ? state.value : undefined, true)
 
   listItemsDlg.value = true
   childListDlg.value = false
@@ -153,7 +170,13 @@ const active = inject(ActiveCellInj, ref(false))
 function onCellClick(e: Event) {
   if (e.type !== 'click') return
   if (isExpandedForm.value || isForm.value || active.value) {
-    openChildList()
+    // 可编辑时优先进入可关联列表（等同 + 按钮），只读才走查看列表（等同 expand）。
+    // 这样点击空白区域的行为与顶部按钮语义一致。
+    if (hasEditPermission.value) {
+      openListDlg()
+    } else {
+      openChildList()
+    }
   }
 }
 
@@ -225,9 +248,10 @@ onUnmounted(() => {
         </template>
       </div>
 
+      <!-- 操作按钮下移到与 chip 视觉基线对齐，避免进入编辑态时出现“按钮下跳”错觉 -->
       <div
         v-if="!isUnderLookup && !isSystemColumn(column)"
-        class="flex justify-end gap-[2px] min-h-4 items-center absolute right-0 top-0 bottom-0 has-many-actions"
+        class="flex justify-end gap-[2px] min-h-4 items-center absolute right-0 top-[6px] has-many-actions"
         :class="{ active }"
         @click.stop
       >
