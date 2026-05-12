@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnType, TableType, ViewType } from 'nocodb-sdk'
+import type { GridType, TableType, ViewType } from 'nocodb-sdk'
 import { ExpandedFormMode, PermissionEntity, PermissionKey, ViewTypes } from 'nocodb-sdk'
 import type { Ref } from 'vue'
 import { Drawer } from 'ant-design-vue'
@@ -175,12 +175,21 @@ const {
   isAllowedAddNewRecord,
 } = expandedFormStore
 
+const { isSqlView } = useProvideSmartsheetStore(ref({}) as Ref<ViewType>, meta)
+
 const loadingEmit = (event: 'update:modelValue' | 'cancel' | 'next' | 'prev' | 'createdRecord') => {
   emits(event)
   isLoading.value = true
 }
 
 const tableTitle = computed(() => activeMeta.value?.title)
+
+const effectiveView = computed(() => {
+  if (activeView.value?.id && props.view?.id && activeView.value.id === props.view.id) {
+    return activeView.value
+  }
+  return props.view
+})
 
 const templateNameInputRef = ref<HTMLInputElement | null>(null)
 
@@ -215,18 +224,121 @@ const activeViewMode = ref(
     : ExpandedFormMode.FIELD,
 )
 
+const currentGridMeta = computed<Record<string, any>>(
+  () => parseProp((effectiveView.value?.view as GridType | undefined)?.meta) || {},
+)
+
+const expandedFormWideEnabledByUser = computed(() => !!currentGridMeta.value?.expanded_form_wide)
+const expandedFormWideLocal = ref(false)
+
+const shouldUseWideLayout = computed(() => expandedFormWideLocal.value)
+const isDetachedLinkedRecordDialog = computed(() => !!props.newRecordHeader || !!props.newRecordSubmitBtnText)
+const applyWideFieldLayout = computed(
+  () => shouldUseWideLayout.value && !props.templateMode && !props.blueprintMode && !isDetachedLinkedRecordDialog.value,
+)
+
+const expandedFormDialogWidth = computed(() => {
+  if (props.templateMode || props.blueprintMode) {
+    return 'min(65vw,700px)'
+  }
+  // For nested LTAR/linked-record create/edit forms opened from cells, keep legacy sizing
+  // and avoid inheriting parent view-wide preference.
+  if (isDetachedLinkedRecordDialog.value) {
+    return 'min(80vw,1280px)'
+  }
+  // Default non-wide mode must match pre-optimization behavior exactly.
+  return shouldUseWideLayout.value ? 'min(96vw,1800px)' : 'min(80vw,1280px)'
+})
+
+watch(
+  () => [effectiveView.value?.id, expandedFormWideEnabledByUser.value] as const,
+  ([, wideFromMeta]) => {
+    expandedFormWideLocal.value = !!wideFromMeta
+  },
+  { immediate: true },
+)
+
+const showWideLayoutToggle = computed(() => {
+  return (
+    !props.templateMode &&
+    !props.blueprintMode &&
+    !isMobileMode.value &&
+    !isSqlView.value &&
+    activeViewMode.value === ExpandedFormMode.FIELD &&
+    !!effectiveView.value?.id &&
+    isUIAllowed('viewCreateOrEdit')
+  )
+})
+
+const toggleExpandedFormWideLayout = async () => {
+  if (!effectiveView.value?.id || !isUIAllowed('viewCreateOrEdit') || isSqlView.value || isPublic.value) return
+
+  const next = !expandedFormWideLocal.value
+  expandedFormWideLocal.value = next
+
+  const nextMeta = {
+    ...currentGridMeta.value,
+    expanded_form_wide: next,
+  }
+
+  try {
+    // Optimistic update so width changes immediately on click.
+    await viewsStore.updateViewMeta(
+      effectiveView.value.id,
+      (effectiveView.value.type as ViewTypes) || ViewTypes.GRID,
+      {
+        meta: nextMeta,
+      },
+      {
+        skipNetworkCall: true,
+      },
+    )
+
+    await viewsStore.updateViewMeta(
+      effectiveView.value.id,
+      (effectiveView.value.type as ViewTypes) || ViewTypes.GRID,
+      {
+        meta: nextMeta,
+      },
+      {
+        skipNetworkCall: false,
+      },
+    )
+  } catch (e: any) {
+    expandedFormWideLocal.value = !next
+    message.error((await extractSdkResponseErrorMsg(e)) || 'Failed to update expanded form width setting')
+  }
+}
+
 watch(activeViewMode, async (v) => {
   const viewId = props.view?.id
   if (!viewId) return
 
-  if (v === ExpandedFormMode.FIELD || v === ExpandedFormMode.DISCUSSION) {
+  if (v === ExpandedFormMode.FIELD) {
     await viewsStore.setCurrentViewExpandedFormMode(viewId, v)
+  } else if (v === ExpandedFormMode.DISCUSSION) {
+    // Discussion is now surfaced by the right sidebar toggles in FIELD mode.
+    // Normalize persisted legacy mode to FIELD to keep behavior consistent.
+    activeViewMode.value = ExpandedFormMode.FIELD
+    await viewsStore.setCurrentViewExpandedFormMode(viewId, ExpandedFormMode.FIELD)
   } else if (v === ExpandedFormMode.ATTACHMENT) {
     const firstAttachmentField = fields.value?.find((f) => f.uidt === 'Attachment')
 
     await viewsStore.setCurrentViewExpandedFormMode(viewId, v, props.view?.attachment_mode_column_id ?? firstAttachmentField?.id)
   }
 })
+
+watch(
+  activeViewMode,
+  (v) => {
+    if (v === ExpandedFormMode.FIELD && !isSqlView.value && isUIAllowed('commentList', baseRoles.value)) {
+      commentsDrawer.value = true
+    } else if (v !== ExpandedFormMode.FIELD) {
+      commentsDrawer.value = false
+    }
+  },
+  { immediate: true },
+)
 
 const displayField = computed(() => meta.value?.columns?.find((c) => c.pv && fields.value?.includes(c)) ?? null)
 
@@ -260,8 +372,6 @@ onBeforeUnmount(() => {
 })
 
 const duplicatingRowInProgress = ref(false)
-
-const { isSqlView } = useProvideSmartsheetStore(ref({}) as Ref<ViewType>, meta)
 
 // Mobile: toggle between Fields and Discussion (Comments/Activity) view
 const mobileDiscussionMode = ref(false)
@@ -923,17 +1033,11 @@ export default {
   <component
     :is="isMobileMode ? Drawer : NcModal"
     :body-style="{ padding: 0 }"
-    :class="{ active: isExpanded }"
+    :class="{ 'active': isExpanded, 'nc-expanded-form-wide': applyWideFieldLayout }"
     :closable="false"
     :footer="null"
     :visible="isExpanded"
-    :width="
-      templateMode || blueprintMode
-        ? 'min(65vw,700px)'
-        : commentsDrawer && isUIAllowed('commentList', baseRoles)
-        ? 'min(80vw,1280px)'
-        : 'min(70vw,768px)'
-    "
+    :width="expandedFormDialogWidth"
     class="nc-drawer-expanded-form"
     :size="isMobileMode ? 'medium' : 'small'"
     v-bind="modalProps"
@@ -987,7 +1091,7 @@ export default {
           <div v-else class="flex-1 flex items-center gap-2 xs:(flex-row-reverse justify-end) min-w-0">
             <!-- Table selector dropdown (template mode) -->
             <NcListTableSelector
-              v-if="templateMode && !props.showNextPrevIcons && activeMeta?.base_id"
+              v-if="props.templateMode && !props.showNextPrevIcons && activeMeta?.base_id"
               :key="activeMeta.base_id"
               :value="activeMeta.id || null"
               :base-id="activeMeta.base_id"
@@ -1007,7 +1111,7 @@ export default {
               <GeneralTableIcon size="xsmall" :meta="activeMeta" class="!mx-0 !text-nc-content-inverted-secondary" />
               <span class="nc-expanded-form-table-name whitespace-nowrap">{{ tableTitle }}</span>
             </div>
-            <div v-if="templateMode" class="flex flex-col truncate overflow-hidden">
+            <div v-if="props.templateMode" class="flex flex-col truncate overflow-hidden">
               <input
                 ref="templateNameInputRef"
                 v-model="editableTemplateName"
@@ -1044,24 +1148,11 @@ export default {
             </div>
           </div>
         </div>
-        <div v-if="!templateMode && !blueprintMode" class="ml-auto">
+        <div v-if="!props.templateMode && !props.blueprintMode" class="ml-auto">
           <SmartsheetExpandedFormViewModeSelector v-model="activeViewMode" :view="view" class="nc-expanded-form-mode-switch" />
         </div>
         <div v-else class="ml-auto" />
-        <div class="flex gap-2">
-          <NcButton
-            v-if="showMobileDiscussionToggle"
-            v-e="['c:row-expand:mobile-discussion-toggle']"
-            class="!w-7 !h-7"
-            type="secondary"
-            size="xsmall"
-            @click="mobileDiscussionMode = !mobileDiscussionMode"
-          >
-            <GeneralIcon
-              :icon="mobileDiscussionMode ? 'menu' : 'ncMessageSquare1Outline'"
-              class="text-md text-nc-content-inverted-secondary"
-            />
-          </NcButton>
+        <div class="flex gap-2 items-center">
           <PermissionsTooltip
             v-if="isUIAllowed('dataEdit', baseRoles) && !isSqlView"
             :entity="PermissionEntity.TABLE"
@@ -1086,6 +1177,36 @@ export default {
               </NcButton>
             </template>
           </PermissionsTooltip>
+          <template v-if="showWideLayoutToggle">
+            <NcTooltip>
+              <template #title>{{ expandedFormWideEnabledByUser ? 'Exit Wide Form' : 'Wide Form' }}</template>
+              <NcButton
+                type="text"
+                size="xsmall"
+                class="!w-7 !h-7"
+                :class="{
+                  '!text-nc-content-brand-disabled': expandedFormWideEnabledByUser,
+                  '!text-nc-content-inverted-secondary': !expandedFormWideEnabledByUser,
+                }"
+                @click="toggleExpandedFormWideLayout"
+              >
+                <GeneralIcon :icon="expandedFormWideEnabledByUser ? 'minimize' : 'maximize'" class="h-4 w-4" />
+              </NcButton>
+            </NcTooltip>
+          </template>
+          <NcButton
+            v-if="showMobileDiscussionToggle"
+            v-e="['c:row-expand:mobile-discussion-toggle']"
+            class="!w-7 !h-7"
+            type="secondary"
+            size="xsmall"
+            @click="mobileDiscussionMode = !mobileDiscussionMode"
+          >
+            <GeneralIcon
+              :icon="mobileDiscussionMode ? 'menu' : 'ncMessageSquare1Outline'"
+              class="text-md text-nc-content-inverted-secondary"
+            />
+          </NcButton>
           <NcTooltip v-if="visibleMoreOptions.copyRecordUrl && !isMobileMode" class="!<lg:hidden">
             <template #title> {{ isRecordLinkCopied ? $t('labels.copiedRecordURL') : $t('labels.copyRecordURL') }} </template>
             <NcButton
@@ -1260,6 +1381,7 @@ export default {
             :row-id="rowId"
             :fields="fields ?? []"
             :hidden-fields="hiddenFields"
+            :is-wide-layout="applyWideFieldLayout"
             :is-unsaved-duplicated-record-exist="isUnsavedDuplicatedRecordExist"
             :is-unsaved-form-exist="isUnsavedFormExist"
             :is-loading="isLoading"
@@ -1294,11 +1416,13 @@ export default {
         </template>
       </div>
       <div
-        v-if="templateMode || blueprintMode"
+        v-if="props.templateMode || props.blueprintMode"
         class="nc-expanded-form-template-notice flex items-center justify-center gap-2 px-4 py-1.5 border-t-1 border-nc-border-gray-medium bg-nc-bg-gray-extralight text-nc-content-gray-muted text-[11px] flex-shrink-0"
       >
         <GeneralIcon icon="info" class="flex-none w-3.5 h-3.5" />
-        <span v-if="templateMode">You are editing a record template. Changes here define default values for new records.</span>
+        <span v-if="props.templateMode"
+          >You are editing a record template. Changes here define default values for new records.</span
+        >
         <span v-else>You are editing a sub-record. A new record will be created and linked each time the template is used.</span>
       </div>
     </div>
@@ -1385,6 +1509,14 @@ export default {
 
 .nc-expanded-cell-header:not(.nc-cell-expanded-form-header) > :first-child {
   @apply pl-0;
+}
+
+.nc-expanded-form-wide .nc-expanded-cell-header > :first-child {
+  @apply pl-0;
+}
+
+.nc-expanded-form-wide .nc-expanded-cell-header .nc-cell-name-wrapper .name {
+  @apply !pl-0;
 }
 
 .nc-drawer-expanded-form .nc-modal {

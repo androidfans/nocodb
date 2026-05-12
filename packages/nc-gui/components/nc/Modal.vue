@@ -33,7 +33,11 @@ const props = withDefaults(defineProps<NcModalProps>(), {
 
 const emits = defineEmits(['update:visible'])
 
-const { width: propWidth, height: propHeight, destroyOnClose, wrapClassName: _wrapClassName, showSeparator } = props
+const propWidth = toRef(props, 'width')
+const propHeight = toRef(props, 'height')
+const destroyOnClose = toRef(props, 'destroyOnClose')
+const _wrapClassName = toRef(props, 'wrapClassName')
+const showSeparator = toRef(props, 'showSeparator')
 
 const { maskClosable, keyboard, ncModalClassName, stopEventPropogation } = toRefs(props)
 
@@ -57,8 +61,8 @@ const width = computed(() => {
     return '95vw'
   }
 
-  if (propWidth) {
-    return propWidth
+  if (propWidth.value) {
+    return propWidth.value
   }
 
   if (props.size === 'small') {
@@ -85,8 +89,8 @@ const height = computed(() => {
     return '95vh'
   }
 
-  if (propHeight) {
-    return propHeight
+  if (propHeight.value) {
+    return propHeight.value
   }
 
   if (props.size === 'small') {
@@ -110,8 +114,8 @@ const height = computed(() => {
 
 const newWrapClassName = computed(() => {
   let className = 'nc-modal-wrapper'
-  if (_wrapClassName) {
-    className += ` ${_wrapClassName}`
+  if (_wrapClassName.value) {
+    className += ` ${_wrapClassName.value}`
   }
   return className
 })

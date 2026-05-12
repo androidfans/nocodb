@@ -13,6 +13,7 @@ const props = defineProps<{
   fields: ColumnType[]
   forceVerticalMode?: boolean
   isLoading: boolean
+  isWideLayout?: boolean
   showColCallback?: (col: ColumnType) => boolean
   isHiddenCol?: boolean
 }>()
@@ -148,7 +149,8 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
       <div
         class="flex-none flex items-center rounded-lg overflow-hidden"
         :class="{
-          'w-45 <lg:(w-full px-0 mb-2) h-[32px] xs:(h-auto) sm:(mx-2)': !props.forceVerticalMode,
+          'w-36 <lg:(w-full px-0 mb-2) h-[32px] xs:(h-auto) sm:(mr-2 ml-0)': !props.forceVerticalMode && props.isWideLayout,
+          'w-45 <lg:(w-full px-0 mb-2) h-[32px] xs:(h-auto) sm:(mx-2)': !props.forceVerticalMode && !props.isWideLayout,
           'w-full px-0 mb-2 h-auto': props.forceVerticalMode,
         }"
       >
@@ -175,7 +177,8 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
         active
         class="flex-none h-8 <lg:!w-full lg:flex-1 !rounded-lg !overflow-hidden"
         :class="{
-          '!h-[151px]': isTextArea(col),
+          '!h-[272px]': isTextArea(col) && props.isWideLayout,
+          '!h-[151px]': isTextArea(col) && !props.isWideLayout,
           '!h-[118px]': isAttachment(col),
           '!h-[80px]': isQrCode(col),
           '!h-[64px]': isBarcode(col),
@@ -189,7 +192,8 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
         class="<lg:(!w-full !flex-none) lg:flex-1 flex"
         :class="{
           'w-full !flex-none': props.forceVerticalMode,
-          'lg:max-w-[calc(100%_-_188px)]': !props.forceVerticalMode,
+          'lg:max-w-none': !props.forceVerticalMode && props.isWideLayout,
+          'lg:max-w-[calc(100%_-_188px)]': !props.forceVerticalMode && !props.isWideLayout,
         }"
         :placement="isMobileMode ? 'top' : 'right'"
         :disabled="!showReadonlyColumnTooltip(col) && !isParentLtarColumn(col)"
@@ -212,9 +216,13 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
         >
           <template #default="{ isAllowed }">
             <SmartsheetDivDataCell
-              class="flex-1 bg-nc-bg-default px-1 min-h-8 flex items-center relative"
+              class="flex-1 bg-nc-bg-default min-h-8 flex items-center relative"
               :class="{
                 'w-full': props.forceVerticalMode,
+                '!min-h-[272px] items-start': isTextArea(col) && props.isWideLayout,
+                'nc-wide-longtext': isTextArea(col) && props.isWideLayout,
+                'px-2': props.isWideLayout,
+                'px-1': !props.isWideLayout,
                 '!select-text nc-system-field !bg-nc-bg-gray-extralight !text-nc-content-inverted-primary-disabled':
                   showReadonlyColumnTooltip(col) || isParentLtarColumn(col),
                 '!select-text nc-readonly-div-data-cell': readOnly || !isAllowed || isSyncedColumn(col),
@@ -268,7 +276,11 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
         'pl-0': props.forceVerticalMode,
       }"
     >
-      <div v-if="!props.forceVerticalMode" class="flex-none w-45 <lg:hidden sm:mx-2" />
+      <div
+        v-if="!props.forceVerticalMode"
+        class="flex-none <lg:hidden"
+        :class="props.isWideLayout ? 'w-36 sm:(mr-2 ml-0)' : 'w-45 sm:mx-2'"
+      />
       <div class="flex flex-col gap-1.5 mt-3">
         <span class="text-[11px] text-nc-content-gray-muted">Or, create and link a new record</span>
         <div class="flex items-center gap-2">
@@ -400,14 +412,44 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
 }
 
 :deep(.nc-data-cell .nc-cell .nc-cell-field) {
-  @apply px-2;
+  @apply px-2.5;
 }
 
 :deep(.nc-data-cell .nc-virtual-cell .nc-cell-field) {
-  @apply px-2;
+  @apply px-2.5;
 }
 
 :deep(.nc-data-cell .nc-cell-field.nc-lookup-cell .nc-cell-field) {
   @apply px-0;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext textarea.nc-inline-textarea) {
+  min-height: 272px !important;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext) {
+  min-height: 272px !important;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext .nc-expanded-form-open) {
+  min-height: 272px !important;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext .long-text-wrapper) {
+  min-height: 272px !important;
+  align-items: stretch !important;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext .long-text-wrapper > .h-full.w-full) {
+  min-height: 272px !important;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext .nc-readonly-rich-text-wrapper) {
+  min-height: 272px !important;
+  max-height: 272px !important;
+}
+
+.nc-wide-longtext :deep(.nc-cell.nc-cell-longtext .nc-readonly-rich-text-wrapper .nc-cell-field.nc-rich-text-content) {
+  min-height: 272px !important;
 }
 </style>

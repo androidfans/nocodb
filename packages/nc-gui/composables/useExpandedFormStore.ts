@@ -47,7 +47,8 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
 
     const isAuditLoading = ref(false)
 
-    const commentsDrawer = ref(true)
+    const commentsDrawer = ref(false)
+    const sidebarTab = ref<'comments' | 'audits'>('comments')
 
     const saveRowAndStay = ref(0)
 
@@ -932,6 +933,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       saveComment,
       isYou,
       commentsDrawer,
+      sidebarTab,
       row,
       deleteRowById,
       displayValue,

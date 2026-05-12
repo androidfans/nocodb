@@ -5,6 +5,7 @@ const props = defineProps<{
   fields: ColumnType[]
   hiddenFields: ColumnType[]
   isLoading: boolean
+  isWideLayout?: boolean
   forceVerticalMode?: boolean
 }>()
 
@@ -20,12 +21,18 @@ const showHiddenFields = ref(false)
 <template>
   <div
     ref="expandedFormScrollWrapper"
-    class="flex flex-col flex-grow gap-5 h-full max-h-full nc-scrollbar-thin items-center w-full p-4 xs:(px-4 pt-4 pb-2 gap-6) children:max-w-[588px] <lg:(children:max-w-[450px])"
+    class="flex flex-col flex-grow gap-5 h-full max-h-full nc-scrollbar-thin w-full py-4 xs:(pt-4 pb-2 gap-6)"
+    :class="
+      props.isWideLayout
+        ? 'items-start px-8 xs:px-6 children:w-full children:max-w-none'
+        : 'items-center p-4 xs:px-4 children:max-w-[588px] <lg:(children:max-w-[450px])'
+    "
   >
     <SmartsheetExpandedFormPresentorsFieldsColumnList
       :fields="fields"
       :force-vertical-mode="forceVerticalMode"
       :is-loading="isLoading"
+      :is-wide-layout="props.isWideLayout"
     />
     <div v-if="hiddenFields.length > 0" class="flex w-full <lg:(px-1) items-center py-6">
       <div class="flex-grow h-px mr-1 bg-nc-bg-gray-light" />
@@ -47,6 +54,7 @@ const showHiddenFields = ref(false)
       is-hidden-col
       :force-vertical-mode="forceVerticalMode"
       :is-loading="isLoading"
+      :is-wide-layout="props.isWideLayout"
       :show-col-callback="(col) => isFormula(col)"
     />
   </div>

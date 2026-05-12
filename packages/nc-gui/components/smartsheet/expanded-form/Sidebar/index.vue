@@ -9,9 +9,21 @@ const expandedFormStore = useExpandedFormStoreOrThrow()
 
 const { isExpandedFormCommentMode } = storeToRefs(useConfigStore())
 
-const tab = ref<'fields' | 'comments' | 'audits'>(
-  props.showFieldsTab && (!isExpandedFormCommentMode.value || isSqlView.value) ? 'fields' : 'comments',
-)
+const { sidebarTab } = storeToRefs(expandedFormStore)
+
+const tab = computed<'fields' | 'comments' | 'audits'>({
+  get: () => {
+    if (props.showFieldsTab) {
+      return !isExpandedFormCommentMode.value || isSqlView.value ? 'fields' : 'comments'
+    }
+    return sidebarTab.value
+  },
+  set: (value) => {
+    if (value === 'comments' || value === 'audits') {
+      sidebarTab.value = value
+    }
+  },
+})
 
 watch(tab, (newValue) => {
   if (newValue === 'audits') {
