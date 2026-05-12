@@ -43,7 +43,9 @@ export const BelongsToCellRenderer: CellRenderer = {
     let returnData
 
     if (isValidValue(value)) {
-      const cellWidth = width - (!readonly && selected ? 34 : 0)
+      // 选中态右侧有操作按钮（+ / 展开），这里预留 24px，避免按钮与 chip 文字互相挤压。
+      // 之前预留过大导致“右边距明显大于左边距”的视觉问题。
+      const cellWidth = width - (!readonly && selected ? 24 : 0)
 
       const cellValue =
         value && !Array.isArray(value) && typeof value === 'object'
@@ -71,6 +73,9 @@ export const BelongsToCellRenderer: CellRenderer = {
           renderAsTag: true,
           tagBgColor: getColor(themeV4Colors.brand['50'], 'var(--nc-bg-gray-light)'),
           tagHeight: 24,
+          // 单独控制左右内边距，让胶囊视觉更贴近边界但不至于贴边到难读。
+          tagPaddingX: 6,
+          tagPaddingRight: 12,
         },
         meta: relatedTableMeta,
         x: x + 4,

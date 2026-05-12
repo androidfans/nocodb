@@ -1,5 +1,5 @@
 import type { ColumnType, LinkToAnotherRecordType, TableType } from 'nocodb-sdk'
-import { isBoxHovered, renderIconButton, renderSingleLineText } from '../../utils/canvas'
+import { defaultOffscreen2DContext, isBoxHovered, renderIconButton, renderSingleLineText } from '../../utils/canvas'
 import { PlainCellRenderer } from '../Plain'
 import { renderAsCellLookupOrLtarValue } from '../../utils/cell'
 
@@ -18,7 +18,6 @@ export const ManyToManyCellRenderer: CellRenderer = {
       spriteLoader,
       mousePosition,
       relatedTableMeta,
-      padding,
       renderCell,
       setCursor,
       cellRenderStore,
@@ -47,13 +46,21 @@ export const ManyToManyCellRenderer: CellRenderer = {
 
       return acc
     }, []) as { value: any; item: Record<string, any> }[]
-
     const initialX = x + 4
-    const initialWidth = width - 8
+    const initialWidth = width - 6
+    // 以固定右边界驱动布局，避免逐段扣减宽度带来的累计误差，
+    // 这是修复 “... 贴边不稳定 / 右侧空白偏大” 的关键。
+    const rightBoundary = initialX + initialWidth
 
     let currentX = initialX
     let currentY = y + (rowHeightInPx['1'] === height ? 0 : 2)
     let currentWidth = initialWidth
+
+    // 统一裁剪区域，避免 chip 在极端宽度或换行过程中绘制溢出。
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(x, y, width, height)
+    ctx.clip()
 
     /**
      * Chip info which is oldX, oldY, x, y, width, height, value is required when user click on chip item to expand record
@@ -68,12 +75,16 @@ export const ManyToManyCellRenderer: CellRenderer = {
       relatedTableMeta: undefined,
       readonly: true,
       height: rowHeightInPx['1']!,
-      padding: 10,
+      // 减小内边距，提高可利用宽度，降低“明明有空间却提前省略”的概率。
+      padding: 4,
       textColor: getColor(themeV4Colors.brand['500']),
       tag: {
         renderAsTag: true,
         tagBgColor: getColor(themeV4Colors.brand['50'], 'var(--nc-bg-gray-light)'),
         tagHeight: 24,
+        // 轻量化 tag 内外间距，和 Teable 风格更接近，同时不改变交互模型。
+        tagPaddingX: 6,
+        tagSpacing: 2,
       },
       meta: relatedTableMeta,
     }
@@ -83,29 +94,86 @@ export const ManyToManyCellRenderer: CellRenderer = {
         ? renderCell(ctx, m2mColumn, options)
         : PlainCellRenderer.render(ctx, options)
     }
+    const measureCellRenderer = (options: CellRendererOptions) => {
+      // 离屏预判是否会溢出当前行，避免“先画后挪”造成换行抖动。
+      return renderAsCellLookupOrLtarValue.includes(m2mColumn.uidt)
+        ? renderCell(defaultOffscreen2DContext, m2mColumn, options)
+        : PlainCellRenderer.render(defaultOffscreen2DContext, options)
+    }
 
     const maxLines = rowHeightTruncateLines(height, true)
     let line = 1
     let flag = false
     let count = 1
+    // 对 point.x 做微小补偿，修正部分渲染器返回值偏保守导致的视觉断层。
+    const chipEndCompensation = 4
+    // 保证 chip 在最窄场景也尽量保留至少 1 个字符，不退化成纯色块。
+    const minChipTextSafeWidth = 30
 
-    for (const cell of cells) {
+    for (let i = 0; i < cells.length; i++) {
+      const cell = cells[i]!
+      const hasRemainingCells = i < cells.length - 1
+      const getLineLayout = () => {
+        // 若后续还需渲染 ...，提前预留槽位，避免与最后一个 chip 重叠。
+        const reserveEllipsisWidth = line >= maxLines && hasRemainingCells ? ellipsisWidth + 1 : 0
+        const chipRightBoundary = rightBoundary - reserveEllipsisWidth
+        const availableWidth = Math.max(0, chipRightBoundary - currentX)
+        return { chipRightBoundary, availableWidth }
+      }
+      let { chipRightBoundary, availableWidth } = getLineLayout()
+
+      if (line >= maxLines && hasRemainingCells && availableWidth <= minChipTextSafeWidth) {
+        flag = true
+        break
+      }
+
+      if (currentX > initialX) {
+        const measurePoint = measureCellRenderer({
+          ...renderProps,
+          value: cell.value,
+          x: 0,
+          y: 0,
+          width: availableWidth,
+        })
+        const measuredWidth = Math.max(0, (measurePoint?.x ?? 0) - 0)
+
+        if (measuredWidth > availableWidth) {
+          if (line + 1 > maxLines) {
+            flag = true
+            break
+          }
+
+          currentX = initialX
+          currentWidth = initialWidth
+          currentY += 28
+          line += 1
+          ;({ chipRightBoundary, availableWidth } = getLineLayout())
+
+          if (line >= maxLines && hasRemainingCells && availableWidth <= minChipTextSafeWidth) {
+            flag = true
+            break
+          }
+        }
+      }
+
       const point = cellRenderer({
         ...renderProps,
         value: cell.value,
         x: currentX,
         y: currentY,
-        width: currentWidth,
+        width: availableWidth,
       })
 
       if (point?.x) {
+        // 限制最终落点不越过本行可用右边界，保证绘制与命中区域一致。
+        const boundedPointX = Math.min(point.x + chipEndCompensation, chipRightBoundary)
         // Add rendered chip info in return data
         returnData.push({
           oldX: currentX + 4,
           oldY: currentY + 4,
-          x: point.x,
+          x: boundedPointX,
           y: point.y,
-          width: point.x - (currentX + 4),
+          width: boundedPointX - (currentX + 4),
           height: point.y ? point.y - (currentY + 4) : 24,
           value: cell.item,
         })
@@ -115,16 +183,18 @@ export const ManyToManyCellRenderer: CellRenderer = {
           !readonly &&
           selected &&
           isBoxHovered(
-            { x: currentX, y: currentY, width: point.x - currentX, height: point.y ? point.y - currentY : 24 },
+            { x: currentX, y: currentY, width: boundedPointX - currentX, height: point.y ? point.y - currentY : 24 },
             mousePosition,
           )
         ) {
           setCursor('pointer')
         }
 
-        if (point?.x >= x + initialWidth - padding * 2 - (count < cells.length ? 50 - ellipsisWidth : 0)) {
+        const shouldMoveToNextLine = point?.nextLine || boundedPointX >= chipRightBoundary
+
+        if (shouldMoveToNextLine) {
           if (line + 1 > maxLines) {
-            currentX = point?.x
+            currentX = boundedPointX
             flag = true
             break
           }
@@ -134,8 +204,8 @@ export const ManyToManyCellRenderer: CellRenderer = {
           currentY = point?.y && y !== point?.y && point?.y - y >= 28 ? point?.y : currentY + 28
           line += 1
         } else {
-          currentWidth = currentX + currentWidth - point?.x
-          currentX = point?.x
+          currentWidth = Math.max(0, rightBoundary - boundedPointX)
+          currentX = boundedPointX
         }
       } else {
         // Add rendered chip info in return data
@@ -168,8 +238,10 @@ export const ManyToManyCellRenderer: CellRenderer = {
     }
 
     if (flag && count < cells.length) {
+      // ... 直接右对齐到边界，避免在拖拽列宽时出现“chip 贴边但 ... 不贴边”。
+      const ellipsisX = rightBoundary
       renderSingleLineText(ctx, {
-        x: currentX + 12,
+        x: ellipsisX,
         y,
         text: '...',
         maxWidth: ellipsisWidth,
@@ -180,6 +252,8 @@ export const ManyToManyCellRenderer: CellRenderer = {
         height,
       })
     }
+
+    ctx.restore()
 
     Object.assign(cellRenderStore, { ltar: returnData })
 
