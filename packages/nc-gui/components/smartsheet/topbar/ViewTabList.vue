@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
 }
 
 .nc-view-tab-list {
-  @apply flex items-center gap-0.5 overflow-x-auto min-w-0 flex-1 py-1;
+  @apply flex items-center gap-0.5 overflow-x-auto min-w-0 w-max max-w-full py-1;
   overscroll-behavior-x: contain;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -251,6 +251,6 @@ onBeforeUnmount(() => {
 }
 
 .nc-view-tab-reload {
-  @apply ml-auto flex-none;
+  @apply flex-none;
 }
 </style>

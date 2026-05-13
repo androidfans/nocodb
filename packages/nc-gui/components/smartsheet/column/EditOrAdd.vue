@@ -1522,9 +1522,7 @@ const unique = computed({
                 !isVirtualCol(formState) &&
                 isUniqueConstraintSupportedType(formState.uidt, formState.meta) &&
                 !isUUID(formState) &&
-                !isAutoNumber(formState) &&
-                isEeUI &&
-                showEEFeatures
+                !isAutoNumber(formState)
               "
               class="flex"
             >

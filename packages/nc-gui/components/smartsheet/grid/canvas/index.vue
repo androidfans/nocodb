@@ -219,6 +219,8 @@ const paddingLessUITypes = new Set([
   UITypes.SingleSelect,
   UITypes.MultiSelect,
   UITypes.Formula,
+  UITypes.LinkToAnotherRecord,
+  UITypes.Links,
 ])
 const scroller = ref()
 provide(ClientMousePositionInj, clientMousePosition)
@@ -3142,6 +3144,7 @@ watch(
               :class="{
                 'px-[0.550rem]': !noPadding && !editEnabled.fixed,
                 'px-[0.49rem]': editEnabled.fixed,
+                'px-1': noPadding && !editEnabled.fixed,
                 'top-[0.5px]': isGroupBy && isClamped.isStuck,
                 'top-[2.5px]': isGroupBy,
                 'left-[2.5px] ': isGroupBy && !editEnabled.fixed,

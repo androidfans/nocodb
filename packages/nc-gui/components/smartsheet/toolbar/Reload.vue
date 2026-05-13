@@ -31,7 +31,7 @@ watch(isReloading, () => {
     <template #title> {{ $t('general.reload') }} </template>
 
     <div
-      class="flex ml-1 items-center justify-center select-none cursor-pointer text-gray-500 w-5.5 h-5.5 hover:(bg-nc-bg-gray-light text-nc-content-gray-extreme) rounded"
+      class="flex ml-1 pt-[1px] items-center justify-center select-none cursor-pointer text-gray-500 w-5.5 h-5.5 hover:(bg-nc-bg-gray-light text-nc-content-gray-extreme) rounded"
     >
       <component
         :is="iconMap.reload"

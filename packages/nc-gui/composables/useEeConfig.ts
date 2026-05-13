@@ -110,7 +110,7 @@ export const useEeConfig = createSharedComposable(() => {
 
   const blockSync = computed(() => true)
 
-  const blockUnique = computed(() => true)
+  const blockUnique = computed(() => false)
 
   // UUID field is EE-only — always blocked in CE
   const blockUuidField = computed(() => true)
