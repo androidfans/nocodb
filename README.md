@@ -108,6 +108,62 @@ Auto-upstall does the following: 🕊
 
 For more installation methods, please refer to [our docs](https://nocodb.com/docs/self-hosting)
 
+# Local Development (Port Convention)
+
+Use the following local port convention to avoid frontend/backend mismatch:
+
+- Backend: `http://localhost:18080`
+- Frontend: `http://localhost:13000`
+
+Start backend:
+
+```bash
+cd packages/nocodb
+PORT=18080 node dist/main.js
+```
+
+Start backend via local PostgreSQL proxy container (`nocodb-pg-proxy-dev` on `55432`):
+
+```bash
+cd packages/nocodb
+PORT=18080 NC_DB='pg://127.0.0.1:55432?u=postgres&p=password&d=root_db' node dist/main.js
+```
+
+Create/remove the local proxy container (`localhost:55432 -> nocodb_docker-root_db-1:5432`):
+
+```bash
+# create
+docker run -d --name nocodb-pg-proxy-dev \
+  --network nocodb_docker_default \
+  -p 55432:5432 \
+  alpine/socat \
+  -d -d TCP-LISTEN:5432,fork,reuseaddr TCP:nocodb_docker-root_db-1:5432
+
+# check mapping
+docker ps --filter name=nocodb-pg-proxy-dev --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+
+# remove after use
+docker rm -f nocodb-pg-proxy-dev
+```
+
+If `NC_DB` is not set:
+
+- NocoDB defaults to local SQLite (`noco.db`).
+- File location is `${NC_APP_DATA_DIR}/noco.db` or `${NC_TOOL_DIR}/noco.db`; if both are unset, it falls back to `${PWD}/noco.db`.
+- In this repo, if backend is started from `packages/nocodb`, default file is `packages/nocodb/noco.db`.
+
+Start frontend (must point to backend explicitly):
+
+```bash
+cd packages/nc-gui
+NUXT_PUBLIC_NC_BACKEND_URL=http://localhost:18080 node ./node_modules/.bin/../nuxt/bin/nuxt.mjs dev --host 0.0.0.0 --port 13000
+```
+
+If you see `AxiosError: Network Error` on sign in, verify:
+
+- Backend process is listening on `18080`.
+- Frontend was started with `NUXT_PUBLIC_NC_BACKEND_URL=http://localhost:18080`.
+
 # Screenshots
 ![2](https://github.com/nocodb/nocodb/assets/86527202/a127c05e-2121-4af2-a342-128e0e2d0291)
 ![3](https://github.com/nocodb/nocodb/assets/86527202/674da952-8a06-4848-a0e8-a7b02d5f5c88)
