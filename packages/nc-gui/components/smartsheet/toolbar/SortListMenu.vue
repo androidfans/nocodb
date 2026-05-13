@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { type ColumnType, type LinkToAnotherRecordType, UITypesName, ViewLockType, ViewSettingOverrideOptions } from 'nocodb-sdk'
-import { PlanLimitTypes, RelationTypes, UITypes, isColumnInError, isLinksOrLTAR, isSystemColumn } from 'nocodb-sdk'
+import { type ColumnType, UITypesName, ViewLockType, ViewSettingOverrideOptions } from 'nocodb-sdk'
+import { PlanLimitTypes, UITypes, isColumnInError } from 'nocodb-sdk'
 import rfdc from 'rfdc'
-import { getColumnUidtByID as sortGetColumnUidtByID } from '~/utils/sortUtils'
+import { getColumnUidtByID as getSortColumnUidtByID, isSortFieldVisibleInToolbar } from '~/utils/sortUtils'
 
 const meta = inject(MetaInj, ref())
 const view = inject(ActiveViewInj, ref())
@@ -28,7 +28,20 @@ const {
   canSyncSort,
 } = useViewSorts(view, () => reloadDataHook?.trigger())
 
-const { showSystemFields, metaColumnById } = useViewColumnsOrThrow()
+const { showSystemFields, metaColumnById, fieldsMap, gridViewCols } = useViewColumnsOrThrow()
+
+const fieldNameAlias = computed<Record<string, string>>(() => {
+  return Object.keys(fieldsMap.value ?? {}).reduce<Record<string, string>>((acc, columnId) => {
+    const label = gridViewCols.value?.[columnId]?.label?.trim?.()
+    const title = fieldsMap.value?.[columnId]?.title?.trim?.()
+    if (label || title) {
+      acc[columnId] = label || title
+    }
+    return acc
+  }, {})
+})
+
+provide(FieldNameAlias, fieldNameAlias)
 
 const { appearanceConfig: filteredOrSortedAppearanceConfig } = useColumnFilteredOrSorted()
 
@@ -114,30 +127,23 @@ const columnByID = computed(() =>
 const availableColumns = computed(() => {
   return columns.value
     ?.filter((c: ColumnType) => {
-      if (c.uidt === UITypes.Links) {
-        return true
-      }
-      if (isSystemColumn(metaColumnById?.value?.[c.id!])) {
-        return (
-          /** hide system columns if not enabled */
-          showSystemFields.value
-        )
-      } else if (c.uidt === UITypes.QrCode || c.uidt === UITypes.Barcode || c.uidt === UITypes.ID || c.uidt === UITypes.Button) {
+      if (c.uidt === UITypes.QrCode || c.uidt === UITypes.Barcode || c.uidt === UITypes.ID || c.uidt === UITypes.Button) {
         return false
-      } else {
-        /** ignore hasmany and manytomany relations if it's using within sort menu */
-        return !(
-          isLinksOrLTAR(c) &&
-          ![RelationTypes.BELONGS_TO, RelationTypes.ONE_TO_ONE].includes((c.colOptions as LinkToAnotherRecordType).type)
-        )
-        /** ignore virtual fields which are system fields ( mm relation ) and qr code fields */
       }
+
+      return isSortFieldVisibleInToolbar({
+        column: c,
+        meta: meta.value,
+        metaColumnById: metaColumnById.value,
+        showSystemFields: showSystemFields.value,
+        fieldsMap: fieldsMap.value,
+      })
     })
     .filter((c) => !(displayedSorts.value ?? []).find((s) => s.fk_column_id === c.id))
 })
 
 const getColumnUidtByID = (key?: string) => {
-  return sortGetColumnUidtByID(key, columnByID.value)
+  return getSortColumnUidtByID(key, columnByID.value)
 }
 
 const open = ref(false)

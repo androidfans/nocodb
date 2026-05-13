@@ -21,11 +21,13 @@ const emits = defineEmits<{ selected: [ColumnType] }>()
 
 const { isParentOpen, toolbarMenu, searchInputPlaceholder, selectedOptionId, showSelectedOption } = toRefs(props)
 
-const { fieldsMap, isLocalMode } = useViewColumnsOrThrow()
+const { fieldsMap, isLocalMode, gridViewCols } = useViewColumnsOrThrow()
 
 const { $e } = useNuxtApp()
 
 const { t } = useI18n()
+
+const fieldNameAlias = inject(FieldNameAlias, ref({} as Record<string, string>))
 
 const options = computed(() =>
   (props.options || [])
@@ -115,6 +117,29 @@ const fieldSearchBasisOptions = computed<NcListSearchBasisOptionType[]>(() => [
     },
   },
 ])
+
+const displayOptions = computed(() =>
+  options.value.map((option) => {
+    const originalTitle = option.title
+    const displayTitle = option?.id
+      ? gridViewCols.value?.[option.id]?.label?.trim?.() || fieldNameAlias.value[option.id] || originalTitle
+      : originalTitle
+
+    return {
+      ...option,
+      title: displayTitle,
+      ncOriginalTitle: originalTitle,
+    }
+  }),
+)
+
+const filterOption = (query: string, option: NcListItemType) => {
+  if (props.toolbarMenu !== 'sort') {
+    return searchCompare(option?.title, query)
+  }
+
+  return searchCompare([option?.title, option?.ncOriginalTitle], query)
+}
 </script>
 
 <template>
@@ -133,10 +158,11 @@ const fieldSearchBasisOptions = computed<NcListSearchBasisOptionType[]>(() => [
     :is-locked="isLocked && toolbarMenu !== 'globalSearch'"
     show-search-always
     :item-class-name="configByToolbarMenu.optionClassName"
-    :list="options"
+    :list="displayOptions"
     :value="selectedOptionId"
     variant="medium"
     :search-basis-options="fieldSearchBasisOptions"
+    :filter-option="filterOption"
     @change="handleSelect"
   >
     <template #listItemExtraLeft="{ option }">

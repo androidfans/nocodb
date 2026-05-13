@@ -1,4 +1,12 @@
-import { type ColumnType, type SortType, UITypes, getEquivalentUIType } from 'nocodb-sdk'
+import {
+  type ColumnType,
+  type SortType,
+  type TableType,
+  UITypes,
+  getEquivalentUIType,
+  isHiddenCol,
+  isSystemColumn,
+} from 'nocodb-sdk'
 import dayjs from 'dayjs'
 
 export const getSortDirectionOptions = (uidt: UITypes | string, isGroupBy?: boolean) => {
@@ -251,4 +259,33 @@ export const getColumnUidtByID = (key?: string, columns?: ColumnType[] | Record<
   }
 
   return uidt || ''
+}
+
+export const isSortFieldVisibleInToolbar = ({
+  column,
+  meta,
+  metaColumnById,
+  showSystemFields,
+  fieldsMap,
+}: {
+  column: ColumnType
+  meta?: TableType
+  metaColumnById?: Record<string, ColumnType>
+  showSystemFields: boolean
+  fieldsMap?: Record<string, { show?: boolean; initialShow?: boolean } | undefined>
+}) => {
+  if (column.uidt === UITypes.Links) {
+    return true
+  }
+
+  if (isSystemColumn(metaColumnById?.[column.id!])) {
+    if (isHiddenCol(column, meta)) {
+      /** ignore mm relation column, created by and last modified by system field */
+      return false
+    }
+
+    return showSystemFields || !!(column.id && (fieldsMap?.[column.id]?.show || fieldsMap?.[column.id]?.initialShow))
+  }
+
+  return true
 }

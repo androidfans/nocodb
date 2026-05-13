@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import { type ColumnType, type LinkToAnotherRecordType, type SortType, UITypesName } from 'nocodb-sdk'
-import { RelationTypes, UITypes, isColumnInError, isHiddenCol, isLinksOrLTAR, isSystemColumn } from 'nocodb-sdk'
-
+import { type ColumnType, type SortType, UITypesName } from 'nocodb-sdk'
+import { UITypes, isColumnInError } from 'nocodb-sdk'
 import rfdc from 'rfdc'
+import { isSortFieldVisibleInToolbar } from '~/utils/sortUtils'
 
 const props = defineProps<{
   // As we need to focus search box when the parent is opened
@@ -29,7 +29,7 @@ const isListConfigured = computed(() => listViewStore?.isConfigured.value ?? fal
 
 const { getMetaByKey } = useMetas()
 
-const { showSystemFields, metaColumnById } = useViewColumnsOrThrow(activeView, meta)
+const { showSystemFields, metaColumnById, fieldsMap } = useViewColumnsOrThrow(activeView, meta)
 
 const levelTableColumns = computed(() => {
   if (!isList.value || !isListConfigured.value || !listViewStore?.selectedLevel.value) {
@@ -46,31 +46,15 @@ const levelTableColumns = computed(() => {
 const options = computed<ColumnType[]>(() =>
   (
     clone(levelTableColumns.value)
-      ?.filter((c: ColumnType) => {
-        if (c.uidt === UITypes.Links) {
-          return true
-        }
-        if (isSystemColumn(metaColumnById?.value?.[c.id!])) {
-          if (isHiddenCol(c, meta.value)) {
-            /** ignore mm relation column, created by and last modified by system field */
-            return false
-          }
-
-          return (
-            /** hide system columns if not enabled */
-            showSystemFields.value
-          )
-        } else {
-          /** ignore hasmany and manytomany relations if it's using within sort menu */
-          return !(
-            isLinksOrLTAR(c) &&
-            ![RelationTypes.BELONGS_TO, RelationTypes.ONE_TO_ONE].includes(
-              (c.colOptions as LinkToAnotherRecordType).type as RelationTypes,
-            )
-          )
-          /** ignore virtual fields which are system fields ( mm relation ) and qr code fields */
-        }
-      })
+      ?.filter((c: ColumnType) =>
+        isSortFieldVisibleInToolbar({
+          column: c,
+          meta: meta.value,
+          metaColumnById: metaColumnById.value,
+          showSystemFields: showSystemFields.value,
+          fieldsMap: fieldsMap.value,
+        }),
+      )
       .filter((c: ColumnType) => !props.sorts?.find((s) => s.fk_column_id === c.id)) ?? []
   ).map((c) => {
     const isDisabled = [UITypes.QrCode, UITypes.Barcode, UITypes.ID, UITypes.Button].includes(c.uidt) || isColumnInError(c)

@@ -187,8 +187,28 @@ const columns = computed(() => {
   return meta.value?.columns || []
 })
 
-const { showSystemFields } =
-  widget.value || workflow.value || rlsPolicyId?.value ? { showSystemFields: ref(false) } : useViewColumnsOrThrow()
+const { showSystemFields, fieldsMap, gridViewCols } =
+  widget.value || workflow.value || rlsPolicyId?.value
+    ? { showSystemFields: ref(false), fieldsMap: ref({} as Record<string, any>), gridViewCols: ref({} as Record<string, any>) }
+    : useViewColumnsOrThrow()
+
+const fieldNameAlias = computed<Record<string, string>>(() => {
+  return Object.keys(fieldsMap.value ?? {}).reduce<Record<string, string>>((acc, columnId) => {
+    const label = gridViewCols.value?.[columnId]?.label?.trim?.()
+    const title = fieldsMap.value?.[columnId]?.title?.trim?.()
+    if (label || title) {
+      acc[columnId] = label || title
+    }
+    return acc
+  }, {})
+})
+
+provide(FieldNameAlias, fieldNameAlias)
+
+const activeFilterColumnIds = computed(() => {
+  const allCurrentFilters = [...(modelValue.value ?? []), ...(smartsheetAllFilters.value ?? []), ...(nestedFilters.value ?? [])]
+  return new Set(allCurrentFilters.map((filter) => filter?.fk_column_id).filter((columnId): columnId is string => !!columnId))
+})
 
 const fieldsToFilter = computed(() =>
   clone(columns.value)
@@ -197,7 +217,7 @@ const fieldsToFilter = computed(() =>
 
       if (!link.value && !webHook.value && !workflow.value && isSystemColumn(c)) {
         if (isHiddenCol(c, meta.value)) return false
-        if (!showSystemFields.value) return false
+        if (!showSystemFields.value && !activeFilterColumnIds.value.has(c.id!)) return false
       }
 
       const customFilter = props.filterOption ? props.filterOption(c) : true
@@ -1141,6 +1161,7 @@ defineExpose({
       v-if="visibleFilters && visibleFilters.length"
       ref="wrapperDomRef"
       v-bind="getDraggableAutoScrollOptions({ scrollSensitivity: 100 })"
+      item-key="id"
       :list="visibleFilters"
       :disabled="!isReorderEnabled"
       group="nc-column-filters"
