@@ -4,8 +4,6 @@ import type { ColumnType, FormulaType, LinkToAnotherRecordType, RollupType, Tabl
 import {
   ColumnHelper,
   FormulaDataTypes,
-  PlanFeatureTypes,
-  PlanTitles,
   UITypes,
   getAvailableRollupForColumn,
   integerPreservingRollupFunctions,
@@ -41,8 +39,6 @@ const { getMeta, getMetaByKey } = useMetas()
 const { t } = useI18n()
 
 const { $e } = useNuxtApp()
-
-const { getPlanTitle, showEEFeatures } = useEeConfig()
 
 const filterRef = ref()
 
@@ -451,39 +447,19 @@ const handleScrollIntoView = () => {
       </div>
     </a-form-item>
 
-    <div v-if="isEeUI && showEEFeatures" class="w-full flex flex-col gap-4">
+    <div class="w-full flex flex-col gap-4">
       <div class="flex flex-col gap-2">
-        <PaymentUpgradeBadgeProvider :feature="PlanFeatureTypes.FEATURE_ROLLUP_LIMIT_RECORDS_BY_FILTER">
-          <template #default="{ click }">
-            <div class="flex gap-1 items-center whitespace-nowrap">
-              <NcSwitch
-                :checked="limitRecToCond"
-                :disabled="!selectedTable"
-                size="small"
-                data-testid="nc-rollup-limit-record-filters"
-                @change="
-                  (value) => {
-                    if (value && click(PlanFeatureTypes.FEATURE_ROLLUP_LIMIT_RECORDS_BY_FILTER)) return
-                    onFilterLabelClick()
-                  }
-                "
-              >
-                {{ $t('labels.onlyIncludeLinkedRecordsThatMeetSpecificConditions') }}
-              </NcSwitch>
-
-              <LazyPaymentUpgradeBadge
-                v-if="!limitRecToCond"
-                :feature="PlanFeatureTypes.FEATURE_ROLLUP_LIMIT_RECORDS_BY_FILTER"
-                :content="
-                  $t('upgrade.upgradeToIncludeLinkedRecordsThatMeetSpecificConditions', {
-                    plan: getPlanTitle(PlanTitles.PLUS),
-                  })
-                "
-                class="ml-1"
-              />
-            </div>
-          </template>
-        </PaymentUpgradeBadgeProvider>
+        <div class="flex gap-1 items-center whitespace-nowrap">
+          <NcSwitch
+            :checked="limitRecToCond"
+            :disabled="!selectedTable"
+            size="small"
+            data-testid="nc-rollup-limit-record-filters"
+            @change="onFilterLabelClick"
+          >
+            {{ $t('labels.onlyIncludeLinkedRecordsThatMeetSpecificConditions') }}
+          </NcSwitch>
+        </div>
 
         <div v-if="limitRecToCond" class="overflow-auto nc-scrollbar-thin">
           <LazySmartsheetToolbarColumnFilter
