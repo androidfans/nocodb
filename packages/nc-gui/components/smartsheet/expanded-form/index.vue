@@ -85,6 +85,7 @@ const isUnsavedFormExist = ref(false)
 const isUnsavedDuplicatedRecordExist = ref(false)
 
 const isRecordLinkCopied = ref(false)
+const isRecordIdCopied = ref(false)
 
 const { isUIAllowed } = useRoles()
 
@@ -612,6 +613,16 @@ const copyRecordUrl = async () => {
   isRecordLinkCopied.value = false
 }
 
+const copyRecordId = async () => {
+  const id = primaryKey.value
+  if (id === undefined || id === null || isNew.value) return
+
+  await copy(String(id))
+  isRecordIdCopied.value = true
+  await ncDelay(1500)
+  isRecordIdCopied.value = false
+}
+
 const saveChanges = async () => {
   if (isPreventChangeModalOpen.value) {
     isUnsavedFormExist.value = false
@@ -714,8 +725,17 @@ const addNewRow = () => {
 useActiveKeydownListener(
   isExpanded,
   async (e: KeyboardEvent) => {
+    const cmdOrCtrl = isMac() ? e.metaKey : e.ctrlKey
+    const isSaveShortcut = (cmdOrCtrl || e.altKey) && e.code === 'KeyS'
+
+    if (isSaveShortcut) {
+      e.preventDefault()
+    }
+
     if (!e.altKey || isNew.value || !props.showNextPrevIcons || isActiveInputElementExist(e) || isNestedExpandedFormOpenExist()) {
-      return
+      if (!isSaveShortcut) {
+        return
+      }
     }
 
     if (e.key === 'ArrowLeft') {
@@ -730,7 +750,7 @@ useActiveKeydownListener(
       onNext()
     }
     // on alt + s save record
-    else if (e.code === 'KeyS') {
+    else if (isSaveShortcut) {
       // remove focus from the active input if any
       ;(document.activeElement as HTMLElement)?.blur()
 
@@ -1088,65 +1108,83 @@ export default {
           <div v-if="isLoading" class="flex items-center">
             <a-skeleton-input active class="!h-6 !sm:mr-14 !w-52 !rounded-md !overflow-hidden" size="small" />
           </div>
-          <div v-else class="flex-1 flex items-center gap-2 xs:(flex-row-reverse justify-end) min-w-0">
-            <!-- Table selector dropdown (template mode) -->
-            <NcListTableSelector
-              v-if="props.templateMode && !props.showNextPrevIcons && activeMeta?.base_id"
-              :key="activeMeta.base_id"
-              :value="activeMeta.id || null"
-              :base-id="activeMeta.base_id"
-              disable-label
-              dropdown-class="max-w-64 min-w-32"
-              dropdown-overlay-class-name="max-w-64 min-w-32"
-              default-slot-wrapper-class="!px-1.5 !bg-nc-bg-gray-extralight hover:!bg-nc-bg-gray-light"
-              @update:value="onTemplateTableChange($event as string)"
-            >
-            </NcListTableSelector>
-
-            <!-- Static table chip (non-template mode) -->
-            <div
-              v-else-if="!props.showNextPrevIcons"
-              class="hidden md:flex items-center rounded-lg bg-nc-bg-gray-light px-2 py-1 gap-2"
-            >
-              <GeneralTableIcon size="xsmall" :meta="activeMeta" class="!mx-0 !text-nc-content-inverted-secondary" />
-              <span class="nc-expanded-form-table-name whitespace-nowrap">{{ tableTitle }}</span>
-            </div>
-            <div v-if="props.templateMode" class="flex flex-col truncate overflow-hidden">
-              <input
-                ref="templateNameInputRef"
-                v-model="editableTemplateName"
-                class="bg-transparent border-none outline-none font-bold text-xl w-full placeholder-gray-300"
-                :class="isDuplicateTemplateName ? 'text-red-500' : 'text-nc-content-gray'"
-                placeholder="Enter template name..."
-              />
-              <span v-if="isDuplicateTemplateName" class="text-red-500 text-[11px] pl-0.5">
-                A template with this name already exists
-              </span>
-            </div>
-            <div v-else-if="row.rowMeta?.new || props.newRecordHeader" class="flex flex-col truncate overflow-hidden">
-              <!-- Breadcrumb trail for nested sub-record forms (e.g., Project Template > Tasks) -->
+          <template v-else>
+            <NcTooltip v-if="!row?.rowMeta?.new && primaryKey !== undefined && primaryKey !== null">
+              <template #title>
+                {{ isRecordIdCopied ? $t('msg.info.copiedToClipboard') : `ID: ${primaryKey}` }}
+              </template>
               <div
-                v-if="props.breadcrumbs?.length"
-                class="flex items-center gap-1 text-[11px] text-nc-content-gray-muted leading-tight"
+                class="self-center h-7 max-w-[180px] flex items-center gap-1 px-2 rounded-lg bg-nc-bg-gray-light text-nc-content-gray-muted cursor-pointer select-none"
+                data-testid="nc-expanded-form-copy-record-id"
+                @click="copyRecordId"
               >
-                <template v-for="(crumb, idx) in props.breadcrumbs" :key="idx">
-                  <span class="truncate max-w-[140px]">{{ crumb }}</span>
-                  <GeneralIcon icon="chevronRight" class="flex-none h-3 w-3 text-nc-content-gray-muted" />
-                </template>
+                <span class="text-[11px] font-semibold uppercase tracking-wide">ID</span>
+                <span class="text-xs truncate">{{ primaryKey }}</span>
+                <GeneralIcon v-if="isRecordIdCopied" icon="check" class="h-3.5 w-3.5 text-nc-content-brand" />
+                <GeneralIcon v-else icon="copy" class="h-3.5 w-3.5 text-nc-content-gray-subtle" />
               </div>
-              <span class="font-bold text-nc-content-gray text-xl truncate">
-                {{ props.newRecordHeader ?? $t('activity.newRecord') }}
-              </span>
+            </NcTooltip>
+            <div class="flex-1 flex items-center gap-2 xs:(flex-row-reverse justify-end) min-w-0">
+              <!-- Table selector dropdown (template mode) -->
+              <NcListTableSelector
+                v-if="props.templateMode && !props.showNextPrevIcons && activeMeta?.base_id"
+                :key="activeMeta.base_id"
+                :value="activeMeta.id || null"
+                :base-id="activeMeta.base_id"
+                disable-label
+                dropdown-class="max-w-64 min-w-32"
+                dropdown-overlay-class-name="max-w-64 min-w-32"
+                default-slot-wrapper-class="!px-1.5 !bg-nc-bg-gray-extralight hover:!bg-nc-bg-gray-light"
+                @update:value="onTemplateTableChange($event as string)"
+              >
+              </NcListTableSelector>
+
+              <!-- Static table chip (non-template mode) -->
+              <div
+                v-else-if="!props.showNextPrevIcons"
+                class="hidden md:flex items-center rounded-lg bg-nc-bg-gray-light px-2 py-1 gap-2"
+              >
+                <GeneralTableIcon size="xsmall" :meta="activeMeta" class="!mx-0 !text-nc-content-inverted-secondary" />
+                <span class="nc-expanded-form-table-name whitespace-nowrap">{{ tableTitle }}</span>
+              </div>
+
+              <div v-if="props.templateMode" class="flex flex-col truncate overflow-hidden">
+                <input
+                  ref="templateNameInputRef"
+                  v-model="editableTemplateName"
+                  class="bg-transparent border-none outline-none font-bold text-xl w-full placeholder-gray-300"
+                  :class="isDuplicateTemplateName ? 'text-red-500' : 'text-nc-content-gray'"
+                  placeholder="Enter template name..."
+                />
+                <span v-if="isDuplicateTemplateName" class="text-red-500 text-[11px] pl-0.5">
+                  A template with this name already exists
+                </span>
+              </div>
+              <div v-else-if="row.rowMeta?.new || props.newRecordHeader" class="flex flex-col truncate overflow-hidden">
+                <!-- Breadcrumb trail for nested sub-record forms (e.g., Project Template > Tasks) -->
+                <div
+                  v-if="props.breadcrumbs?.length"
+                  class="flex items-center gap-1 text-[11px] text-nc-content-gray-muted leading-tight"
+                >
+                  <template v-for="(crumb, idx) in props.breadcrumbs" :key="idx">
+                    <span class="truncate max-w-[140px]">{{ crumb }}</span>
+                    <GeneralIcon icon="chevronRight" class="flex-none h-3 w-3 text-nc-content-gray-muted" />
+                  </template>
+                </div>
+                <span class="font-bold text-nc-content-gray text-xl truncate">
+                  {{ props.newRecordHeader ?? $t('activity.newRecord') }}
+                </span>
+              </div>
+              <div
+                v-else-if="displayValue && !row?.rowMeta?.new"
+                class="flex items-center font-bold text-nc-content-gray text-2xl overflow-hidden"
+              >
+                <span class="min-w-[120px] md:min-w-[300px]">
+                  <SmartsheetPlainCell v-model="displayValue" :column="displayField" show-tooltip />
+                </span>
+              </div>
             </div>
-            <div
-              v-else-if="displayValue && !row?.rowMeta?.new"
-              class="flex items-center font-bold text-nc-content-gray text-2xl overflow-hidden"
-            >
-              <span class="min-w-[120px] md:min-w-[300px]">
-                <SmartsheetPlainCell v-model="displayValue" :column="displayField" show-tooltip />
-              </span>
-            </div>
-          </div>
+          </template>
         </div>
         <div v-if="!props.templateMode && !props.blueprintMode" class="ml-auto">
           <SmartsheetExpandedFormViewModeSelector v-model="activeViewMode" :view="view" class="nc-expanded-form-mode-switch" />

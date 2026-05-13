@@ -144,40 +144,40 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
     const fields = computed(() => {
       // Give preference to props.useMetaFields instead of fieldsFromParent
       if (useMetaFields) {
-        if (maintainDefaultViewOrder.value) {
-          return (meta.value.columns ?? [])
-            .filter(
+        const baseFields = maintainDefaultViewOrder.value
+          ? (meta.value.columns ?? [])
+              .filter(
+                (col) =>
+                  !isHiddenCol(col, meta.value ?? {}) &&
+                  !isSystemColumn(col) &&
+                  !!(col.meta?.defaultViewColVisibility ?? true) &&
+                  // if new record, then hide readonly fields
+                  (!rowStore.isNew.value || !isHiddenColumnInNewRecord(col)),
+              )
+              .sort((a, b) => {
+                return (a.meta?.defaultViewColOrder ?? Infinity) - (b.meta?.defaultViewColOrder ?? Infinity)
+              })
+          : (meta.value.columns ?? []).filter(
               (col) =>
                 !isHiddenCol(col, meta.value ?? {}) &&
-                !isSystemColumn(col) &&
-                !!(col.meta?.defaultViewColVisibility ?? true) &&
                 // if new record, then hide readonly fields
-                (!rowStore.isNew.value || !isHiddenColumnInNewRecord(col)),
+                (!rowStore.isNew.value || !isHiddenColumnInNewRecord(col)) &&
+                // exclude system columns
+                !isSystemColumn(col) &&
+                // exclude hidden columns
+                !!(col.meta?.defaultViewColVisibility ?? true),
             )
-            .sort((a, b) => {
-              return (a.meta?.defaultViewColOrder ?? Infinity) - (b.meta?.defaultViewColOrder ?? Infinity)
-            })
-        }
 
-        return (meta.value.columns ?? []).filter(
-          (col) =>
-            !isHiddenCol(col, meta.value ?? {}) &&
-            // if new record, then hide readonly fields
-            (!rowStore.isNew.value || !isHiddenColumnInNewRecord(col)) &&
-            // exclude system columns
-            !isSystemColumn(col) &&
-            // exclude hidden columns
-            !!(col.meta?.defaultViewColVisibility ?? true),
-        )
+        return baseFields
       }
 
       // If `props.useMetaFields` is not enabled, use fields from the parent component
       if (fieldsFromParent.value) {
-        if (rowStore.isNew.value) {
-          return fieldsFromParent.value.filter((col) => !isHiddenColumnInNewRecord(col))
-        }
+        const baseFields = rowStore.isNew.value
+          ? fieldsFromParent.value.filter((col) => !isHiddenColumnInNewRecord(col))
+          : fieldsFromParent.value
 
-        return fieldsFromParent.value
+        return baseFields
       }
 
       return []
@@ -206,7 +206,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       }
       // record from same view and same table (not linked)
       else {
-        return _hiddenFields
+        const nonSystemHiddenFields = _hiddenFields
           .filter((col) => {
             if (rowStore.isNew.value || !showSystemFields.value) {
               return !isSystemColumn(col)
@@ -217,6 +217,20 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           .sort((a, b) => {
             return (fieldsMap.value[a.id]?.order ?? Infinity) - (fieldsMap.value[b.id]?.order ?? Infinity)
           })
+
+        if (rowStore.isNew.value || showSystemFields.value) {
+          return nonSystemHiddenFields
+        }
+
+        // If system fields are hidden in main form, append them at hidden section tail.
+        // Include ID as requested.
+        const systemHiddenTail = _hiddenFields
+          .filter((col) => isSystemColumn(col))
+          .sort((a, b) => {
+            return (fieldsMap.value[a.id]?.order ?? Infinity) - (fieldsMap.value[b.id]?.order ?? Infinity)
+          })
+
+        return [...nonSystemHiddenFields, ...systemHiddenTail]
       }
     })
 
