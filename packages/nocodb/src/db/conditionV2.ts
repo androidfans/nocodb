@@ -1608,5 +1608,35 @@ export async function extractLinkRelFiltersAndApply(_: {
   context: NcContext;
   baseModel: IBaseModelSqlV2;
 }) {
-  // do nothing, it's just a placeholder
+  const { qb, column, alias, context, baseModel } = _;
+
+  let meta: Record<string, any> | undefined;
+  if (typeof column.meta === 'string') {
+    try {
+      meta = JSON.parse(column.meta);
+    } catch {
+      meta = undefined;
+    }
+  } else {
+    meta = column.meta as Record<string, any>;
+  }
+
+  if (!meta?.enableConditions) return;
+
+  const filters =
+    (await Filter.rootFilterListByLink(context, {
+      columnId: column.id,
+    })) || [];
+
+  if (!filters.length) return;
+
+  const filterOperationResult = await parseConditionV2(
+    baseModel,
+    filters,
+    { count: 0 },
+    alias,
+  );
+
+  filterOperationResult.clause(qb);
+  filterOperationResult.rootApply?.(qb);
 }
