@@ -1219,10 +1219,16 @@ const parseConditionV2 = async (
               }
               break;
             case 'in':
-              qb = qb.whereIn(
-                field,
-                Array.isArray(val) ? val : val?.split?.(','),
-              );
+              {
+                const inValues = Array.isArray(val)
+                  ? val
+                  : typeof val === 'string'
+                    ? val.split(',')
+                    : val === null || val === undefined
+                      ? []
+                      : [val];
+                qb = qb.whereIn(field, inValues);
+              }
               break;
             case 'is':
               if (filter.value === 'null' || filter.value === null)
