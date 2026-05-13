@@ -13,6 +13,8 @@ export interface ValidSearchQueryForColumnReturnType {
 }
 
 export function useFieldQuery() {
+  const SEARCH_STORAGE_KEY = 'nc-field-query-search-map'
+
   const baseStore = useBase()
 
   const { isMysql, isPg } = baseStore
@@ -30,16 +32,59 @@ export function useFieldQuery() {
 
   // mapping view id (key) to corresponding emptyFieldQueryObj (value)
   const searchMap = useState<Record<string, FieldQueryType>>('field-query-search-map', () => ({}))
+  const isSearchMapHydrated = useState<boolean>('field-query-search-map-hydrated', () => false)
+  const isSearchMapPersistWatcherRegistered = useState<boolean>('field-query-search-map-persist-watcher-registered', () => false)
 
   // the fieldQueryObj under the current view
   const search = useState<FieldQueryType>('field-query-search', () => ({
     ...emptyFieldQueryObj,
   }))
 
+  const hydrateSearchMapFromStorage = () => {
+    if (!import.meta.client || isSearchMapHydrated.value) return
+
+    try {
+      const stored = localStorage.getItem(SEARCH_STORAGE_KEY)
+      if (!stored) return
+
+      const parsed = JSON.parse(stored)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        searchMap.value = parsed as Record<string, FieldQueryType>
+      }
+    } catch (error) {
+      console.error('Failed to hydrate search map from local storage:', error)
+    } finally {
+      isSearchMapHydrated.value = true
+    }
+  }
+
+  const persistSearchMapToStorage = () => {
+    if (!import.meta.client) return
+
+    try {
+      localStorage.setItem(SEARCH_STORAGE_KEY, JSON.stringify(searchMap.value))
+    } catch (error) {
+      console.error('Failed to persist search map to local storage:', error)
+    }
+  }
+
+  if (!isSearchMapPersistWatcherRegistered.value) {
+    isSearchMapPersistWatcherRegistered.value = true
+    watch(
+      searchMap,
+      () => {
+        persistSearchMapToStorage()
+      },
+      { deep: true },
+    )
+  }
+
   // retrieve the fieldQueryObj of the given view id
   // if it is not found in `searchMap`, init with emptyFieldQueryObj
   const loadFieldQuery = (id?: string, reset = false) => {
     if (!id) return
+
+    hydrateSearchMapFromStorage()
 
     if (reset || !(id in searchMap.value)) {
       searchMap.value[id] = { ...emptyFieldQueryObj }
