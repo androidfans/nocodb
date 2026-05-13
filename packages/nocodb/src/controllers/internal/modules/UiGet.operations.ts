@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
+import { UITypes } from 'nocodb-sdk';
 import type { OPERATION_SCOPES } from '~/controllers/internal/operationScopes';
 import type { NcContext, NcRequest } from 'nocodb-sdk';
 import type {
   InternalApiModule,
   InternalGETResponseType,
 } from '~/utils/internal-type';
-import { UITypes } from 'nocodb-sdk';
 import { DataTableService } from '~/services/data-table.service';
 import { PagedResponseImpl } from '~/helpers/PagedResponse';
 import { TablesService } from '~/services/tables.service';
@@ -23,6 +23,7 @@ import { MapsService } from '~/services/maps.service';
 import { CommentsService } from '~/services/comments.service';
 import { SyncService } from '~/services/sync.service';
 import { ExtensionsService } from '~/services/extensions.service';
+import { NcError } from '~/helpers/catchError';
 
 @Injectable()
 export class UiGetOperations
@@ -102,19 +103,20 @@ export class UiGetOperations
         }
         if (!tableId) return NcError.notFound('Table not found for view');
 
-        const [tableMeta, viewColumns, filters, sorts, viewList] = await Promise.all([
-          this.tablesService.getTableWithAccessibleViews(context, {
-            tableId,
-            user: req.user,
-          }),
-          this.viewColumnsService.columnList(context, { viewId }),
-          this.filtersService.filterList(context, { viewId }),
-          this.sortsService.sortList(context, { viewId }),
-          this.viewsService.viewList(context, {
-            tableId,
-            user: req.user,
-          }),
-        ]);
+        const [tableMeta, viewColumns, filters, sorts, viewList] =
+          await Promise.all([
+            this.tablesService.getTableWithAccessibleViews(context, {
+              tableId,
+              user: req.user,
+            }),
+            this.viewColumnsService.columnList(context, { viewId }),
+            this.filtersService.filterList(context, { viewId }),
+            this.sortsService.sortList(context, { viewId }),
+            this.viewsService.viewList(context, {
+              tableId,
+              user: req.user,
+            }),
+          ]);
 
         const relatedTableIds = new Set<string>();
         const columnsById = new Map(
@@ -127,7 +129,10 @@ export class UiGetOperations
             col.uidt === UITypes.LinkToAnotherRecord ||
             col.uidt === UITypes.Links
           ) {
-            if (opts.fk_related_model_id && opts.fk_related_model_id !== tableId) {
+            if (
+              opts.fk_related_model_id &&
+              opts.fk_related_model_id !== tableId
+            ) {
               relatedTableIds.add(opts.fk_related_model_id);
             }
           } else if (
@@ -161,7 +166,8 @@ export class UiGetOperations
                   const deepMeta = await Model.getWithInfo(context, {
                     id: opts.fk_related_model_id,
                   });
-                  if (deepMeta) relatedMetas[opts.fk_related_model_id] = deepMeta;
+                  if (deepMeta)
+                    relatedMetas[opts.fk_related_model_id] = deepMeta;
                 }
               }
             }
@@ -257,6 +263,18 @@ export class UiGetOperations
         return new PagedResponseImpl(
           await this.filtersService.hookFilterList(context, {
             hookId: req.query.hookId as string,
+          }),
+        );
+      case 'linkFilterList':
+        return new PagedResponseImpl(
+          await this.filtersService.linkFilterList(context, {
+            columnId: req.query.columnId as string,
+          }),
+        );
+      case 'buttonFilterList':
+        return new PagedResponseImpl(
+          await this.filtersService.buttonFilterList(context, {
+            buttonColId: req.query.buttonColId as string,
           }),
         );
       case 'hookSamplePayload':

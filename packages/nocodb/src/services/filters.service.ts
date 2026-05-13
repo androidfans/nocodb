@@ -338,17 +338,36 @@ export class FiltersService {
     return filter;
   }
 
+  async linkFilterList(context: NcContext, param: { columnId: string }) {
+    return Filter.rootFilterListByLink(context, { columnId: param.columnId });
+  }
+
   async linkFilterCreate(
-    _context: NcContext,
-    _param: {
-      filter: any;
+    context: NcContext,
+    param: {
+      filter: FilterReqType;
       columnId: string;
       user: UserType;
       req: NcRequest;
     },
   ): Promise<any> {
-    // placeholder method
-    return null;
+    validatePayload('swagger.json#/components/schemas/FilterReq', param.filter);
+
+    if (param.filter.fk_column_id) {
+      const column = await Column.get(context, {
+        colId: param.filter.fk_column_id,
+      });
+      if (column?.colOptions?.error) {
+        NcError.get(context).badRequest(
+          `Cannot use column '${column.title}' in filter: ${column.colOptions.error}`,
+        );
+      }
+    }
+
+    return await Filter.insert(context, {
+      ...param.filter,
+      fk_link_col_id: param.columnId,
+    });
   }
 
   /**

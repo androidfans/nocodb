@@ -225,13 +225,14 @@ export default class Filter implements FilterType {
         id &&
         (filter.fk_view_id ||
           filter.fk_hook_id ||
+          filter.fk_link_col_id ||
           filter.fk_parent_column_id ||
           filter.fk_level_id ||
           filter.fk_button_col_id)
       )
     ) {
       NcError.get(context).badRequest(
-        `Mandatory fields missing in FILTER_EXP cache population : id(${id}), fk_view_id(${filter.fk_view_id}), fk_hook_id(${filter.fk_hook_id}), fk_parent_column_id(${filter.fk_parent_column_id}), fk_level_id(${filter.fk_level_id}), fk_button_col_id(${filter.fk_button_col_id})`,
+        `Mandatory fields missing in FILTER_EXP cache population : id(${id}), fk_view_id(${filter.fk_view_id}), fk_hook_id(${filter.fk_hook_id}), fk_link_col_id(${filter.fk_link_col_id}), fk_parent_column_id(${filter.fk_parent_column_id}), fk_level_id(${filter.fk_level_id}), fk_button_col_id(${filter.fk_button_col_id})`,
       );
     }
     const key = `${CacheScope.FILTER_EXP}:${id}`;
@@ -265,6 +266,16 @@ export default class Filter implements FilterType {
               context,
               CacheScope.FILTER_EXP,
               [FilterCacheScope.HOOK, filter.fk_hook_id],
+              key,
+            ),
+          );
+        }
+        if (filter.fk_link_col_id) {
+          p.push(
+            NocoCache.appendToList(
+              context,
+              CacheScope.FILTER_EXP,
+              [FilterCacheScope.LINK_COL, filter.fk_link_col_id],
               key,
             ),
           );
@@ -1320,11 +1331,44 @@ export default class Filter implements FilterType {
   }
 
   static async rootFilterListByLink(
-    _context: NcContext,
-    { columnId: _columnId }: { columnId: string },
-    _ncMeta = Noco.ncMeta,
+    context: NcContext,
+    { columnId }: { columnId: string },
+    ncMeta = Noco.ncMeta,
   ) {
-    return [];
+    const cachedList = await NocoCache.getList(
+      context,
+      CacheScope.FILTER_EXP,
+      [FilterCacheScope.LINK_COL, columnId],
+      { key: 'order' },
+    );
+    let { list: filterObjs } = cachedList;
+    const { isNoneList } = cachedList;
+
+    if (!isNoneList && !filterObjs.length) {
+      filterObjs = await ncMeta.metaList2(
+        context.workspace_id,
+        context.base_id,
+        MetaTable.FILTER_EXP,
+        {
+          condition: { fk_link_col_id: columnId },
+          orderBy: {
+            order: 'asc',
+          },
+        },
+      );
+      await NocoCache.setList(
+        context,
+        CacheScope.FILTER_EXP,
+        [FilterCacheScope.LINK_COL, columnId],
+        filterObjs,
+      );
+    }
+
+    return (
+      filterObjs
+        ?.filter((f) => !f.fk_parent_id)
+        ?.map((f) => this.castType(f)) || []
+    );
   }
 
   static async allLinkFilterList(

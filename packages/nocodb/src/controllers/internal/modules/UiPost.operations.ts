@@ -404,6 +404,20 @@ export class UiPostOperations
           user: req.user,
           req,
         });
+      case 'linkFilterCreate':
+        return await this.filtersService.linkFilterCreate(context, {
+          columnId: req.query.columnId as string,
+          filter: payload,
+          user: req.user,
+          req,
+        });
+      case 'buttonFilterCreate':
+        return await this.filtersService.buttonFilterCreate(context, {
+          buttonColId: req.query.buttonColId as string,
+          filter: payload,
+          user: req.user,
+          req,
+        });
       case 'gridViewCreate':
         return await this.gridsService.gridViewCreate(context, {
           grid: payload,
