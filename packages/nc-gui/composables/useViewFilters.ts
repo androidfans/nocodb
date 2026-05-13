@@ -123,20 +123,24 @@ export function useViewFilters(
 
   const filters = computed<ColumnFilterType[]>({
     get: () => {
-      return (nestedMode.value && !isLink && !isWebhook && !isWidget && !isWorkflow && !isRlsPolicy && !buttonColId?.value) ||
+      if (
+        (nestedMode.value && !isLink && !isWebhook && !isWidget && !isWorkflow && !isRlsPolicy && !buttonColId?.value) ||
         (isForm.value && !isWebhook)
-        ? currentFilters.value!
-        : _filters.value
+      ) {
+        return Array.isArray(currentFilters.value) ? currentFilters.value : []
+      }
+      return Array.isArray(_filters.value) ? _filters.value : []
     },
     set: (value: ColumnFilterType[]) => {
+      const nextValue = Array.isArray(value) ? value : []
       if (isForm.value && !isWebhook) {
-        currentFilters.value = value
+        currentFilters.value = nextValue
         return
       } else if (nestedMode.value || isWorkflow) {
-        currentFilters.value = value
+        currentFilters.value = nextValue
         if (!isLink && !isWebhook && !isWidget && !isWorkflow && !isRlsPolicy && !buttonColId?.value) {
           if (!isNestedRoot) {
-            nestedFilters.value = value
+            nestedFilters.value = nextValue
           }
           nestedFilters.value = [...nestedFilters.value]
         }
@@ -144,7 +148,7 @@ export function useViewFilters(
         return
       }
 
-      _filters.value = value
+      _filters.value = nextValue
     },
   })
 
@@ -160,7 +164,7 @@ export function useViewFilters(
 
   // when a filter is deleted with auto apply disabled, the status is marked as 'delete'
   // nonDeletedFilters are those filters that are not deleted physically & virtually
-  const nonDeletedFilters = computed(() => filters.value.filter((f) => f.status !== 'delete'))
+  const nonDeletedFilters = computed(() => (filters.value || []).filter((f) => f.status !== 'delete'))
 
   const activeView = inject(ActiveViewInj, ref())
 
