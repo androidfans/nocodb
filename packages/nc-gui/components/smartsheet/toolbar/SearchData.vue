@@ -77,14 +77,13 @@ watch(
   () => activeView.value?.id,
   (n, o) => {
     if (n !== o) {
-      let reset = false
-
       if (n !== lastOpenedViewId.value) {
         lastOpenedViewId.value = n
-        reset = true
       }
 
-      loadFieldQuery(activeView.value?.id, reset)
+      // Keep per-view field/query persisted state across page reloads.
+      // `loadFieldQuery` already initializes missing entries, so no forced reset here.
+      loadFieldQuery(activeView.value?.id)
     }
   },
   { immediate: true },
@@ -107,15 +106,36 @@ function onPressEnter() {
 }
 
 const displayColumn = computed(() => {
-  if (search.value.field) {
+  const selectedFieldId = search.value.field
+  const availableColumns = columns.value ?? []
+
+  if (selectedFieldId) {
     // use search field label if specified
-    return columns.value?.find((column) => column.id === search.value.field)
+    const selectedColumn = availableColumns.find((column) => column.id === selectedFieldId)
+    if (selectedColumn) return selectedColumn
+
+    // Columns are not ready yet; keep persisted field id untouched to avoid
+    // resetting it during initial page refresh.
+    if (!availableColumns.length) return undefined
   }
-  // use primary value label by default
-  const pvColumn = columns.value?.find((column) => column.pv)
-  search.value.field = pvColumn?.id as string
-  return pvColumn
+
+  // use primary value label by default (fallback to first searchable column)
+  return availableColumns.find((column) => column.pv) || availableColumns[0]
 })
+
+watch(
+  columns,
+  (availableColumns) => {
+    if (!availableColumns?.length) return
+    if (search.value.field) return
+
+    const pvColumn = availableColumns.find((column) => column.pv) || availableColumns[0]
+    if (pvColumn?.id) {
+      search.value.field = pvColumn.id as string
+    }
+  },
+  { immediate: true },
+)
 
 const searchInputMode = computed(() => {
   if (!displayColumn.value?.uidt) return

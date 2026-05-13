@@ -32,6 +32,7 @@ export function useFieldQuery() {
 
   // mapping view id (key) to corresponding emptyFieldQueryObj (value)
   const searchMap = useState<Record<string, FieldQueryType>>('field-query-search-map', () => ({}))
+  const activeSearchViewId = useState<string | undefined>('field-query-active-view-id', () => undefined)
   const isSearchMapHydrated = useState<boolean>('field-query-search-map-hydrated', () => false)
   const isSearchMapPersistWatcherRegistered = useState<boolean>('field-query-search-map-persist-watcher-registered', () => false)
 
@@ -68,7 +69,7 @@ export function useFieldQuery() {
     }
   }
 
-  if (!isSearchMapPersistWatcherRegistered.value) {
+  if (import.meta.client && !isSearchMapPersistWatcherRegistered.value) {
     isSearchMapPersistWatcherRegistered.value = true
     watch(
       searchMap,
@@ -85,13 +86,32 @@ export function useFieldQuery() {
     if (!id) return
 
     hydrateSearchMapFromStorage()
+    activeSearchViewId.value = id
 
     if (reset || !(id in searchMap.value)) {
       searchMap.value[id] = { ...emptyFieldQueryObj }
     }
 
-    search.value = searchMap.value[id]!
+    // Use a local copy and sync it back explicitly so persistence does not rely
+    // on object reference sharing across reactive states.
+    search.value = { ...searchMap.value[id]! }
   }
+
+  watch(
+    search,
+    (nextSearch) => {
+      const viewId = activeSearchViewId.value
+      if (!viewId) return
+
+      searchMap.value[viewId] = {
+        ...searchMap.value[viewId],
+        ...nextSearch,
+      }
+      // Persist immediately for robustness across hard refreshes.
+      persistSearchMapToStorage()
+    },
+    { deep: true },
+  )
 
   /**
    * @param col
