@@ -21,6 +21,7 @@ import axios from 'axios'
 import { useColumnDrag } from './useColumnDrag'
 import { useRowDragging } from './useRowDragging'
 import { type CellRange, NavigateDir, type Row, type ViewActionState } from '#imports'
+import { validateRowFilters } from '~/utils/dataUtils'
 
 const props = defineProps<{
   totalRows: number
@@ -120,10 +121,18 @@ const openNewRecordFormHook = inject(OpenNewRecordFormHookInj, createEventHook()
 
 const reloadVisibleDataHook = inject(ReloadVisibleDataHookInj, undefined)
 
-const { appInfo, isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode } = useGlobal()
+const { appInfo, isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode, user } = useGlobal()
 
-const { isPkAvail, isSqlView, eventBus, allFilters, sorts, isExternalSource, isViewOperationsAllowed } =
-  useSmartsheetStoreOrThrow()
+const {
+  isPkAvail,
+  isSqlView,
+  eventBus,
+  allFilters,
+  validFiltersFromUrlParams,
+  sorts,
+  isExternalSource,
+  isViewOperationsAllowed,
+} = useSmartsheetStoreOrThrow()
 
 const { isColumnSortedOrFiltered, appearanceConfig: filteredOrSortedAppearanceConfig } = useColumnFilteredOrSorted()
 
@@ -131,7 +140,9 @@ const { $e, $api } = useNuxtApp()
 
 const { t } = useI18n()
 
-const { getMeta } = useMetas()
+const { metas, getMeta } = useMetas()
+
+const { getBaseType } = useBase()
 
 const { addUndo, clone, defineViewScope } = useUndoRedo()
 
@@ -156,6 +167,8 @@ const { paste } = usePaste()
 const { addLTARRef, syncLTARRefs, clearLTARCell, cleaMMCell } = useSmartsheetLtarHelpersOrThrow()
 
 const { loadViewAggregate } = useViewAggregateOrThrow()
+
+const { getEvaluatedRowMetaRowColorInfo } = useViewRowColorRender()
 
 const { isAiFeaturesEnabled, generateRows, generatingRows, generatingColumnRows, generatingColumns, aiIntegrations } = useNocoAi()
 
@@ -1853,7 +1866,63 @@ watch(activeCell, (activeCell) => {
   eventBus.emit(SmartsheetStoreEvents.CELL_SELECTED, { rowId, colId: col?.id, val, viewId })
 })
 
+const refreshCachedLinkRecordRow = async (rowId?: string) => {
+  if (!rowId || !meta.value?.id) return
+
+  const rowEntry = Array.from(cachedRows.value.entries()).find(([, row]) => {
+    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
+  })
+
+  if (!rowEntry) return
+
+  const [rowIndex, cachedRow] = rowEntry
+  const record = await $api.dbTableRow.read(
+    NOCO,
+    meta.value.base_id || (view.value as any)?.base_id,
+    meta.value.id,
+    encodeURIComponent(rowId),
+    {
+      getHiddenColumn: true,
+    },
+  )
+
+  const rowMeta = {
+    ...cachedRow.rowMeta,
+    ...getEvaluatedRowMetaRowColorInfo(record),
+    isValidationFailed: !validateRowFilters(
+      [...allFilters.value, ...validFiltersFromUrlParams.value],
+      record,
+      meta.value?.columns as ColumnType[],
+      getBaseType((view.value as any)?.source_id),
+      metas.value,
+      meta.value?.base_id,
+      {
+        currentUser: user.value?.id ? { id: user.value.id, email: user.value.email } : undefined,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      },
+    ),
+    isRowOrderUpdated: sorts.value.some((sort) => {
+      const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
+      return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
+    }),
+    isRlsHidden: !!record.__nc_rls_hidden,
+  }
+  delete rowMeta.ltarState
+
+  cachedRows.value.set(rowIndex, {
+    ...cachedRow,
+    row: record,
+    oldRow: { ...record },
+    rowMeta,
+  })
+}
+
 const reloadViewDataHookHandler = withLoading(async (param) => {
+  if (param?.isFromLinkRecord) {
+    await refreshCachedLinkRecordRow(param.rowId)
+    return
+  }
+
   if (param?.fieldAdd) {
     gridWrapper.value?.scrollTo({ top: 0, left: 0, behavior: 'instant' })
   }

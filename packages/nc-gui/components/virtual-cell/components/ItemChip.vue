@@ -133,6 +133,9 @@ function openExpandedForm() {
   function onCreatedRecord() {
     reloadTrigger?.trigger({
       shouldShowLoading: false,
+      isFromLinkRecord: true,
+      relatedTableMetaId: relatedTableMeta.value.id,
+      rowId: rowId!,
     })
 
     reloadViewDataTrigger?.trigger({

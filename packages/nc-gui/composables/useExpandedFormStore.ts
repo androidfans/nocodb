@@ -547,6 +547,11 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
       }
 
       try {
+        const currentRecordId = extractPkFromRow(row.value.row, meta.value.columns as ColumnType[])
+        if ((onlyVirtual || onlyNewColumns || !rowId) && currentRecordId && `${currentRecordId}` !== `${recordId}`) {
+          return
+        }
+
         // update only virtual columns value if `onlyVirtual` is true
         if (onlyVirtual) {
           record = {
@@ -572,12 +577,13 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           }, {} as Record<string, any>)
         }
 
+        const rowMeta = { ...row.value.rowMeta }
+        delete rowMeta.ltarState
+
         Object.assign(row.value, {
           row: record,
           oldRow: { ...record },
-          rowMeta: {
-            ...row.value.rowMeta,
-          },
+          rowMeta,
         })
       } catch (e: any) {
         message.error(`${t('msg.error.errorLoadingRecord')}`)

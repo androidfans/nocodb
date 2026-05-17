@@ -19,13 +19,21 @@ interface DataApiResponse {
   pageInfo: PaginatedType
 }
 
+interface ReloadRowDataParams {
+  shouldShowLoading?: boolean
+  isFromLinkRecord?: boolean
+  relatedTableMetaId?: string
+  rowId?: string
+  path?: Array<number>
+}
+
 /** Store for managing Link to another cells */
 const [useProvideLTARStore, useLTARStore] = useInjectionState(
   (
     column: Ref<Required<ColumnType>> | ComputedRef<Required<ColumnType>>,
     row: Ref<Row>,
     isNewRow: ComputedRef<boolean> | Ref<boolean>,
-    _reloadData = (_params: { shouldShowLoading?: boolean }) => {},
+    _reloadData = (_params: ReloadRowDataParams) => {},
   ) => {
     // when initialized by link popup dialog, keep current row
     // to avoid being changed by sort or filter
@@ -36,7 +44,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
     }
 
     if (isEeUI) {
-      _reloadData = (_params: { shouldShowLoading?: boolean }) => {}
+      _reloadData = (_params: ReloadRowDataParams) => {}
     }
 
     // state
@@ -759,7 +767,13 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
               return false
             }
 
-            _reloadData?.({ shouldShowLoading: false, path: path.value })
+            _reloadData?.({
+              shouldShowLoading: false,
+              isFromLinkRecord: true,
+              relatedTableMetaId: relatedTableMeta.value.id,
+              rowId: rowId.value,
+              path: path.value,
+            })
 
             /** reload child list if not a new row */
             if (!isNewRow?.value) {
@@ -856,7 +870,13 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         childrenCachedLoadingState.value.set(index, false)
       }
 
-      _reloadData?.({ shouldShowLoading: false, path: path.value })
+      _reloadData?.({
+        shouldShowLoading: false,
+        isFromLinkRecord: true,
+        relatedTableMetaId: relatedTableMeta.value.id,
+        rowId: rowId.value,
+        path: path.value,
+      })
 
       if (undo && isCanvasInjected) {
         reloadViewDataTrigger.trigger({ shouldShowLoading: false })
@@ -960,7 +980,13 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         excludedLoadingState.value.set(index, false)
       }
 
-      _reloadData?.({ shouldShowLoading: false, path: path.value })
+      _reloadData?.({
+        shouldShowLoading: false,
+        isFromLinkRecord: true,
+        relatedTableMetaId: relatedTableMeta.value.id,
+        rowId: rowId.value,
+        path: path.value,
+      })
 
       if (undo && isCanvasInjected) {
         reloadViewDataTrigger.trigger({ shouldShowLoading: false })

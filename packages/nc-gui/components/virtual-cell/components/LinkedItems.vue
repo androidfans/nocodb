@@ -152,8 +152,7 @@ const newRowState = computed(() => {
       (colOpt.type === RelationTypes.MANY_TO_ONE && colOpt1?.type === RelationTypes.ONE_TO_MANY)
     ) {
       return (
-        colOpt.fk_parent_column_id === colOpt1.fk_child_column_id &&
-        colOpt.fk_child_column_id === colOpt1.fk_parent_column_id
+        colOpt.fk_parent_column_id === colOpt1.fk_child_column_id && colOpt.fk_child_column_id === colOpt1.fk_parent_column_id
       )
     } else {
       return (
@@ -223,6 +222,9 @@ const onCreatedRecord = async (record: any) => {
 
   reloadTrigger?.trigger({
     shouldShowLoading: false,
+    isFromLinkRecord: true,
+    relatedTableMetaId: relatedTableMeta.value.id,
+    rowId: rowId.value!,
   })
 
   reloadViewDataTrigger?.trigger({

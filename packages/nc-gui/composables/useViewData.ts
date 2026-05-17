@@ -435,8 +435,9 @@ export function useViewData(
     )
   }
 
-  const navigateToSiblingRow = async (dir: NavigateDir) => {
+  const navigateToSiblingRow = async (dir: NavigateDir): Promise<boolean> => {
     const expandedRowIndex = getExpandedRowIndex()
+    if (expandedRowIndex === -1) return false
 
     // calculate next row index based on direction
     let siblingRowIndex = expandedRowIndex + (dir === NavigateDir.NEXT ? 1 : -1)
@@ -451,7 +452,10 @@ export function useViewData(
     // if next row index is less than 0, go to previous page and point to last element
     if (siblingRowIndex < 0) {
       // if first page, do nothing
-      if (currentPage === 1) return message.info(t('msg.info.noMoreRecords'))
+      if (currentPage === 1) {
+        message.info(t('msg.info.noMoreRecords'))
+        return false
+      }
 
       await changePage(currentPage - 1)
       siblingRowIndex = formattedData.value.length - 1
@@ -459,7 +463,10 @@ export function useViewData(
       // if next row index is greater than total rows in current view
       // then load next page of formattedData and set next row index to 0
     } else if (siblingRowIndex >= formattedData.value.length) {
-      if (paginationData?.value?.isLastPage) return message.info(t('msg.info.noMoreRecords'))
+      if (paginationData?.value?.isLastPage) {
+        message.info(t('msg.info.noMoreRecords'))
+        return false
+      }
 
       await changePage(currentPage + 1)
       siblingRowIndex = 0
@@ -474,7 +481,10 @@ export function useViewData(
           rowId,
         },
       })
+      return true
     }
+
+    return false
   }
 
   return {

@@ -946,17 +946,22 @@ export function useInfiniteData(args: {
     dataCache.cachedRows.value = newCachedRows
   }
 
-  const navigateToSiblingRow = async (dir: NavigateDir) => {
+  const navigateToSiblingRow = async (dir: NavigateDir): Promise<boolean> => {
     const path = routeQuery.value?.path?.length === 0 ? [] : (routeQuery.value?.path?.split('-') ?? []).map((c) => +c)
-    const expandedRowIndex = await getExpandedRowIndexWithWait(path)
-    if (expandedRowIndex === -1) return
+    const expandedRowIndex = await getExpandedRowIndexWithWait(path).catch((error) => {
+      console.error('Failed to resolve expanded row index:', error)
+      return -1
+    })
+
+    if (expandedRowIndex === -1) return false
 
     const dataCache = getDataCache(path)
 
     const siblingIndex = expandedRowIndex + (dir === NavigateDir.NEXT ? 1 : -1)
 
     if (siblingIndex < 0 || siblingIndex >= dataCache.totalRows.value) {
-      return message.info(t('msg.info.noMoreRecords'))
+      message.info(t('msg.info.noMoreRecords'))
+      return false
     }
 
     let row = dataCache.cachedRows.value.get(siblingIndex)
@@ -966,7 +971,7 @@ export function useInfiniteData(args: {
       row = dataCache.cachedRows.value.get(siblingIndex)
     }
 
-    if (!row) return
+    if (!row) return false
 
     const rowId = extractPkFromRow(row.row, meta.value?.columns as ColumnType[])
     if (rowId) {
@@ -976,7 +981,10 @@ export function useInfiniteData(args: {
           rowId,
         },
       })
+      return true
     }
+
+    return false
   }
 
   const fetchMissingChunks = async (startIndex: number, endIndex: number, path: Array<number> = []) => {
