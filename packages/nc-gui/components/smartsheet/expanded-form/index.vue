@@ -646,8 +646,8 @@ const reloadParentRowHook = inject(ReloadRowDataHookInj, createEventHook())
 // override reload trigger and use it to reload grid and the form itself
 const reloadHook = createEventHook()
 
-reloadHook.on(() => {
-  reloadParentRowHook?.trigger({ shouldShowLoading: false })
+reloadHook.on((params) => {
+  reloadParentRowHook?.trigger({ shouldShowLoading: false, ...(params || {}) })
   if (isNew.value) return
 
   _loadRow(undefined, true)

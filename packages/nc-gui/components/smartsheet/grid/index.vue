@@ -170,6 +170,37 @@ const expandedFormOnRowIdDlg = computed({
   },
 })
 
+const shouldReloadAfterExpandedFormClose = ref(false)
+
+const isExpandedFormOpen = computed(() => expandedFormDlg.value || expandedFormOnRowIdDlg.value)
+
+const markExpandedFormDirtyOnLinkRecordReload = (params?: { isFromLinkRecord?: boolean } | void) => {
+  if (isExpandedFormOpen.value && params?.isFromLinkRecord) {
+    shouldReloadAfterExpandedFormClose.value = true
+  }
+}
+
+reloadViewDataHook.on(markExpandedFormDirtyOnLinkRecordReload)
+
+const reloadViewDataAfterExpandedFormClose = () => {
+  if (!shouldReloadAfterExpandedFormClose.value) return
+
+  shouldReloadAfterExpandedFormClose.value = false
+  reloadViewDataHook?.trigger({ shouldShowLoading: false })
+}
+
+watch(expandedFormDlg, (isOpen, wasOpen) => {
+  if (wasOpen && !isOpen) {
+    reloadViewDataAfterExpandedFormClose()
+  }
+})
+
+watch(expandedFormOnRowIdDlg, (isOpen, wasOpen) => {
+  if (wasOpen && !isOpen) {
+    reloadViewDataAfterExpandedFormClose()
+  }
+})
+
 const addRowExpandOnClose = (row: Row) => {
   if (!skipRowRemovalOnCancel.value) {
     eventBus.emit(SmartsheetStoreEvents.CLEAR_NEW_ROW, row)
@@ -201,15 +232,28 @@ const smartsheetEvents = (event: SmartsheetStoreEvents) => {
 eventBus.on(smartsheetEvents)
 
 onBeforeUnmount(() => {
+  reloadViewDataHook.off(markExpandedFormDirtyOnLinkRecordReload)
   eventBus.off(smartsheetEvents)
 })
 
-const goToNextRow = () => {
-  navigateToSiblingRow(NavigateDir.NEXT)
+const goToNextRow = async () => {
+  const navigated = await navigateToSiblingRow(NavigateDir.NEXT).catch((error) => {
+    console.error('Failed to navigate to next row:', error)
+    return false
+  })
+  if (!navigated) {
+    expandedFormRef.value?.stopLoading?.()
+  }
 }
 
-const goToPreviousRow = () => {
-  navigateToSiblingRow(NavigateDir.PREV)
+const goToPreviousRow = async () => {
+  const navigated = await navigateToSiblingRow(NavigateDir.PREV).catch((error) => {
+    console.error('Failed to navigate to previous row:', error)
+    return false
+  })
+  if (!navigated) {
+    expandedFormRef.value?.stopLoading?.()
+  }
 }
 
 const updateViewWidth = () => {
@@ -334,7 +378,7 @@ const validateExternalSourceRecordVisibility = (page: number, callback?: () => v
   callback?.()
 }
 
-const pGoToNextRow = () => {
+const pGoToNextRow = async () => {
   const currentIndex = pGetExpandedRowIndex()
 
   if (
@@ -346,11 +390,23 @@ const pGoToNextRow = () => {
     return
   }
 
-  pNavigateToSiblingRow(NavigateDir.NEXT)
+  const navigated = await pNavigateToSiblingRow(NavigateDir.NEXT).catch((error) => {
+    console.error('Failed to navigate to next row:', error)
+    return false
+  })
+  if (!navigated) {
+    expandedFormRef.value?.stopLoading?.()
+  }
 }
 
-const pGoToPreviousRow = () => {
-  pNavigateToSiblingRow(NavigateDir.PREV)
+const pGoToPreviousRow = async () => {
+  const navigated = await pNavigateToSiblingRow(NavigateDir.PREV).catch((error) => {
+    console.error('Failed to navigate to previous row:', error)
+    return false
+  })
+  if (!navigated) {
+    expandedFormRef.value?.stopLoading?.()
+  }
 }
 
 const groupPath = ref([])
