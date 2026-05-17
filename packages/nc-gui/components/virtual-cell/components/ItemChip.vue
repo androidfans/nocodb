@@ -134,6 +134,7 @@ function openExpandedForm() {
   function onCreatedRecord() {
     const reloadParams = {
       shouldShowLoading: false,
+      // Without a persisted parent row id we cannot target a cached parent row, so fall back to the normal reload path.
       ...(parentRowId
         ? {
             isFromLinkRecord: true,

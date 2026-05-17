@@ -170,7 +170,22 @@ const expandedFormOnRowIdDlg = computed({
   },
 })
 
+const shouldReloadAfterExpandedFormClose = ref(false)
+
+const isExpandedFormOpen = computed(() => expandedFormDlg.value || expandedFormOnRowIdDlg.value)
+
+const markExpandedFormDirtyOnLinkRecordReload = (params?: { isFromLinkRecord?: boolean } | void) => {
+  if (isExpandedFormOpen.value && params?.isFromLinkRecord) {
+    shouldReloadAfterExpandedFormClose.value = true
+  }
+}
+
+reloadViewDataHook.on(markExpandedFormDirtyOnLinkRecordReload)
+
 const reloadViewDataAfterExpandedFormClose = () => {
+  if (!shouldReloadAfterExpandedFormClose.value) return
+
+  shouldReloadAfterExpandedFormClose.value = false
   reloadViewDataHook?.trigger({ shouldShowLoading: false })
 }
 
@@ -217,6 +232,7 @@ const smartsheetEvents = (event: SmartsheetStoreEvents) => {
 eventBus.on(smartsheetEvents)
 
 onBeforeUnmount(() => {
+  reloadViewDataHook.off(markExpandedFormDirtyOnLinkRecordReload)
   eventBus.off(smartsheetEvents)
 })
 
