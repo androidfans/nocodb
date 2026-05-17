@@ -720,6 +720,15 @@ const addNewRow = () => {
     isExpanded.value = true
   }, 500)
 }
+
+const isTopMostExpandedForm = () => {
+  const currentForm = wrapper.value?.closest('.nc-drawer-expanded-form.active')
+  if (!currentForm) return false
+
+  const activeForms = Array.from(document.querySelectorAll('.nc-drawer-expanded-form.active'))
+  return activeForms[activeForms.length - 1] === currentForm
+}
+
 // attach keyboard listeners to switch between rows
 // using alt + left/right arrow keys
 useActiveKeydownListener(
@@ -727,6 +736,14 @@ useActiveKeydownListener(
   async (e: KeyboardEvent) => {
     const cmdOrCtrl = isMac() ? e.metaKey : e.ctrlKey
     const isSaveShortcut = (cmdOrCtrl || e.altKey) && e.code === 'KeyS'
+
+    if (e.key === 'Escape' && isTopMostExpandedForm()) {
+      if (isLinkDropdownExist() || isSelectActive()) return
+
+      e.stopPropagation()
+      onClose()
+      return
+    }
 
     if (isSaveShortcut) {
       e.preventDefault()
