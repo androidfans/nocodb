@@ -115,6 +115,7 @@ function openExpandedForm() {
   }
 
   const rowId = extractPkFromRow(item.value, relatedTableMeta.value.columns as ColumnType[])
+  const parentRowId = extractPkFromRow(parentRow.value?.row, parentTableMeta.value?.columns as ColumnType[])
 
   if (!rowId) return
 
@@ -131,19 +132,20 @@ function openExpandedForm() {
   })
 
   function onCreatedRecord() {
-    reloadTrigger?.trigger({
+    const reloadParams = {
       shouldShowLoading: false,
-      isFromLinkRecord: true,
-      relatedTableMetaId: relatedTableMeta.value.id,
-      rowId: rowId!,
-    })
+      ...(parentRowId
+        ? {
+            isFromLinkRecord: true,
+            relatedTableMetaId: relatedTableMeta.value.id,
+            rowId: parentRowId,
+          }
+        : {}),
+    }
 
-    reloadViewDataTrigger?.trigger({
-      shouldShowLoading: false,
-      isFromLinkRecord: true,
-      relatedTableMetaId: relatedTableMeta.value.id,
-      rowId: rowId!,
-    })
+    reloadTrigger?.trigger(reloadParams)
+
+    reloadViewDataTrigger?.trigger(reloadParams)
   }
 }
 </script>

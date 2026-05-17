@@ -1677,7 +1677,7 @@ async function refreshCachedLinkRecordRow(rowId?: string) {
 
 async function reloadViewDataHandler(params: ReloadViewDataParams) {
   if (params?.isFromLinkRecord) {
-    await refreshCachedLinkRecordRow(params.rowId)
+    await Promise.all([refreshCachedLinkRecordRow(params.rowId), loadViewAggregate()])
     return
   }
 

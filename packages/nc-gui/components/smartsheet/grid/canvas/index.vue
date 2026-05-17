@@ -2361,7 +2361,7 @@ const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = 
 
 const reloadViewDataHookHandler = withLoading(async (params) => {
   if (params?.isFromLinkRecord) {
-    await refreshCachedLinkRecordRow(params.rowId, params.path)
+    await Promise.all([refreshCachedLinkRecordRow(params.rowId, params.path), loadViewAggregate()])
     return
   }
 
