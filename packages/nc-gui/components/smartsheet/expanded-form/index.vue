@@ -669,9 +669,16 @@ if (isKanban.value) {
 }
 provide(IsExpandedFormOpenInj, isExpanded)
 
+let latestTriggerRowLoadSeq = 0
+
 const triggerRowLoad = async (rowId?: string) => {
+  const triggerRowLoadSeq = ++latestTriggerRowLoadSeq
+
   await Promise.allSettled([loadComments(rowId, false), _loadRow(rowId)])
+  if (triggerRowLoadSeq !== latestTriggerRowLoadSeq) return false
+
   isLoading.value = false
+  return true
 }
 
 const reloadCurrentRecord = async () => {
@@ -706,6 +713,7 @@ onMounted(async () => {
     isTriggered = true
   } else if (props.rowId && props.loadRow && !isTriggered) {
     await triggerRowLoad(props.rowId)
+    isTriggered = true
   } else {
     _row.value = props.row
   }
@@ -714,7 +722,9 @@ onMounted(async () => {
     await loadAudits(rowId.value, false)
   }
 
-  isLoading.value = false
+  if (!isTriggered) {
+    isLoading.value = false
+  }
 
   if (focusFirstCell && isNew.value) {
     setTimeout(() => {
@@ -884,10 +894,14 @@ useActiveKeydownListener(
 const showDeleteRowModal = ref(false)
 
 const onDeleteRowClick = () => {
+  if (isLoading.value) return
+
   showDeleteRowModal.value = true
 }
 
 const onConfirmDeleteRowClick = async () => {
+  if (isLoading.value) return
+
   await deleteRowById(primaryKey.value || undefined)
 
   emits('deletedRecord')
@@ -1387,7 +1401,7 @@ export default {
                     }}
                   </template>
                   <NcButton
-                    :disabled="!isAllowed"
+                    :disabled="!isAllowed || isLoading"
                     class="text-nc-content-inverted-secondary !h-7 !w-7"
                     type="text"
                     size="xsmall"

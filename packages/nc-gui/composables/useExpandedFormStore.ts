@@ -56,6 +56,8 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
 
     const localOnlyChanges = ref<Record<string, any>>({})
 
+    let latestLoadRowRequestSeq = 0
+
     const basesStore = useBases()
 
     const { basesUser } = storeToRefs(basesStore)
@@ -524,6 +526,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
 
       if (!recordId) return
 
+      const loadRowRequestSeq = ++latestLoadRowRequestSeq
       let record: Record<string, any> = {}
       try {
         record = await $api.dbTableRow.read(
@@ -537,6 +540,8 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           },
         )
       } catch (err: any) {
+        if (loadRowRequestSeq !== latestLoadRowRequestSeq) return
+
         if (err.response?.status === 404) {
           const router = useRouter()
           message.error(t('msg.noRecordFound'))
@@ -544,9 +549,13 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
         } else {
           message.error(`${await extractSdkResponseErrorMsg(err)}`)
         }
+
+        return
       }
 
       try {
+        if (loadRowRequestSeq !== latestLoadRowRequestSeq) return
+
         const currentRecordId = extractPkFromRow(row.value.row, meta.value.columns as ColumnType[])
         if ((onlyVirtual || onlyNewColumns || !rowId) && currentRecordId && `${currentRecordId}` !== `${recordId}`) {
           return

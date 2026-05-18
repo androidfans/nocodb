@@ -13,6 +13,8 @@ export interface CommentTypeExtended extends CommentType {
 const [useProvideRowComments, useRowComments] = useInjectionState((meta: Ref<TableType>, row: Ref<Row>) => {
   const isCommentsLoading = ref(false)
 
+  let latestLoadCommentsRequestSeq = 0
+
   const { user } = useGlobal()
 
   const { isUIAllowed } = useRoles()
@@ -57,6 +59,7 @@ const [useProvideRowComments, useRowComments] = useInjectionState((meta: Ref<Tab
 
     if (!rowId) return
 
+    const loadCommentsRequestSeq = ++latestLoadCommentsRequestSeq
     try {
       if (!ignoreLoadingIndicator) isCommentsLoading.value = true
 
@@ -67,6 +70,8 @@ const [useProvideRowComments, useRowComments] = useInjectionState((meta: Ref<Tab
           fk_model_id: meta.value.id as string,
         })
       ).list || []) as Array<CommentTypeExtended>
+
+      if (loadCommentsRequestSeq !== latestLoadCommentsRequestSeq) return
 
       comments.value = res.map((comment) => {
         const user = baseUsers.value.find((u) => u.id === comment.created_by)
@@ -82,6 +87,8 @@ const [useProvideRowComments, useRowComments] = useInjectionState((meta: Ref<Tab
         }
       })
     } catch (e: unknown) {
+      if (loadCommentsRequestSeq !== latestLoadCommentsRequestSeq) return
+
       message.error(
         await extractSdkResponseErrorMsg(
           e as Error & {
@@ -90,7 +97,9 @@ const [useProvideRowComments, useRowComments] = useInjectionState((meta: Ref<Tab
         ),
       )
     } finally {
-      if (!ignoreLoadingIndicator) isCommentsLoading.value = false
+      if (!ignoreLoadingIndicator && loadCommentsRequestSeq === latestLoadCommentsRequestSeq) {
+        isCommentsLoading.value = false
+      }
     }
   }
 

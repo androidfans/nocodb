@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { ColumnType } from 'nocodb-sdk'
 import { UITypes, isVirtualCol } from 'nocodb-sdk'
+import type { UseExpandedFormDetachedProps } from '~/composables/useExpandedFormDetached'
 
 interface Props {
   value: string | number | boolean
@@ -122,7 +123,7 @@ function openExpandedForm() {
   if (!rowId) return
 
   const siblings = props.siblingItems?.length ? props.siblingItems : [item.value]
-  const state = reactive({
+  const state = reactive<UseExpandedFormDetachedProps>({
     isOpen: true,
     row: { row: item.value, rowMeta: {}, oldRow: { ...item.value } },
     meta: relatedTableMeta.value,
@@ -134,37 +135,16 @@ function openExpandedForm() {
     showNextPrevIcons: siblings.length > 1,
     firstRow: false,
     lastRow: false,
-    next: () => navigateSibling(1),
-    prev: () => navigateSibling(-1),
     createdRecord: onCreatedRecord,
   })
 
-  const updateSiblingState = (nextIndex: number) => {
-    const nextItem = siblings[nextIndex]
-    const nextRowId = nextItem ? extractPkFromRow(nextItem, relatedTableMeta.value.columns as ColumnType[]) : undefined
-    if (!nextItem || !nextRowId) return false
-
-    state.row = { row: nextItem, rowMeta: {}, oldRow: { ...nextItem } }
-    state.rowId = nextRowId
-    state.firstRow = nextIndex === 0
-    state.lastRow = nextIndex === siblings.length - 1
-
-    return true
-  }
-
-  const findCurrentSiblingIndex = () => {
-    const currentRowId = state.rowId
-    const currentIndex = siblings.findIndex((sibling) => {
-      return extractPkFromRow(sibling, relatedTableMeta.value.columns as ColumnType[]) === currentRowId
-    })
-
-    return currentIndex === -1 ? 0 : currentIndex
-  }
-
-  function navigateSibling(dir: 1 | -1) {
-    const nextIndex = findCurrentSiblingIndex() + dir
-    updateSiblingState(nextIndex)
-  }
+  const { updateSiblingState, findCurrentSiblingIndex, navigateSibling } = useExpandedFormSiblingNavigation({
+    state,
+    siblings,
+    columns: relatedTableMeta.value.columns as ColumnType[],
+  })
+  state.next = () => navigateSibling(1)
+  state.prev = () => navigateSibling(-1)
 
   updateSiblingState(props.siblingIndex !== undefined && props.siblingIndex >= 0 ? props.siblingIndex : findCurrentSiblingIndex())
   open(state)

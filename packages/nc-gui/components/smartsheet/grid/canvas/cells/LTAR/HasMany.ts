@@ -2,6 +2,7 @@ import type { ColumnType, LinkToAnotherRecordType, TableType } from 'nocodb-sdk'
 import { defaultOffscreen2DContext, isBoxHovered, renderIconButton, renderSingleLineText } from '../../utils/canvas'
 import { PlainCellRenderer } from '../Plain'
 import { renderAsCellLookupOrLtarValue } from '../../utils/cell'
+import type { UseExpandedFormDetachedProps } from '~/composables/useExpandedFormDetached'
 
 const ellipsisWidth = 15
 const buttonSize = 20
@@ -415,7 +416,7 @@ export const HasManyCellRenderer: CellRenderer = {
             const siblings = ncIsArray(fullCellValue)
               ? fullCellValue.filter((item) => ncIsObject(item))
               : cellRenderStore.ltar.filter((item) => ncIsObject(item.value)).map((item) => item.value)
-            const state = reactive({
+            const state = reactive<UseExpandedFormDetachedProps>({
               isOpen: true,
               row: { row: cellItem.value, rowMeta: {}, oldRow: { ...cellItem.value } },
               meta: column.relatedTableMeta || ({} as TableType),
@@ -426,29 +427,15 @@ export const HasManyCellRenderer: CellRenderer = {
               showNextPrevIcons: siblings.length > 1,
               firstRow: false,
               lastRow: false,
-              next: () => navigateSibling(1),
-              prev: () => navigateSibling(-1),
             })
 
-            const updateSiblingState = (nextIndex: number) => {
-              const nextItem = siblings[nextIndex]
-              const nextRowId = nextItem ? extractPkFromRow(nextItem, relatedColumns) : undefined
-              if (!nextItem || !nextRowId) return
-
-              state.row = { row: nextItem, rowMeta: {}, oldRow: { ...nextItem } }
-              state.rowId = nextRowId
-              state.firstRow = nextIndex === 0
-              state.lastRow = nextIndex === siblings.length - 1
-            }
-
-            const findCurrentSiblingIndex = () => {
-              const currentIndex = siblings.findIndex((sibling) => extractPkFromRow(sibling, relatedColumns) === state.rowId)
-              return currentIndex === -1 ? 0 : currentIndex
-            }
-
-            function navigateSibling(dir: 1 | -1) {
-              updateSiblingState(findCurrentSiblingIndex() + dir)
-            }
+            const { updateSiblingState, findCurrentSiblingIndex, navigateSibling } = useExpandedFormSiblingNavigation({
+              state,
+              siblings,
+              columns: relatedColumns,
+            })
+            state.next = () => navigateSibling(1)
+            state.prev = () => navigateSibling(-1)
 
             updateSiblingState(findCurrentSiblingIndex())
             openDetachedExpandedForm(state)
