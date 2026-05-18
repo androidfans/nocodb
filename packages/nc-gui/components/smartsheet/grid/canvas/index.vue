@@ -215,6 +215,7 @@ const openGroupContextMenuDropdown = ref<CanvasGroup | null>(null)
 const openColumnDropdownField = ref<ColumnType | null>(null)
 const _isDropdownVisible = ref(false)
 const contextMenuTarget = ref<{ row: number; col: number; path: Array<number> } | null>(null)
+const rowWarningClearSeq = ref(0)
 const _isContextMenuOpen = ref(false)
 const _isCreateOrEditColumnDropdownOpen = ref(false)
 const columnEditOrAddProviderRef = ref()
@@ -800,6 +801,8 @@ async function onGroupRowChange({ row, level }) {
 }
 
 function onActiveCellChanged() {
+  rowWarningClearSeq.value += 1
+
   if (isGroupBy.value) {
     function processGroups(groups: Map<number, CanvasGroup>) {
       for (const [, group] of groups) {
@@ -2306,7 +2309,7 @@ const handleMouseLeave = () => {
   triggerRefreshCanvas()
 }
 
-const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = []) => {
+const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = [], skipIfWarningCleared = false) => {
   if (!rowId || !meta.value?.id) return
 
   const dataCache = getDataCache(path)
@@ -2316,7 +2319,7 @@ const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = 
 
   if (!rowEntry) return
 
-  const [rowIndex, cachedRow] = rowEntry
+  const refreshSeq = rowWarningClearSeq.value
   const record = await $api.dbTableRow.read(
     NOCO,
     meta.value.base_id || (view.value as any)?.base_id,
@@ -2327,6 +2330,15 @@ const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = 
     },
   )
 
+  if (skipIfWarningCleared && refreshSeq !== rowWarningClearSeq.value) return
+
+  const latestRowEntry = Array.from(dataCache.cachedRows.value.entries()).find(([, row]) => {
+    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
+  })
+
+  if (!latestRowEntry) return
+
+  const [rowIndex, cachedRow] = latestRowEntry
   const rowMeta = {
     ...cachedRow.rowMeta,
     ...getEvaluatedRowMetaRowColorInfo(record),
@@ -2342,10 +2354,12 @@ const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = 
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
     ),
-    isRowOrderUpdated: sorts.value.some((sort) => {
-      const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
-      return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
-    }),
+    isRowOrderUpdated:
+      cachedRow.rowMeta?.isRowOrderUpdated ||
+      sorts.value.some((sort) => {
+        const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
+        return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
+      }),
     isRlsHidden: !!record.__nc_rls_hidden,
   }
   delete rowMeta.ltarState
@@ -2361,7 +2375,7 @@ const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = 
 
 const reloadViewDataHookHandler = withLoading(async (params) => {
   if (params?.isFromLinkRecord) {
-    await Promise.all([refreshCachedLinkRecordRow(params.rowId, params.path), loadViewAggregate()])
+    await Promise.all([refreshCachedLinkRecordRow(params.rowId, params.path, params.skipIfWarningCleared), loadViewAggregate()])
     return
   }
 

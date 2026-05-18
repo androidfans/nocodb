@@ -170,34 +170,63 @@ const expandedFormOnRowIdDlg = computed({
   },
 })
 
-const shouldReloadAfterExpandedFormClose = ref(false)
-
 const isExpandedFormOpen = computed(() => expandedFormDlg.value || expandedFormOnRowIdDlg.value)
 
-const markExpandedFormDirtyOnLinkRecordReload = (params?: { isFromLinkRecord?: boolean } | void) => {
-  if (isExpandedFormOpen.value && params?.isFromLinkRecord) {
-    shouldReloadAfterExpandedFormClose.value = true
+const expandedFormLinkRecordReloadRows = ref(
+  new Map<
+    string,
+    {
+      isFromLinkRecord: true
+      relatedTableMetaId?: string
+      rowId: string
+      path?: Array<number>
+      skipIfWarningCleared: true
+    }
+  >(),
+)
+
+const rememberExpandedFormLinkRecordReload = (
+  params?: { isFromLinkRecord?: boolean; relatedTableMetaId?: string; rowId?: string; path?: Array<number> } | void,
+) => {
+  if (!isExpandedFormOpen.value || !params?.isFromLinkRecord || !params.rowId) {
+    return
   }
+
+  const key = `${params.path?.join('-') ?? ''}:${params.rowId}`
+  expandedFormLinkRecordReloadRows.value.set(key, {
+    isFromLinkRecord: true,
+    relatedTableMetaId: params.relatedTableMetaId,
+    rowId: params.rowId,
+    path: params.path,
+    skipIfWarningCleared: true,
+  })
 }
 
-reloadViewDataHook.on(markExpandedFormDirtyOnLinkRecordReload)
+reloadViewDataHook.on(rememberExpandedFormLinkRecordReload)
 
-const reloadViewDataAfterExpandedFormClose = () => {
-  if (!shouldReloadAfterExpandedFormClose.value) return
+const refreshExpandedFormLinkRecordRowsAfterClose = () => {
+  const rowsToRefresh = Array.from(expandedFormLinkRecordReloadRows.value.values())
+  if (!rowsToRefresh.length) return
 
-  shouldReloadAfterExpandedFormClose.value = false
-  reloadViewDataHook?.trigger({ shouldShowLoading: false })
+  expandedFormLinkRecordReloadRows.value.clear()
+
+  rowsToRefresh.forEach((params) => {
+    reloadViewDataHook?.trigger({
+      ...params,
+      shouldShowLoading: false,
+    })
+  })
 }
 
 watch(expandedFormDlg, (isOpen, wasOpen) => {
   if (wasOpen && !isOpen) {
-    reloadViewDataAfterExpandedFormClose()
+    refreshExpandedFormLinkRecordRowsAfterClose()
   }
 })
 
 watch(expandedFormOnRowIdDlg, (isOpen, wasOpen) => {
   if (wasOpen && !isOpen) {
-    reloadViewDataAfterExpandedFormClose()
+    refreshExpandedFormLinkRecordRowsAfterClose()
   }
 })
 
@@ -232,7 +261,7 @@ const smartsheetEvents = (event: SmartsheetStoreEvents) => {
 eventBus.on(smartsheetEvents)
 
 onBeforeUnmount(() => {
-  reloadViewDataHook.off(markExpandedFormDirtyOnLinkRecordReload)
+  reloadViewDataHook.off(rememberExpandedFormLinkRecordReload)
   eventBus.off(smartsheetEvents)
 })
 

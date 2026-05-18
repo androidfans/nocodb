@@ -48,6 +48,7 @@ export const ReloadViewDataHookInj: InjectionKey<
     relatedTableMetaId?: string
     rowId?: string
     path?: Array<number>
+    skipIfWarningCleared?: boolean
     skipLoadingRowId?: string
   } | void>
 > = Symbol('reload-view-data-injection')

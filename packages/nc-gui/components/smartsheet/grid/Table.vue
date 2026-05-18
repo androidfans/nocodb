@@ -1627,13 +1627,12 @@ type ReloadViewDataParams = void | {
 async function refreshCachedLinkRecordRow(rowId?: string) {
   if (!rowId || !meta.value?.id) return
 
-  const rowIndex = dataRef.value.findIndex((row) => {
+  let rowIndex = dataRef.value.findIndex((row) => {
     return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
   })
 
   if (rowIndex === -1) return
 
-  const cachedRow = dataRef.value[rowIndex]
   const record = await $api.dbTableRow.read(
     NOCO,
     meta.value.base_id || (view.value as any)?.base_id,
@@ -1644,6 +1643,13 @@ async function refreshCachedLinkRecordRow(rowId?: string) {
     },
   )
 
+  rowIndex = dataRef.value.findIndex((row) => {
+    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
+  })
+
+  if (rowIndex === -1) return
+
+  const cachedRow = dataRef.value[rowIndex]
   const rowMeta = {
     ...cachedRow.rowMeta,
     ...getEvaluatedRowMetaRowColorInfo(record),
@@ -1659,10 +1665,12 @@ async function refreshCachedLinkRecordRow(rowId?: string) {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
     ),
-    isRowOrderUpdated: sorts.value.some((sort) => {
-      const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
-      return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
-    }),
+    isRowOrderUpdated:
+      cachedRow.rowMeta?.isRowOrderUpdated ||
+      sorts.value.some((sort) => {
+        const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
+        return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
+      }),
     isRlsHidden: !!record.__nc_rls_hidden,
   }
   delete rowMeta.ltarState

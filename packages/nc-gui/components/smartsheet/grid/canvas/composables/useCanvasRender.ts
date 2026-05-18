@@ -1920,7 +1920,7 @@ export function useCanvasRender({
     const colorWhite = _rowColors.white
     const colorGray200 = _rowColors.gray200
     const colorGray300 = _rowColors.gray300
-    let warningRow: { row: Row; yOffset: number } | null = null
+    const warningRows: { row: Row; yOffset: number }[] = []
     const dataCache = getDataCache()
 
     // Pre-cache reactive refs accessed per-row to avoid repeated .value proxy reads in the loop
@@ -2013,7 +2013,7 @@ export function useCanvasRender({
         }
 
         if (row?.rowMeta.isValidationFailed || row?.rowMeta.isRowOrderUpdated || row?.rowMeta.isRlsHidden) {
-          warningRow = { row, yOffset }
+          warningRows.push({ row, yOffset })
         }
 
         yOffset += _rowH
@@ -2080,38 +2080,40 @@ export function useCanvasRender({
       }
     }
 
-    if (warningRow) {
+    if (warningRows.length) {
       const orange = getColor(themeV4Colors.yellow['500'])
-      // Warning top border
-      ctx.strokeStyle = 'orange'
-      ctx.beginPath()
-      ctx.moveTo(0, warningRow.yOffset)
-      ctx.lineTo(adjustedWidth, warningRow.yOffset)
-      ctx.lineWidth = 2
-      ctx.stroke()
+      for (const warningRow of warningRows) {
+        // Warning top border
+        ctx.strokeStyle = 'orange'
+        ctx.beginPath()
+        ctx.moveTo(0, warningRow.yOffset)
+        ctx.lineTo(adjustedWidth, warningRow.yOffset)
+        ctx.lineWidth = 2
+        ctx.stroke()
 
-      // Warning bottom border
-      ctx.strokeStyle = 'orange'
-      ctx.beginPath()
-      ctx.moveTo(0, warningRow.yOffset + rowHeight.value)
-      ctx.lineTo(adjustedWidth, warningRow.yOffset + rowHeight.value)
-      ctx.lineWidth = 2
-      ctx.stroke()
+        // Warning bottom border
+        ctx.strokeStyle = 'orange'
+        ctx.beginPath()
+        ctx.moveTo(0, warningRow.yOffset + rowHeight.value)
+        ctx.lineTo(adjustedWidth, warningRow.yOffset + rowHeight.value)
+        ctx.lineWidth = 2
+        ctx.stroke()
 
-      roundedRect(ctx, 0, warningRow.yOffset + rowHeight.value, 90, 25, { bottomRight: 6 }, { backgroundColor: orange })
-      renderSingleLineText(ctx, {
-        text: warningRow.row.rowMeta.isValidationFailed
-          ? 'Row filtered'
-          : warningRow.row.rowMeta.isRlsHidden
-          ? 'Row hidden'
-          : 'Row moved',
-        x: 10,
-        y: warningRow.yOffset + rowHeight.value,
-        py: 7,
-        fillStyle: getColor(themeV4Colors.gray['800']),
-        fontSize: 12,
-        fontFamily: '600 12px Inter',
-      })
+        roundedRect(ctx, 0, warningRow.yOffset + rowHeight.value, 90, 25, { bottomRight: 6 }, { backgroundColor: orange })
+        renderSingleLineText(ctx, {
+          text: warningRow.row.rowMeta.isValidationFailed
+            ? 'Row filtered'
+            : warningRow.row.rowMeta.isRlsHidden
+            ? 'Row hidden'
+            : 'Row moved',
+          x: 10,
+          y: warningRow.yOffset + rowHeight.value,
+          py: 7,
+          fillStyle: getColor(themeV4Colors.gray['800']),
+          fontSize: 12,
+          fontFamily: '600 12px Inter',
+        })
+      }
     }
     renderActiveState(ctx, activeState)
 
@@ -2743,7 +2745,7 @@ export function useCanvasRender({
       column: CanvasGridColumn
     }[] = []
 
-    let warningRow: { row: Row; yOffset: number } | null = null
+    const warningRows: { row: Row; yOffset: number }[] = []
     yOffset += 1
     const indent = level * 13 + 1
 
@@ -2809,7 +2811,7 @@ export function useCanvasRender({
         row?.rowMeta.isGroupChanged ||
         row?.rowMeta.isRlsHidden
       ) {
-        warningRow = { row, yOffset }
+        warningRows.push({ row, yOffset })
       }
 
       yOffset += rowHeight.value
@@ -2923,41 +2925,43 @@ export function useCanvasRender({
       yOffset += _headerRowHeight
     }
 
-    if (warningRow) {
+    if (warningRows.length) {
       const orange = getColor(themeV4Colors.yellow['500'])
       // Group level x axis offset
       const gXOffset = level * 13
 
-      // Warning top border
-      ctx.strokeStyle = 'orange'
-      ctx.beginPath()
-      ctx.moveTo(gXOffset, warningRow.yOffset)
-      ctx.lineTo(adjustedWidth + gXOffset + 2, warningRow.yOffset)
-      ctx.lineWidth = 2
-      ctx.stroke()
+      for (const warningRow of warningRows) {
+        // Warning top border
+        ctx.strokeStyle = 'orange'
+        ctx.beginPath()
+        ctx.moveTo(gXOffset, warningRow.yOffset)
+        ctx.lineTo(adjustedWidth + gXOffset + 2, warningRow.yOffset)
+        ctx.lineWidth = 2
+        ctx.stroke()
 
-      // Warning bottom border
-      ctx.strokeStyle = 'orange'
-      ctx.beginPath()
-      ctx.moveTo(gXOffset, warningRow.yOffset + rowHeight.value)
-      ctx.lineTo(adjustedWidth + gXOffset + 2, warningRow.yOffset + rowHeight.value)
-      ctx.lineWidth = 2
-      ctx.stroke()
+        // Warning bottom border
+        ctx.strokeStyle = 'orange'
+        ctx.beginPath()
+        ctx.moveTo(gXOffset, warningRow.yOffset + rowHeight.value)
+        ctx.lineTo(adjustedWidth + gXOffset + 2, warningRow.yOffset + rowHeight.value)
+        ctx.lineWidth = 2
+        ctx.stroke()
 
-      roundedRect(ctx, gXOffset, warningRow.yOffset + rowHeight.value, 90, 25, { bottomRight: 6 }, { backgroundColor: orange })
-      renderSingleLineText(ctx, {
-        text: warningRow.row.rowMeta.isValidationFailed
-          ? 'Row filtered'
-          : warningRow.row.rowMeta.isRlsHidden
-          ? 'Row hidden'
-          : 'Row moved',
-        x: 10 + gXOffset,
-        y: warningRow.yOffset + rowHeight.value,
-        py: 7,
-        fillStyle: getColor(themeV4Colors.gray['800']),
-        fontSize: 12,
-        fontFamily: '600 12px Inter',
-      })
+        roundedRect(ctx, gXOffset, warningRow.yOffset + rowHeight.value, 90, 25, { bottomRight: 6 }, { backgroundColor: orange })
+        renderSingleLineText(ctx, {
+          text: warningRow.row.rowMeta.isValidationFailed
+            ? 'Row filtered'
+            : warningRow.row.rowMeta.isRlsHidden
+            ? 'Row hidden'
+            : 'Row moved',
+          x: 10 + gXOffset,
+          y: warningRow.yOffset + rowHeight.value,
+          py: 7,
+          fillStyle: getColor(themeV4Colors.gray['800']),
+          fontSize: 12,
+          fontFamily: '600 12px Inter',
+        })
+      }
     }
 
     const postRenderCbk = () => {

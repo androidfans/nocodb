@@ -1875,7 +1875,6 @@ const refreshCachedLinkRecordRow = async (rowId?: string) => {
 
   if (!rowEntry) return
 
-  const [rowIndex, cachedRow] = rowEntry
   const record = await $api.dbTableRow.read(
     NOCO,
     meta.value.base_id || (view.value as any)?.base_id,
@@ -1886,6 +1885,13 @@ const refreshCachedLinkRecordRow = async (rowId?: string) => {
     },
   )
 
+  const latestRowEntry = Array.from(cachedRows.value.entries()).find(([, row]) => {
+    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
+  })
+
+  if (!latestRowEntry) return
+
+  const [rowIndex, cachedRow] = latestRowEntry
   const rowMeta = {
     ...cachedRow.rowMeta,
     ...getEvaluatedRowMetaRowColorInfo(record),
@@ -1901,10 +1907,12 @@ const refreshCachedLinkRecordRow = async (rowId?: string) => {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       },
     ),
-    isRowOrderUpdated: sorts.value.some((sort) => {
-      const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
-      return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
-    }),
+    isRowOrderUpdated:
+      cachedRow.rowMeta?.isRowOrderUpdated ||
+      sorts.value.some((sort) => {
+        const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
+        return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
+      }),
     isRlsHidden: !!record.__nc_rls_hidden,
   }
   delete rowMeta.ltarState

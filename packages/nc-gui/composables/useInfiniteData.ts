@@ -2411,6 +2411,8 @@ export function useInfiniteData(args: {
         }
 
         const { cachedRow } = found
+        const previousRow = { ...cachedRow.row }
+        const updatedRow = { ...previousRow, ...(payload ?? {}) }
 
         // If the update changes any group-by column value, the row needs to
         // move between groups (or into a new group). We can't do that in
@@ -2426,12 +2428,23 @@ export function useInfiniteData(args: {
           }
         }
 
+        const needsResorting =
+          cachedRow.rowMeta.isRowOrderUpdated ||
+          willSortOrderChange({
+            row: {
+              ...cachedRow,
+              row: previousRow,
+            },
+            newData: updatedRow,
+            path: cachedRow.rowMeta.path ?? [],
+          })
+
         Object.assign(cachedRow.row, payload)
         Object.assign(cachedRow.oldRow, payload)
 
         const isValidationFailed = !validateRowFilters(
           [...allFilters.value, ...computedWhereFilter.value],
-          payload,
+          updatedRow,
           meta.value?.columns as ColumnType[],
           getBaseType(viewMeta.value?.view?.source_id),
           metas.value,
@@ -2443,8 +2456,11 @@ export function useInfiniteData(args: {
         )
 
         cachedRow.rowMeta.isValidationFailed = isValidationFailed
+        cachedRow.rowMeta.isRowOrderUpdated = needsResorting
+        cachedRow.rowMeta.isRlsHidden = !!updatedRow.__nc_rls_hidden
         cachedRow.rowMeta.changed = false
-        Object.assign(cachedRow.rowMeta, getEvaluatedRowMetaRowColorInfo(payload))
+        Object.assign(cachedRow.rowMeta, getEvaluatedRowMetaRowColorInfo(updatedRow))
+        cachedRow.rowMeta.buttonDisabled = evaluateButtonVisibility(updatedRow)
 
         callbacks?.syncVisibleData?.()
       } catch (e) {
