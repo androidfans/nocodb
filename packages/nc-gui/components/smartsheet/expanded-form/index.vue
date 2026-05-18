@@ -669,6 +669,9 @@ if (isKanban.value) {
 }
 provide(IsExpandedFormOpenInj, isExpanded)
 
+// Row switching can issue overlapping row/comment loads. Only the latest
+// trigger may clear the form-level loading state; stale triggers still settle
+// but must not re-enable destructive actions for the previous row.
 let latestTriggerRowLoadSeq = 0
 
 const triggerRowLoad = async (rowId?: string) => {
@@ -894,12 +897,15 @@ useActiveKeydownListener(
 const showDeleteRowModal = ref(false)
 
 const onDeleteRowClick = () => {
+  // During row navigation the visible primary key can still belong to the
+  // previous row. Keep delete blocked until the latest row load has settled.
   if (isLoading.value) return
 
   showDeleteRowModal.value = true
 }
 
 const onConfirmDeleteRowClick = async () => {
+  // Double guard for delayed clicks or an already-open confirm modal.
   if (isLoading.value) return
 
   await deleteRowById(primaryKey.value || undefined)

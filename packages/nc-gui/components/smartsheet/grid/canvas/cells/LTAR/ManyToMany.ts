@@ -411,6 +411,8 @@ export const ManyToManyCellRenderer: CellRenderer = {
           if (rowId) {
             const relatedColumns = (column.relatedTableMeta?.columns || []) as ColumnType[]
             const fullCellValue = column.title ? row.row[column.title] : undefined
+            // Prefer the full cell value so keyboard navigation can reach
+            // linked records that were not rendered as visible canvas chips.
             const siblings = ncIsArray(fullCellValue)
               ? fullCellValue.filter((item) => ncIsObject(item))
               : cellRenderStore.ltar.filter((item) => ncIsObject(item.value)).map((item) => item.value)

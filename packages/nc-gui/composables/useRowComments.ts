@@ -13,6 +13,8 @@ export interface CommentTypeExtended extends CommentType {
 const [useProvideRowComments, useRowComments] = useInjectionState((meta: Ref<TableType>, row: Ref<Row>) => {
   const isCommentsLoading = ref(false)
 
+  // Comments are loaded alongside expanded-form rows. Keep stale responses
+  // from displaying comments for a row the user has already navigated past.
   let latestLoadCommentsRequestSeq = 0
 
   const { user } = useGlobal()

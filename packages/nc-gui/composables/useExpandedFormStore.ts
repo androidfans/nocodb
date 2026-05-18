@@ -56,6 +56,8 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
 
     const localOnlyChanges = ref<Record<string, any>>({})
 
+    // Expanded-form navigation may request multiple records in quick
+    // succession. Older reads must not overwrite the row selected later.
     let latestLoadRowRequestSeq = 0
 
     const basesStore = useBases()

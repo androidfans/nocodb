@@ -7,6 +7,8 @@ interface UseExpandedFormSiblingNavigationOptions {
   columns: ColumnType[]
 }
 
+// Shared by DOM chips and canvas chips so detached expanded forms navigate the
+// same sibling list regardless of which LTAR renderer opened them.
 export function useExpandedFormSiblingNavigation({ state, siblings, columns }: UseExpandedFormSiblingNavigationOptions) {
   const updateSiblingState = (nextIndex: number) => {
     const nextItem = siblings[nextIndex]
