@@ -42,7 +42,7 @@ export default {
 <template>
   <div class="h-full flex flex-row">
     <div
-      class="h-full flex xs:w-full flex-col overflow-hidden"
+      class="h-full flex xs:w-full flex-col overflow-hidden min-w-0"
       :class="{
         'w-full': !showRightSections,
         'flex-1': showRightSections,

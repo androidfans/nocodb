@@ -140,7 +140,7 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
     class="nc-expanded-form-row w-full"
   >
     <div
-      class="flex items-start nc-expanded-cell min-h-[32px]"
+      class="flex items-start nc-expanded-cell min-h-[32px] min-w-0"
       :class="{
         'flex-row <lg:(flex-col w-full)': !props.forceVerticalMode,
         'flex-col w-full': props.forceVerticalMode,
@@ -189,7 +189,7 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
       <NcTooltip
         v-else
         :tooltip-style="{ zIndex: '1049' }"
-        class="<lg:(!w-full !flex-none) lg:flex-1 flex"
+        class="<lg:(!w-full !flex-none) lg:flex-1 flex min-w-0"
         :class="{
           'w-full !flex-none': props.forceVerticalMode,
           'lg:max-w-none': !props.forceVerticalMode && props.isWideLayout,
@@ -204,7 +204,7 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
         }}</template>
         <PermissionsTooltip
           v-if="col.title"
-          class="w-full"
+          class="w-full min-w-0"
           :tooltip-style="{ zIndex: '1049' }"
           :entity="PermissionEntity.FIELD"
           :entity-id="col.id"
@@ -216,7 +216,7 @@ const isSyncedColumn = (column: ColumnType) => meta.value?.synced && column?.rea
         >
           <template #default="{ isAllowed }">
             <SmartsheetDivDataCell
-              class="flex-1 bg-nc-bg-default min-h-8 flex items-center relative"
+              class="flex-1 bg-nc-bg-default min-h-8 flex items-center relative min-w-0"
               :class="{
                 'w-full': props.forceVerticalMode,
                 '!min-h-[272px] items-start': isTextArea(col) && props.isWideLayout,

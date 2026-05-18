@@ -408,7 +408,12 @@ export const ManyToManyCellRenderer: CellRenderer = {
 
           const rowId = extractPkFromRow(cellItem.value, (column.relatedTableMeta?.columns || []) as ColumnType[])
           if (rowId) {
-            openDetachedExpandedForm({
+            const relatedColumns = (column.relatedTableMeta?.columns || []) as ColumnType[]
+            const fullCellValue = column.title ? row.row[column.title] : undefined
+            const siblings = ncIsArray(fullCellValue)
+              ? fullCellValue.filter((item) => ncIsObject(item))
+              : cellRenderStore.ltar.filter((item) => ncIsObject(item.value)).map((item) => item.value)
+            const state = reactive({
               isOpen: true,
               row: { row: cellItem.value, rowMeta: {}, oldRow: { ...cellItem.value } },
               meta: column.relatedTableMeta || ({} as TableType),
@@ -416,7 +421,35 @@ export const ManyToManyCellRenderer: CellRenderer = {
               useMetaFields: true,
               maintainDefaultViewOrder: true,
               loadRow: !isPublic,
+              showNextPrevIcons: siblings.length > 1,
+              firstRow: false,
+              lastRow: false,
+              next: () => navigateSibling(1),
+              prev: () => navigateSibling(-1),
             })
+
+            const updateSiblingState = (nextIndex: number) => {
+              const nextItem = siblings[nextIndex]
+              const nextRowId = nextItem ? extractPkFromRow(nextItem, relatedColumns) : undefined
+              if (!nextItem || !nextRowId) return
+
+              state.row = { row: nextItem, rowMeta: {}, oldRow: { ...nextItem } }
+              state.rowId = nextRowId
+              state.firstRow = nextIndex === 0
+              state.lastRow = nextIndex === siblings.length - 1
+            }
+
+            const findCurrentSiblingIndex = () => {
+              const currentIndex = siblings.findIndex((sibling) => extractPkFromRow(sibling, relatedColumns) === state.rowId)
+              return currentIndex === -1 ? 0 : currentIndex
+            }
+
+            function navigateSibling(dir: 1 | -1) {
+              updateSiblingState(findCurrentSiblingIndex() + dir)
+            }
+
+            updateSiblingState(findCurrentSiblingIndex())
+            openDetachedExpandedForm(state)
           }
 
           /**

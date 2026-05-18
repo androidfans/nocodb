@@ -28,8 +28,13 @@ const shouldClose = (isVisible: boolean, i: number) => {
       :breadcrumbs="state.breadcrumbs"
       :new-record-submit-btn-text="state.newRecordSubmitBtnText"
       :new-record-header="state.newRecordHeader"
+      :show-next-prev-icons="state.showNextPrevIcons"
+      :first-row="state.firstRow"
+      :last-row="state.lastRow"
       @update:model-value="shouldClose($event, i)"
       @cancel="close(i)"
+      @next="state?.next?.()"
+      @prev="state?.prev?.()"
       @created-record="state?.createdRecord?.($event)"
     />
   </template>

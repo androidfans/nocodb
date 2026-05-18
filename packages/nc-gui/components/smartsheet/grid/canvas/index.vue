@@ -38,7 +38,6 @@ import { CanvasElement, ElementTypes } from './utils/CanvasElement'
 import AddNewRowMenu from './components/AddNewRowMenu.vue'
 import GroupContextMenu from './components/GroupHeaderMenu.vue'
 import type { Row } from '#imports'
-import { validateRowFilters } from '~/utils/dataUtils'
 
 const props = defineProps<{
   totalRows: number
@@ -186,8 +185,6 @@ const { metas, getMeta } = useMetas()
 
 const { withLoading } = useLoadingTrigger()
 
-const { getEvaluatedRowMetaRowColorInfo } = useViewRowColorRender()
-
 const { showRecordPlanLimitExceededModal, navigateToPricing } = useEeConfig()
 
 // Props to Refs
@@ -270,11 +267,10 @@ const { height, width } = useElementSize(wrapperRef)
 const { height: windowHeight, width: windowWidth } = useWindowSize()
 const { aggregations, loadViewAggregate } = useViewAggregateOrThrow()
 const { isDataReadOnly, isUIAllowed, isMetaReadOnly } = useRoles()
-const { isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode, appInfo, user } = useGlobal()
+const { isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode, appInfo } = useGlobal()
 const { selectedTemplate } = useRecordTemplate()
 const baseStore = useBase()
 const { base } = storeToRefs(baseStore)
-const { getBaseType } = baseStore
 const route = useRoute()
 const { $e, $api } = useNuxtApp()
 const { t } = useI18n()
@@ -429,6 +425,14 @@ const {
   groupByColumns,
   fetchMissingGroupChunks,
   getDataCache,
+})
+
+const { refreshCachedRow } = useRefreshCachedRow({
+  meta,
+  view,
+  allFilters,
+  validFiltersFromUrlParams,
+  sorts,
 })
 
 // File drop to create records
@@ -2310,67 +2314,23 @@ const handleMouseLeave = () => {
 }
 
 const refreshCachedLinkRecordRow = async (rowId?: string, path: Array<number> = [], skipIfWarningCleared = false) => {
-  if (!rowId || !meta.value?.id) return
-
   const dataCache = getDataCache(path)
-  const rowEntry = Array.from(dataCache.cachedRows.value.entries()).find(([, row]) => {
-    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
-  })
-
-  if (!rowEntry) return
-
   const refreshSeq = rowWarningClearSeq.value
-  const record = await $api.dbTableRow.read(
-    NOCO,
-    meta.value.base_id || (view.value as any)?.base_id,
-    meta.value.id,
-    encodeURIComponent(rowId),
-    {
-      getHiddenColumn: true,
-    },
-  )
+  let applied = false
 
-  if (skipIfWarningCleared && refreshSeq !== rowWarningClearSeq.value) return
-
-  const latestRowEntry = Array.from(dataCache.cachedRows.value.entries()).find(([, row]) => {
-    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
-  })
-
-  if (!latestRowEntry) return
-
-  const [rowIndex, cachedRow] = latestRowEntry
-  const rowMeta = {
-    ...cachedRow.rowMeta,
-    ...getEvaluatedRowMetaRowColorInfo(record),
-    isValidationFailed: !validateRowFilters(
-      [...allFilters.value, ...validFiltersFromUrlParams.value],
-      record,
-      meta.value?.columns as ColumnType[],
-      getBaseType((view.value as any)?.source_id),
-      metas.value,
-      meta.value?.base_id,
-      {
-        currentUser: user.value?.id ? { id: user.value.id, email: user.value.email } : undefined,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-    ),
-    isRowOrderUpdated:
-      cachedRow.rowMeta?.isRowOrderUpdated ||
-      sorts.value.some((sort) => {
-        const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
-        return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
+  await refreshCachedRow(rowId, {
+    findRow: (targetRowId) =>
+      Array.from(dataCache.cachedRows.value.entries()).find(([, row]) => {
+        return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${targetRowId}`
       }),
-    isRlsHidden: !!record.__nc_rls_hidden,
-  }
-  delete rowMeta.ltarState
-
-  dataCache.cachedRows.value.set(rowIndex, {
-    ...cachedRow,
-    row: record,
-    oldRow: { ...record },
-    rowMeta,
+    setRow: (rowIndex, row) => {
+      dataCache.cachedRows.value.set(rowIndex, row)
+      applied = true
+    },
+    shouldApply: () => !skipIfWarningCleared || refreshSeq === rowWarningClearSeq.value,
   })
-  triggerRefreshCanvas()
+
+  if (applied) triggerRefreshCanvas()
 }
 
 const reloadViewDataHookHandler = withLoading(async (params) => {

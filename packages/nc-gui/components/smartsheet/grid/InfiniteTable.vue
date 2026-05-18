@@ -21,7 +21,6 @@ import axios from 'axios'
 import { useColumnDrag } from './useColumnDrag'
 import { useRowDragging } from './useRowDragging'
 import { type CellRange, NavigateDir, type Row, type ViewActionState } from '#imports'
-import { validateRowFilters } from '~/utils/dataUtils'
 
 const props = defineProps<{
   totalRows: number
@@ -121,7 +120,7 @@ const openNewRecordFormHook = inject(OpenNewRecordFormHookInj, createEventHook()
 
 const reloadVisibleDataHook = inject(ReloadVisibleDataHookInj, undefined)
 
-const { appInfo, isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode, user } = useGlobal()
+const { appInfo, isMobileMode, isAddNewRecordGridMode, setAddNewRecordGridMode } = useGlobal()
 
 const {
   isPkAvail,
@@ -140,9 +139,7 @@ const { $e, $api } = useNuxtApp()
 
 const { t } = useI18n()
 
-const { metas, getMeta } = useMetas()
-
-const { getBaseType } = useBase()
+const { getMeta } = useMetas()
 
 const { addUndo, clone, defineViewScope } = useUndoRedo()
 
@@ -168,7 +165,13 @@ const { addLTARRef, syncLTARRefs, clearLTARCell, cleaMMCell } = useSmartsheetLta
 
 const { loadViewAggregate } = useViewAggregateOrThrow()
 
-const { getEvaluatedRowMetaRowColorInfo } = useViewRowColorRender()
+const { refreshCachedRow } = useRefreshCachedRow({
+  meta,
+  view,
+  allFilters,
+  validFiltersFromUrlParams,
+  sorts,
+})
 
 const { isAiFeaturesEnabled, generateRows, generatingRows, generatingColumnRows, generatingColumns, aiIntegrations } = useNocoAi()
 
@@ -1867,61 +1870,12 @@ watch(activeCell, (activeCell) => {
 })
 
 const refreshCachedLinkRecordRow = async (rowId?: string) => {
-  if (!rowId || !meta.value?.id) return
-
-  const rowEntry = Array.from(cachedRows.value.entries()).find(([, row]) => {
-    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
-  })
-
-  if (!rowEntry) return
-
-  const record = await $api.dbTableRow.read(
-    NOCO,
-    meta.value.base_id || (view.value as any)?.base_id,
-    meta.value.id,
-    encodeURIComponent(rowId),
-    {
-      getHiddenColumn: true,
-    },
-  )
-
-  const latestRowEntry = Array.from(cachedRows.value.entries()).find(([, row]) => {
-    return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${rowId}`
-  })
-
-  if (!latestRowEntry) return
-
-  const [rowIndex, cachedRow] = latestRowEntry
-  const rowMeta = {
-    ...cachedRow.rowMeta,
-    ...getEvaluatedRowMetaRowColorInfo(record),
-    isValidationFailed: !validateRowFilters(
-      [...allFilters.value, ...validFiltersFromUrlParams.value],
-      record,
-      meta.value?.columns as ColumnType[],
-      getBaseType((view.value as any)?.source_id),
-      metas.value,
-      meta.value?.base_id,
-      {
-        currentUser: user.value?.id ? { id: user.value.id, email: user.value.email } : undefined,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      },
-    ),
-    isRowOrderUpdated:
-      cachedRow.rowMeta?.isRowOrderUpdated ||
-      sorts.value.some((sort) => {
-        const title = meta.value?.columns?.find((col) => col.id === sort.fk_column_id)?.title
-        return !!title && JSON.stringify(cachedRow.row[title]) !== JSON.stringify(record[title])
+  await refreshCachedRow(rowId, {
+    findRow: (targetRowId) =>
+      Array.from(cachedRows.value.entries()).find(([, row]) => {
+        return `${extractPkFromRow(row.row, meta.value?.columns as ColumnType[])}` === `${targetRowId}`
       }),
-    isRlsHidden: !!record.__nc_rls_hidden,
-  }
-  delete rowMeta.ltarState
-
-  cachedRows.value.set(rowIndex, {
-    ...cachedRow,
-    row: record,
-    oldRow: { ...record },
-    rowMeta,
+    setRow: (rowIndex, row) => cachedRows.value.set(rowIndex, row),
   })
 }
 

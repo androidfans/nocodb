@@ -239,6 +239,8 @@ onUnmounted(() => {
             :item="cell.item"
             :value="cell.value"
             :column="hasManyColumn"
+            :sibling-items="cells.map((cell) => cell.item)"
+            :sibling-index="i"
             :show-unlink-button="false"
             :truncate="false"
             @unlink="unlinkRef(cell.item)"

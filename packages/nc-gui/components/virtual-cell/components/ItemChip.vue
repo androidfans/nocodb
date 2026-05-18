@@ -10,6 +10,8 @@ interface Props {
   border?: boolean
   readonly?: boolean
   truncate?: boolean
+  siblingItems?: any[]
+  siblingIndex?: number
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -119,7 +121,8 @@ function openExpandedForm() {
 
   if (!rowId) return
 
-  open({
+  const siblings = props.siblingItems?.length ? props.siblingItems : [item.value]
+  const state = reactive({
     isOpen: true,
     row: { row: item.value, rowMeta: {}, oldRow: { ...item.value } },
     meta: relatedTableMeta.value,
@@ -128,8 +131,43 @@ function openExpandedForm() {
     maintainDefaultViewOrder: true,
     loadRow: !isPublic.value,
     skipReload: true,
+    showNextPrevIcons: siblings.length > 1,
+    firstRow: false,
+    lastRow: false,
+    next: () => navigateSibling(1),
+    prev: () => navigateSibling(-1),
     createdRecord: onCreatedRecord,
   })
+
+  const updateSiblingState = (nextIndex: number) => {
+    const nextItem = siblings[nextIndex]
+    const nextRowId = nextItem ? extractPkFromRow(nextItem, relatedTableMeta.value.columns as ColumnType[]) : undefined
+    if (!nextItem || !nextRowId) return false
+
+    state.row = { row: nextItem, rowMeta: {}, oldRow: { ...nextItem } }
+    state.rowId = nextRowId
+    state.firstRow = nextIndex === 0
+    state.lastRow = nextIndex === siblings.length - 1
+
+    return true
+  }
+
+  const findCurrentSiblingIndex = () => {
+    const currentRowId = state.rowId
+    const currentIndex = siblings.findIndex((sibling) => {
+      return extractPkFromRow(sibling, relatedTableMeta.value.columns as ColumnType[]) === currentRowId
+    })
+
+    return currentIndex === -1 ? 0 : currentIndex
+  }
+
+  function navigateSibling(dir: 1 | -1) {
+    const nextIndex = findCurrentSiblingIndex() + dir
+    updateSiblingState(nextIndex)
+  }
+
+  updateSiblingState(props.siblingIndex !== undefined && props.siblingIndex >= 0 ? props.siblingIndex : findCurrentSiblingIndex())
+  open(state)
 
   function onCreatedRecord() {
     const reloadParams = {

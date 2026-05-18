@@ -136,6 +136,8 @@ const isLoading = ref(true)
 
 const isSaving = ref(false)
 
+const isRecordReloading = ref(false)
+
 // Template mode: editable template name in the header
 const editableTemplateName = ref(props.templateName || '')
 
@@ -672,6 +674,24 @@ const triggerRowLoad = async (rowId?: string) => {
   isLoading.value = false
 }
 
+const reloadCurrentRecord = async () => {
+  if (isNew.value || isRecordReloading.value) return
+
+  isRecordReloading.value = true
+  isLoading.value = true
+
+  try {
+    const currentRowId = rowId.value ?? primaryKey.value
+
+    await triggerRowLoad(currentRowId)
+    if (activeViewMode.value === ExpandedFormMode.DISCUSSION) {
+      await loadAudits(currentRowId, false)
+    }
+  } finally {
+    isRecordReloading.value = false
+  }
+}
+
 const cellWrapperEl = ref()
 
 onMounted(async () => {
@@ -749,7 +769,13 @@ useActiveKeydownListener(
       e.preventDefault()
     }
 
-    if (!e.altKey || isNew.value || !props.showNextPrevIcons || isActiveInputElementExist(e) || isNestedExpandedFormOpenExist()) {
+    if (
+      !e.altKey ||
+      isNew.value ||
+      !props.showNextPrevIcons ||
+      isActiveInputElementExist(e) ||
+      (isNestedExpandedFormOpenExist() && !isTopMostExpandedForm())
+    ) {
       if (!isSaveShortcut) {
         return
       }
@@ -1024,6 +1050,8 @@ function onTouchEnd() {
 
 const showSendRecordModal = ref(false)
 
+const isDuplicatedRecordDraft = computed(() => duplicatingRowInProgress.value || isUnsavedDuplicatedRecordExist.value)
+
 const visibleMoreOptions = computed(() => {
   // In template/blueprint mode, hide all extra options
   if (props.templateMode || props.blueprintMode) {
@@ -1039,19 +1067,20 @@ const visibleMoreOptions = computed(() => {
     }
   }
   const result = {
-    reloadRecord: !isEeUI,
-    copyRecordUrl: !isNew.value && !!rowId.value,
-    sendRecord: appInfo.value.ee && !isNew.value && !!rowId.value && !isPublic.value,
-    duplicateRecord: isUIAllowed('dataEdit', baseRoles.value) && !isSqlView.value && !isMobileMode.value,
-    deleteRecord: !isNew.value && isUIAllowed('dataEdit', baseRoles.value) && !isSqlView.value,
+    reloadRecord: !isEeUI && !isDuplicatedRecordDraft.value,
+    copyRecordUrl: !duplicatingRowInProgress.value && !isNew.value && !!rowId.value,
+    sendRecord: appInfo.value.ee && !duplicatingRowInProgress.value && !isNew.value && !!rowId.value && !isPublic.value,
+    duplicateRecord:
+      !isDuplicatedRecordDraft.value && isUIAllowed('dataEdit', baseRoles.value) && !isSqlView.value && !isMobileMode.value,
+    deleteRecord: !duplicatingRowInProgress.value && !isNew.value && isUIAllowed('dataEdit', baseRoles.value) && !isSqlView.value,
   }
-  const hasItemsAboveDelete = Object.entries(result).some(([key, value]) => key !== 'deleteRecord' && value)
+  const hasMoreMenuItems = result.sendRecord || (isMobileMode.value && result.copyRecordUrl)
 
   return {
     ...result,
-    showDeleteDivider: result.deleteRecord && hasItemsAboveDelete,
-    showMoreOptionsMenu: hasItemsAboveDelete || result.deleteRecord,
-    allHiddenExceptCopyRecordUrl: !result.reloadRecord && !result.sendRecord && !result.duplicateRecord && !result.deleteRecord,
+    showDeleteDivider: false,
+    showMoreOptionsMenu: hasMoreMenuItems,
+    allHiddenExceptCopyRecordUrl: isMobileMode.value && result.copyRecordUrl && !result.sendRecord,
   }
 })
 
@@ -1100,7 +1129,7 @@ export default {
             <NcTooltip v-if="props.showNextPrevIcons" class="flex items-center">
               <template #title> {{ $t('labels.prevRow') }} {{ renderAltOrOptlKey() }} + ←</template>
               <NcButton
-                :disabled="isFirstRow || isLoading"
+                :disabled="isFirstRow"
                 class="nc-prev-arrow !w-7 !h-7 !text-nc-content-gray-muted !disabled:text-nc-content-brand-hover"
                 type="text"
                 size="xsmall"
@@ -1112,7 +1141,7 @@ export default {
             <NcTooltip v-if="props.showNextPrevIcons" class="flex items-center">
               <template #title> {{ $t('labels.nextRow') }} {{ renderAltOrOptlKey() }} + →</template>
               <NcButton
-                :disabled="isLastRow || isLoading"
+                :disabled="isLastRow"
                 class="nc-next-arrow !w-7 !h-7 !text-nc-content-gray-muted !disabled:text-nc-content-brand-hover"
                 type="text"
                 size="xsmall"
@@ -1232,187 +1261,193 @@ export default {
               </NcButton>
             </template>
           </PermissionsTooltip>
-          <template v-if="showWideLayoutToggle">
-            <NcTooltip>
-              <template #title>{{ expandedFormWideEnabledByUser ? 'Exit Wide Form' : 'Wide Form' }}</template>
-              <NcButton
-                type="text"
-                size="xsmall"
-                class="!w-7 !h-7"
-                :class="{
-                  '!text-nc-content-brand-disabled': expandedFormWideEnabledByUser,
-                  '!text-nc-content-inverted-secondary': !expandedFormWideEnabledByUser,
-                }"
-                @click="toggleExpandedFormWideLayout"
-              >
-                <GeneralIcon :icon="expandedFormWideEnabledByUser ? 'minimize' : 'maximize'" class="h-4 w-4" />
+          <div class="flex gap-2 items-center justify-end">
+            <template v-if="showWideLayoutToggle">
+              <NcTooltip>
+                <template #title>{{ expandedFormWideEnabledByUser ? 'Exit Wide Form' : 'Wide Form' }}</template>
+                <NcButton
+                  type="text"
+                  size="xsmall"
+                  class="!w-7 !h-7"
+                  :class="{
+                    '!text-nc-content-brand-disabled': expandedFormWideEnabledByUser,
+                    '!text-nc-content-inverted-secondary': !expandedFormWideEnabledByUser,
+                  }"
+                  @click="toggleExpandedFormWideLayout"
+                >
+                  <GeneralIcon :icon="expandedFormWideEnabledByUser ? 'minimize' : 'maximize'" class="h-4 w-4" />
+                </NcButton>
+              </NcTooltip>
+            </template>
+            <NcButton
+              v-if="showMobileDiscussionToggle"
+              v-e="['c:row-expand:mobile-discussion-toggle']"
+              class="!w-7 !h-7"
+              type="secondary"
+              size="xsmall"
+              @click="mobileDiscussionMode = !mobileDiscussionMode"
+            >
+              <GeneralIcon
+                :icon="mobileDiscussionMode ? 'menu' : 'ncMessageSquare1Outline'"
+                class="text-md text-nc-content-inverted-secondary"
+              />
+            </NcButton>
+            <NcTooltip v-if="visibleMoreOptions.copyRecordUrl && !isMobileMode" class="!<lg:hidden">
+              <template #title> {{ isRecordLinkCopied ? $t('labels.copiedRecordURL') : $t('labels.copyRecordURL') }} </template>
+              <NcButton class="text-nc-content-inverted-secondary !h-7 !w-7" type="text" size="xsmall" @click="copyRecordUrl()">
+                <div
+                  v-e="['c:row-expand:copy-url']"
+                  data-testid="nc-expanded-form-copy-url"
+                  class="flex items-center relative h-4 w-4"
+                >
+                  <Transition name="icon-fade" :duration="200">
+                    <component :is="iconMap.check" v-if="isRecordLinkCopied" class="cursor-pointer nc-duplicate-row h-4 w-4" />
+                    <component :is="iconMap.copy" v-else class="cursor-pointer nc-duplicate-row h-4 w-4" />
+                  </Transition>
+                </div>
               </NcButton>
             </NcTooltip>
-          </template>
-          <NcButton
-            v-if="showMobileDiscussionToggle"
-            v-e="['c:row-expand:mobile-discussion-toggle']"
-            class="!w-7 !h-7"
-            type="secondary"
-            size="xsmall"
-            @click="mobileDiscussionMode = !mobileDiscussionMode"
-          >
-            <GeneralIcon
-              :icon="mobileDiscussionMode ? 'menu' : 'ncMessageSquare1Outline'"
-              class="text-md text-nc-content-inverted-secondary"
-            />
-          </NcButton>
-          <NcTooltip v-if="visibleMoreOptions.copyRecordUrl && !isMobileMode" class="!<lg:hidden">
-            <template #title> {{ isRecordLinkCopied ? $t('labels.copiedRecordURL') : $t('labels.copyRecordURL') }} </template>
-            <NcButton
-              :disabled="isLoading"
-              class="text-nc-content-inverted-secondary !h-7 !w-7"
-              type="text"
-              size="xsmall"
-              @click="copyRecordUrl()"
-            >
-              <div
-                v-e="['c:row-expand:copy-url']"
-                data-testid="nc-expanded-form-copy-url"
-                class="flex items-center relative h-4 w-4"
+            <NcTooltip v-if="visibleMoreOptions.reloadRecord && !isMobileMode">
+              <template #title>{{ $t('general.reload') }} {{ $t('objects.record') }}</template>
+              <NcButton
+                class="text-nc-content-inverted-secondary !h-7 !w-7"
+                type="text"
+                size="xsmall"
+                @click="reloadCurrentRecord"
               >
-                <Transition name="icon-fade" :duration="200">
-                  <component :is="iconMap.check" v-if="isRecordLinkCopied" class="cursor-pointer nc-duplicate-row h-4 w-4" />
-                  <component :is="iconMap.copy" v-else class="cursor-pointer nc-duplicate-row h-4 w-4" />
-                </Transition>
-              </div>
-            </NcButton>
-          </NcTooltip>
-          <NcDropdown
-            v-if="visibleMoreOptions.showMoreOptionsMenu"
-            placement="bottomRight"
-            :class="{
-              '!lg:hidden': visibleMoreOptions.allHiddenExceptCopyRecordUrl,
-            }"
-          >
-            <NcButton
-              :type="isMobileMode ? 'secondary' : 'text'"
-              size="xsmall"
-              class="nc-expand-form-more-actions !w-7 !h-7"
+                <component
+                  :is="iconMap.reload"
+                  v-e="['c:row-expand:reload']"
+                  class="cursor-pointer h-4 w-4"
+                  data-testid="nc-expanded-form-reload"
+                />
+              </NcButton>
+            </NcTooltip>
+            <NcTooltip v-if="visibleMoreOptions.duplicateRecord && meta?.synced && !isMobileMode">
+              <template #title>{{ $t('msg.info.duplicateNotAvailableForSyncedTable') }}</template>
+              <NcButton disabled class="text-nc-content-inverted-secondary !h-7 !w-7" type="text" size="xsmall">
+                <component
+                  :is="iconMap.duplicate"
+                  class="cursor-pointer nc-duplicate-row h-4 w-4"
+                  data-testid="nc-expanded-form-duplicate"
+                />
+              </NcButton>
+            </NcTooltip>
+            <PermissionsTooltip
+              v-else-if="visibleMoreOptions.duplicateRecord && !isMobileMode"
+              :entity="PermissionEntity.TABLE"
+              :entity-id="meta?.id"
+              :permission="PermissionKey.TABLE_RECORD_ADD"
+              placement="bottom"
+            >
+              <template #default="{ isAllowed }">
+                <NcTooltip>
+                  <template #title>{{ $t('labels.duplicateRecord') }}</template>
+                  <NcButton
+                    :disabled="!isAllowed || isNew"
+                    class="text-nc-content-inverted-secondary !h-7 !w-7"
+                    type="text"
+                    size="xsmall"
+                    @click="!isNew && onDuplicateRow()"
+                  >
+                    <component
+                      :is="iconMap.duplicate"
+                      v-e="['c:row-expand:duplicate']"
+                      class="cursor-pointer nc-duplicate-row h-4 w-4"
+                      data-testid="nc-expanded-form-duplicate"
+                    />
+                  </NcButton>
+                </NcTooltip>
+              </template>
+            </PermissionsTooltip>
+            <NcTooltip v-if="visibleMoreOptions.deleteRecord && meta?.synced && !isMobileMode">
+              <template #title>{{ $t('msg.info.deleteNotAvailableForSyncedTable') }}</template>
+              <NcButton disabled class="text-nc-content-inverted-secondary !h-7 !w-7" type="text" size="xsmall">
+                <GeneralIcon
+                  icon="delete"
+                  class="cursor-pointer nc-delete-row h-4 w-4 !text-nc-content-red-medium"
+                  data-testid="nc-expanded-form-delete"
+                />
+              </NcButton>
+            </NcTooltip>
+            <PermissionsTooltip
+              v-else-if="visibleMoreOptions.deleteRecord && !isMobileMode"
+              :entity="PermissionEntity.TABLE"
+              :entity-id="meta?.id"
+              :permission="PermissionKey.TABLE_RECORD_DELETE"
+              placement="bottom"
+            >
+              <template #default="{ isAllowed }">
+                <NcTooltip>
+                  <template #title>
+                    {{
+                      $t('general.deleteEntity', {
+                        entity: $t('objects.record').toLowerCase(),
+                      })
+                    }}
+                  </template>
+                  <NcButton
+                    :disabled="!isAllowed"
+                    class="text-nc-content-inverted-secondary !h-7 !w-7"
+                    type="text"
+                    size="xsmall"
+                    @click="onDeleteRowClick()"
+                  >
+                    <GeneralIcon
+                      v-e="['c:row-expand:delete']"
+                      icon="delete"
+                      class="cursor-pointer nc-delete-row h-4 w-4 !text-nc-content-red-medium"
+                      data-testid="nc-expanded-form-delete"
+                    />
+                  </NcButton>
+                </NcTooltip>
+              </template>
+            </PermissionsTooltip>
+            <NcDropdown
+              v-if="visibleMoreOptions.showMoreOptionsMenu"
+              placement="bottomRight"
               :class="{
                 '!lg:hidden': visibleMoreOptions.allHiddenExceptCopyRecordUrl,
               }"
-              :disabled="isLoading"
             >
-              <GeneralIcon
-                icon="threeDotVertical"
-                class="text-md"
-                :class="isLoading ? 'text-nc-content-brand-hover' : 'text-nc-content-inverted-secondary'"
-              />
-            </NcButton>
-            <template #overlay>
-              <NcMenu variant="small">
-                <NcMenuItem v-if="visibleMoreOptions.reloadRecord" @click="_loadRow()">
-                  <div v-e="['c:row-expand:reload']" class="flex gap-2 items-center" data-testid="nc-expanded-form-reload">
-                    <component :is="iconMap.reload" class="cursor-pointer" />
-                    {{ $t('general.reload') }} {{ $t('objects.record') }}
-                  </div>
-                </NcMenuItem>
-                <NcMenuItem
-                  v-if="visibleMoreOptions.copyRecordUrl"
-                  type="secondary"
-                  class="!lg:hidden"
-                  :disabled="isLoading"
-                  @click="copyRecordUrl()"
-                >
-                  <div v-e="['c:row-expand:copy-url']" data-testid="nc-expanded-form-copy-url" class="flex gap-2 items-center">
-                    <component :is="iconMap.copy" class="cursor-pointer" />
-                    {{ $t('labels.copyRecordURL') }}
-                  </div>
-                </NcMenuItem>
-                <NcMenuItem v-if="visibleMoreOptions.sendRecord" :disabled="isLoading" @click="showSendRecordModal = true">
-                  <div
-                    v-e="['c:row-expand:send-record']"
-                    data-testid="nc-expanded-form-send-record"
-                    class="flex gap-2 items-center"
+              <NcButton
+                :type="isMobileMode ? 'secondary' : 'text'"
+                size="xsmall"
+                class="nc-expand-form-more-actions !w-7 !h-7"
+                :class="{
+                  '!lg:hidden': visibleMoreOptions.allHiddenExceptCopyRecordUrl,
+                }"
+              >
+                <GeneralIcon icon="threeDotVertical" class="text-md text-nc-content-inverted-secondary" />
+              </NcButton>
+              <template #overlay>
+                <NcMenu variant="small">
+                  <NcMenuItem
+                    v-if="visibleMoreOptions.copyRecordUrl && isMobileMode"
+                    type="secondary"
+                    class="!lg:hidden"
+                    :disabled="isLoading"
+                    @click="copyRecordUrl()"
                   >
-                    <GeneralIcon icon="mail" class="cursor-pointer" />
-                    {{ $t('activity.sendRecord') }}
-                  </div>
-                </NcMenuItem>
-                <NcTooltip v-if="visibleMoreOptions.duplicateRecord && meta?.synced" placement="left">
-                  <template #title>
-                    {{ $t('msg.info.duplicateNotAvailableForSyncedTable') }}
-                  </template>
-                  <NcMenuItem disabled>
-                    <div class="flex gap-2 items-center" data-testid="nc-expanded-form-duplicate">
-                      <component :is="iconMap.duplicate" class="cursor-pointer nc-duplicate-row" />
-                      <span class="-ml-0.25">
-                        {{ $t('labels.duplicateRecord') }}
-                      </span>
+                    <div v-e="['c:row-expand:copy-url']" data-testid="nc-expanded-form-copy-url" class="flex gap-2 items-center">
+                      <component :is="iconMap.copy" class="cursor-pointer" />
+                      {{ $t('labels.copyRecordURL') }}
                     </div>
                   </NcMenuItem>
-                </NcTooltip>
-                <PermissionsTooltip
-                  v-else-if="visibleMoreOptions.duplicateRecord"
-                  :entity="PermissionEntity.TABLE"
-                  :entity-id="meta?.id"
-                  :permission="PermissionKey.TABLE_RECORD_ADD"
-                  placement="right"
-                >
-                  <template #default="{ isAllowed }">
-                    <NcMenuItem :disabled="!isAllowed" @click="!isNew ? onDuplicateRow() : () => {}">
-                      <div
-                        v-e="['c:row-expand:duplicate']"
-                        class="flex gap-2 items-center"
-                        data-testid="nc-expanded-form-duplicate"
-                      >
-                        <component :is="iconMap.duplicate" class="cursor-pointer nc-duplicate-row" />
-                        <span class="-ml-0.25">
-                          {{ $t('labels.duplicateRecord') }}
-                        </span>
-                      </div>
-                    </NcMenuItem>
-                  </template>
-                </PermissionsTooltip>
-                <NcDivider v-if="visibleMoreOptions.showDeleteDivider" />
-                <NcTooltip v-if="visibleMoreOptions.deleteRecord && meta?.synced" placement="left">
-                  <template #title>
-                    {{ $t('msg.info.deleteNotAvailableForSyncedTable') }}
-                  </template>
-                  <NcMenuItem danger disabled>
-                    <div class="flex gap-2 items-center" data-testid="nc-expanded-form-delete">
-                      <GeneralIcon icon="delete" class="cursor-pointer nc-delete-row" />
-                      <span class="-ml-0.25">
-                        {{
-                          $t('general.deleteEntity', {
-                            entity: $t('objects.record').toLowerCase(),
-                          })
-                        }}
-                      </span>
+                  <NcMenuItem v-if="visibleMoreOptions.sendRecord" :disabled="isLoading" @click="showSendRecordModal = true">
+                    <div
+                      v-e="['c:row-expand:send-record']"
+                      data-testid="nc-expanded-form-send-record"
+                      class="flex gap-2 items-center"
+                    >
+                      <GeneralIcon icon="mail" class="cursor-pointer" />
+                      {{ $t('activity.sendRecord') }}
                     </div>
                   </NcMenuItem>
-                </NcTooltip>
-                <PermissionsTooltip
-                  v-else-if="visibleMoreOptions.deleteRecord"
-                  :entity="PermissionEntity.TABLE"
-                  :entity-id="meta?.id"
-                  :permission="PermissionKey.TABLE_RECORD_DELETE"
-                  placement="right"
-                >
-                  <template #default="{ isAllowed }">
-                    <NcMenuItem danger :disabled="!isAllowed" @click="!isNew && onDeleteRowClick()">
-                      <div v-e="['c:row-expand:delete']" class="flex gap-2 items-center" data-testid="nc-expanded-form-delete">
-                        <GeneralIcon icon="delete" class="cursor-pointer nc-delete-row" />
-                        <span class="-ml-0.25">
-                          {{
-                            $t('general.deleteEntity', {
-                              entity: $t('objects.record').toLowerCase(),
-                            })
-                          }}
-                        </span>
-                      </div>
-                    </NcMenuItem>
-                  </template>
-                </PermissionsTooltip>
-              </NcMenu>
-            </template>
-          </NcDropdown>
+                </NcMenu>
+              </template>
+            </NcDropdown>
+          </div>
 
           <NcButton
             v-if="!isMobileMode"

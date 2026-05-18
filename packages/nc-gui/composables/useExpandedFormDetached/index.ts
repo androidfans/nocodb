@@ -18,10 +18,15 @@ export interface UseExpandedFormDetachedProps {
   'blueprintMode'?: boolean
   'newRecordSubmitBtnText'?: string
   'newRecordHeader'?: string
+  'showNextPrevIcons'?: boolean
+  'firstRow'?: boolean
+  'lastRow'?: boolean
   'existingTemplateNames'?: string[]
   'editingTemplateId'?: string
   'blueprintParentTableId'?: string
   'breadcrumbs'?: string[]
+  'next'?: () => void | Promise<void>
+  'prev'?: () => void | Promise<void>
   'createdRecord'?: (row: Row['row']) => void
 }
 

@@ -131,6 +131,8 @@ const expandedFormDlg = ref(false)
 
 const expandedFormRow = ref({})
 
+const expandedFormRowIndex = ref(-1)
+
 /** populate initial state for a new row which is parent/child of current record */
 const newRowState = computed(() => {
   if (isNew.value) return {}
@@ -177,19 +179,61 @@ const newRowState = computed(() => {
 
 const colTitle = computed(() => injectedColumn.value?.title || '')
 
-const onClick = (row: Row) => {
+const findLinkedRowIndex = (record: Record<string, any>) => {
+  const recordId = extractPkFromRow(record, relatedTableMeta.value.columns as ColumnType[])
+  if (!recordId) return -1
+
+  for (const [index, cachedRow] of childrenCachedRows.value.entries()) {
+    const cachedRowId = extractPkFromRow(cachedRow, relatedTableMeta.value.columns as ColumnType[])
+    if (`${cachedRowId}` === `${recordId}`) return index
+  }
+
+  return -1
+}
+
+const onClick = (row: Row & { _index?: number }) => {
   if (isPublic.value || isForm.value) return
   // Don't allow expanding if linked table is not accessible
   if (!isLinkedTableAccessible.value) return
   expandedFormRow.value = row
+  expandedFormRowIndex.value = typeof row._index === 'number' ? row._index : findLinkedRowIndex(row)
+  isNewRecord.value = false
+  isBlueprintMode.value = false
   expandedFormDlg.value = true
 }
+
+const showExpandedFormNextPrevIcons = computed(() => {
+  return !isNewRecord.value && expandedFormRowIndex.value >= 0 && childrenCachedTotalRows.value > 1
+})
+
+const isExpandedFormFirstRow = computed(() => expandedFormRowIndex.value <= 0)
+
+const isExpandedFormLastRow = computed(() => {
+  return expandedFormRowIndex.value < 0 || expandedFormRowIndex.value >= childrenCachedTotalRows.value - 1
+})
+
+const goToExpandedFormSibling = async (dir: 1 | -1) => {
+  const nextIndex = expandedFormRowIndex.value + dir
+  if (nextIndex < 0 || nextIndex >= childrenCachedTotalRows.value) return
+
+  if (!childrenCachedRows.value.has(nextIndex)) {
+    await fetchChildrenChunk(Math.floor(nextIndex / _CHUNK_SIZE))
+  }
+
+  const nextRow = childrenCachedRows.value.get(nextIndex)
+  if (!nextRow) return
+
+  expandedFormRow.value = { ...nextRow, _index: nextIndex }
+  expandedFormRowIndex.value = nextIndex
+}
+
 const addNewRecord = () => {
   if (showRecordPlanLimitExceededModal()) return
   // Don't allow creating new record if linked table is not accessible
   if (!isLinkedTableAccessible.value) return
 
   expandedFormRow.value = {}
+  expandedFormRowIndex.value = -1
   expandedFormDlg.value = true
   isExpandedFormCloseAfterSave.value = true
   isNewRecord.value = true
@@ -692,6 +736,9 @@ const handleKeyDown = (e: KeyboardEvent) => {
         }"
         :state="newRowState"
         :row-id="extractPkFromRow(expandedFormRow, relatedTableMeta.columns as ColumnType[])"
+        :show-next-prev-icons="showExpandedFormNextPrevIcons"
+        :first-row="isExpandedFormFirstRow"
+        :last-row="isExpandedFormLastRow"
         use-meta-fields
         skip-reload
         maintain-default-view-order
@@ -705,6 +752,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
             ? $t('activity.tableNameCreateNewRecord', { tableName: relatedTableMeta?.title })
             : undefined
         "
+        @next="goToExpandedFormSibling(1)"
+        @prev="goToExpandedFormSibling(-1)"
         @created-record="onCreatedRecord"
         @deleted-record="onDeletedRecord"
       />
