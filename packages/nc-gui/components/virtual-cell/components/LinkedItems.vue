@@ -133,6 +133,15 @@ const expandedFormRow = ref({})
 
 const expandedFormRowIndex = ref(-1)
 
+const relatedRecordView = computed(() => {
+  const colOptions = (injectedColumn.value?.colOptions ?? {}) as LinkToAnotherRecordType & { fk_target_view_id?: string | null }
+  const views = relatedTableMeta.value?.views ?? []
+
+  return (colOptions.fk_target_view_id ? views.find((view) => view.id === colOptions.fk_target_view_id) : undefined) ?? views[0]
+})
+
+const expandedFormView = computed(() => (isNewRecord.value ? undefined : relatedRecordView.value))
+
 /** populate initial state for a new row which is parent/child of current record */
 const newRowState = computed(() => {
   if (isNew.value) return {}
@@ -725,6 +734,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
         :load-row="!isPublic && !isBlueprintMode"
         :close-after-save="isExpandedFormCloseAfterSave"
         :meta="relatedTableMeta"
+        :view="expandedFormView"
         :row="{
           row: expandedFormRow,
           oldRow: expandedFormRow,

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { ColumnType } from 'nocodb-sdk'
+import type { ColumnType, LinkToAnotherRecordType } from 'nocodb-sdk'
 import { UITypes, isVirtualCol } from 'nocodb-sdk'
 import type { UseExpandedFormDetachedProps } from '~/composables/useExpandedFormDetached'
 
@@ -60,6 +60,13 @@ const isClickDisabled = computed(() => {
 })
 
 const { open } = useExpandedFormDetached()
+
+const relatedRecordView = computed(() => {
+  const colOptions = (injectedColumn.value?.colOptions ?? {}) as LinkToAnotherRecordType & { fk_target_view_id?: string | null }
+  const views = relatedTableMeta.value?.views ?? []
+
+  return (colOptions.fk_target_view_id ? views.find((view) => view.id === colOptions.fk_target_view_id) : undefined) ?? views[0]
+})
 
 /**
  * Open the blueprint editor for this chip's blueprint data.
@@ -127,6 +134,7 @@ function openExpandedForm() {
     isOpen: true,
     row: { row: item.value, rowMeta: {}, oldRow: { ...item.value } },
     meta: relatedTableMeta.value,
+    view: relatedRecordView.value,
     rowId,
     useMetaFields: true,
     maintainDefaultViewOrder: true,
