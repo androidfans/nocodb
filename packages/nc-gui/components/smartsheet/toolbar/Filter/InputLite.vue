@@ -64,6 +64,7 @@ const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: str
   isInt,
   isFloat,
   isTextArea,
+  // Matches both V2 LinkToAnotherRecord (current/active) and deprecated V1 Links
   isLinks: (col: ColumnType) => isLinksOrLTAR(col),
   isUser,
   isReadonlyUser,
@@ -132,7 +133,8 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
-    // Links & LTAR share this slot — see FilterInput.vue for full explanation
+    // Both V2 LinkToAnotherRecord and deprecated V1 Links share this slot.
+    // See FilterInput.vue for the full routing explanation.
     isLinks: RECORD_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
       : columnRef.value?.uidt === UITypes.Links

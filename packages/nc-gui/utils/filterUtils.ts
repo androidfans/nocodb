@@ -149,7 +149,8 @@ export const getDynamicColumns = (metaColumns: ColumnType[], column?: ColumnType
 }
 
 export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
-  // V2 MO/OO Links → filter by display value like LTAR
+  // V2 MO/OO with deprecated Links uidt → normalize to LinkToAnotherRecord
+  // (the current/active type) so filter routing treats them uniformly.
   if (col.uidt === UITypes.Links && isBtLikeV2Junction(col)) {
     return UITypes.LinkToAnotherRecord
   }

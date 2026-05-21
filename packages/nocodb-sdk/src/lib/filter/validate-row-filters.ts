@@ -333,7 +333,11 @@ export class RowFilterValidator {
                 res = false; // Unsupported operation for User fields
             }
           } else if (
-            // LTAR always has record objects in the client cache.
+            // V2 link columns use UITypes.LinkToAnotherRecord (the current/
+            // active type for all new fields). UITypes.Links is the deprecated
+            // V1 type — kept here for backward compat.
+            //
+            // LinkToAnotherRecord always has record objects in the client cache.
             // Links enters this branch in two cases:
             //   1. BT-like V2 junctions (MO/OO) — single-record semantics,
             //      client has the related record object(s).

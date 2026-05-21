@@ -240,8 +240,10 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
-      // Links/LTAR excluded: eq_id replaces eq for record filtering;
+      // Both link types excluded: eq_id replaces eq for record filtering;
       // count filtering uses gt/lt/gte/lte (or a Rollup field).
+      // V2 columns use LinkToAnotherRecord (the current/active type);
+      // Links is the deprecated V1 type — kept here for completeness.
       UITypes.Links,
       UITypes.LinkToAnotherRecord,
     ],
@@ -541,9 +543,14 @@ export const comparisonOpList = (
     ],
     semanticType: 'date_range',
   },
-  // Record-id operators for Links/LTAR columns.
-  // These filter by the related record's primary key, not by display
-  // value or link count. The UI renders a record picker dropdown.
+  // Record-id operators for link columns (both V2 LinkToAnotherRecord
+  // and deprecated V1 Links). These filter by the related record's
+  // primary key, not by display value or link count. The UI renders a
+  // record picker dropdown.
+  //
+  // V2 columns (the current default) use UITypes.LinkToAnotherRecord;
+  // UITypes.Links is the deprecated V1 type, included for backward compat.
+  //
   // Labels reuse the standard "is"/"is not" text via getEqText/getNeqText
   // so users see the same wording — only the input widget changes.
   {
