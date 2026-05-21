@@ -386,12 +386,16 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     const recordOps = ['eq_id', 'neq_id', 'in_id', 'nin_id']
     const prevOp = filterPrevComparisonOp.value[filter.id!]
     const currOp = filter.comparison_op!
-    const prevIsRecord = recordOps.includes(prevOp)
     const currIsRecord = recordOps.includes(currOp)
-    const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
     const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
-    if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
+    if (!prevOp) {
       filter.value = null
+    } else {
+      const prevIsRecord = recordOps.includes(prevOp)
+      const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
+      if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
+        filter.value = null
+      }
     }
   }
 
