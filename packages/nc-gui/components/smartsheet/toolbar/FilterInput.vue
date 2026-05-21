@@ -133,6 +133,11 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
+    // Links & LTAR share this slot. The input component depends on
+    // the operator and the concrete column type:
+    //   - _id operators (eq_id, in_id, …) → record picker dropdown
+    //   - Links (V2 OM/MM) non-_id (gt, lt, …) → Integer (count)
+    //   - LTAR (V1 BT) non-_id (eq, like, …) → Text (display value)
     isLinks: RECORD_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
       : column.value?.uidt === UITypes.Links
@@ -158,12 +163,15 @@ const componentProps = computed(() => {
     case 'isDecimal':
     case 'isFloat':
     case 'isLinks': {
+      // Record picker needs column meta to resolve the related table
       if (RECORD_OPS.has(props.filter.comparison_op!)) {
         return { column: column.value, comparisonOp: props.filter.comparison_op }
       }
+      // Links (V2 OM/MM) count input — fixed height like other numeric inputs
       if (column.value?.uidt === UITypes.Links) {
         return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
       }
+      // LTAR (V1 BT) text input — no fixed height needed
       return { showReadonlyField: props.filter?.readOnly || props?.disabled }
     }
     case 'isInt': {

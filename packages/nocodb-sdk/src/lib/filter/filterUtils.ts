@@ -240,6 +240,9 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
+      // Links excluded: eq_id replaces eq for record filtering;
+      // count filtering uses gt/lt/gte/lte (or a Rollup field).
+      // LTAR (V1 BT) keeps eq for display-value text filtering.
       UITypes.Links,
     ],
     semanticType: 'equality',
@@ -535,6 +538,11 @@ export const comparisonOpList = (
     ],
     semanticType: 'date_range',
   },
+  // Record-id operators for Links/LTAR columns.
+  // These filter by the related record's primary key, not by display
+  // value or link count. The UI renders a record picker dropdown.
+  // Labels reuse the standard "is"/"is not" text via getEqText/getNeqText
+  // so users see the same wording — only the input widget changes.
   {
     text: getEqText(fieldUiType),
     value: 'eq_id',
