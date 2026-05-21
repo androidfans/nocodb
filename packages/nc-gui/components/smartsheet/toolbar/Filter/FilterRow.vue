@@ -71,7 +71,9 @@ const logicalOps = [
 
 // #region utils & computed
 const slots = useSlots()
-const filterPrevComparisonOp = ref('')
+// Initialize from current filter so the first operator switch can
+// correctly detect compatible vs incompatible transitions.
+const filterPrevComparisonOp = ref(props.modelValue?.comparison_op || '')
 
 const isFilterSaving = ref(false)
 
