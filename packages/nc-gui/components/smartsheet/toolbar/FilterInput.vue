@@ -35,7 +35,8 @@ const emit = defineEmits<Emits>()
 
 const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
-const column = toRef(props, 'column')
+const rawColumn = toRef(props, 'column')
+const column = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
 const editEnabled = ref(true)
 

@@ -162,10 +162,28 @@ export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
   }
   // if column is a lookup column, then use the lookup type extracted from the column
   else if (col.btLookupColumn) {
-    return col.btLookupColumn.uidt as UITypes
+    return getFilterUidt(col.btLookupColumn as ColumnTypeForFilter)
   } else {
     return col.uidt as UITypes
   }
+}
+
+// Resolve the "real" column that a filter input should render for.
+// For lookup columns, follows the chain to the terminal column so the
+// filter input component matches the actual data type (e.g. a lookup
+// pointing to a Links field renders a record picker, not a text box).
+export const getFilterInputColumn = (column?: ColumnTypeForFilter | ColumnType): ColumnTypeForFilter | ColumnType | undefined => {
+  if (!column) return undefined
+
+  const filterColumn = (
+    (column as ColumnTypeForFilter).btLookupColumn ? { ...(column as ColumnTypeForFilter).btLookupColumn } : { ...column }
+  ) as ColumnTypeForFilter
+
+  const filterUidt = (column as ColumnTypeForFilter).filterUidt ?? getFilterUidt(filterColumn as ColumnTypeForFilter)
+  ;(filterColumn as any).uidt = filterUidt
+  ;(filterColumn as any).filterUidt = filterUidt
+
+  return filterColumn
 }
 
 export const composeColumnsForFilter = async ({

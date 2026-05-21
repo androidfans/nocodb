@@ -217,6 +217,10 @@ const hasSelection = computed(() => {
   if (isMulti.value) return false
   return !!props.modelValue
 })
+
+const hasValue = computed(() => !!props.modelValue)
+const hasSearchText = computed(() => !!searchVal.value)
+const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
 </script>
 
 <template>
@@ -225,11 +229,13 @@ const hasSelection = computed(() => {
     v-model:value="selectedValue"
     :mode="isMulti ? 'multiple' : undefined"
     class="w-full nc-filter-record-select"
-    :class="{ 'has-selection': hasSelection }"
+    :class="{ 'has-selection': hasSelection, 'has-search': hasSearchText, 'has-value': hasValue }"
     :placeholder="$t('general.select')"
     :open="isOpen"
     :loading="loading"
+    :search-value="searchVal"
     show-search
+    :show-arrow="showSuffixIcon"
     :filter-option="false"
     :allow-clear="true"
     @search="handleSearch"
@@ -259,6 +265,8 @@ const hasSelection = computed(() => {
 
 <style lang="scss" scoped>
 .nc-filter-record-select {
+  min-width: 14rem;
+
   :deep(.ant-select-selector) {
     @apply !min-h-8 flex items-center flex-wrap;
   }
@@ -267,10 +275,21 @@ const hasSelection = computed(() => {
     @apply !flex items-center !border-none !bg-nc-bg-brand !text-xs !text-nc-content-brand !font-medium !rounded-lg !px-2 !py-[3px] !max-w-32;
   }
 
-  &.has-selection {
+  &.has-selection:not(.ant-select-open) {
     :deep(.ant-select-selection-search) {
       @apply !w-0 !overflow-hidden;
     }
+  }
+
+  &.has-value,
+  &.has-search {
+    :deep(.ant-select-arrow) {
+      @apply !hidden;
+    }
+  }
+
+  :deep(.ant-select-clear) {
+    @apply !right-2;
   }
 }
 </style>
