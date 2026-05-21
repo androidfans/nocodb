@@ -57,6 +57,7 @@ const displayValueColumn = ref<ColumnType | null>(null)
 const pkColumn = ref<ColumnType | null>(null)
 const pkColumnTitle = ref<string>('')
 const relatedTableMeta = ref<any>(null)
+const metaLoaded = ref(false)
 
 async function loadRelatedTableMeta() {
   if (!relatedTableId.value || !relatedBaseId.value) return
@@ -178,8 +179,6 @@ async function resolveSelectedDisplayValues() {
 function getDisplayLabel(pk: string) {
   return pkToDisplayMap.value.get(pk) || `#${pk}`
 }
-
-const metaLoaded = ref(false)
 
 watch(
   () => props.modelValue,
