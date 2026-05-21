@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { isLinksOrLTAR } from 'nocodb-sdk'
+import { UITypes, isLinksOrLTAR } from 'nocodb-sdk'
 import type { ColumnType } from 'nocodb-sdk'
 import SingleSelect from '~/components/cell/SingleSelect/index.vue'
 import MultiSelect from '~/components/cell/MultiSelect/index.vue'
@@ -133,7 +133,11 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
-    isLinks: RECORD_OPS.has(props.filter.comparison_op!) ? FilterInputRecord : Integer,
+    isLinks: RECORD_OPS.has(props.filter.comparison_op!)
+      ? FilterInputRecord
+      : column.value?.uidt === UITypes.Links
+        ? Integer
+        : Text,
     isUser: User,
     isReadonlyUser: User,
     isColour: ColourFilter,
@@ -157,7 +161,10 @@ const componentProps = computed(() => {
       if (RECORD_OPS.has(props.filter.comparison_op!)) {
         return { column: column.value, comparisonOp: props.filter.comparison_op }
       }
-      return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
+      if (column.value?.uidt === UITypes.Links) {
+        return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
+      }
+      return { showReadonlyField: props.filter?.readOnly || props?.disabled }
     }
     case 'isInt': {
       return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
