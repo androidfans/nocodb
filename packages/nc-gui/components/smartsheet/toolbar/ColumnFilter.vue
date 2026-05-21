@@ -316,6 +316,16 @@ const getColumn = (filter: Filter) => {
 
 const filterPrevComparisonOp = ref<Record<string, string>>({})
 
+const syncFilterPrevComparisonOps = () => {
+  for (const filter of filters.value) {
+    if (filter.id && filter.comparison_op && !filterPrevComparisonOp.value[filter.id]) {
+      filterPrevComparisonOp.value[filter.id] = filter.comparison_op
+    }
+  }
+}
+
+watch(() => filters.value.map((filter) => filter.id).join(','), syncFilterPrevComparisonOps, { immediate: true })
+
 const isFilterDraft = (filter: Filter, col: ColumnType) => {
   if (filter.id) return false
 
