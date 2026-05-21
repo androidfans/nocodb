@@ -6,6 +6,7 @@ import {
   isColumnInError,
   isCreatedOrLastModifiedTimeCol,
   isHiddenCol,
+  isLinksOrLTAR,
   isSystemColumn,
   isVirtualCol,
 } from 'nocodb-sdk'
@@ -316,6 +317,19 @@ const getColumn = (filter: Filter) => {
 
 const filterPrevComparisonOp = ref<Record<string, string>>({})
 
+const getFilterKey = (filter: FilterType) => filter.id || (filter as any).tmp_id || ''
+
+const syncFilterPrevComparisonOps = () => {
+  for (const filter of filters.value) {
+    const key = getFilterKey(filter)
+    if (key && filter.comparison_op && !filterPrevComparisonOp.value[key]) {
+      filterPrevComparisonOp.value[key] = filter.comparison_op
+    }
+  }
+}
+
+watch(() => filters.value.map((filter) => getFilterKey(filter)).join(','), syncFilterPrevComparisonOps, { immediate: true })
+
 const isFilterDraft = (filter: Filter, col: ColumnType) => {
   if (filter.id) return false
 
@@ -347,7 +361,7 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
   if (!col) return
   if (
     col.uidt === UITypes.SingleSelect &&
-    ['anyof', 'nanyof'].includes(filterPrevComparisonOp.value[filter.id!]) &&
+    ['anyof', 'nanyof'].includes(filterPrevComparisonOp.value[getFilterKey(filter)]) &&
     ['eq', 'neq'].includes(filter.comparison_op!)
   ) {
     // anyof and nanyof can allow multiple selections,
@@ -382,13 +396,34 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     if (!filter.meta.timezone) {
       filter.meta.timezone = getTimezoneFromColumn(col)
     }
+  } else if (isLinksOrLTAR(col)) {
+    // Clear filter value when switching between incompatible operator types:
+    //   - record ops (eq_id, in_id) store comma-separated PKs
+    //   - count ops (eq, gt) store a number
+    //   - multi ops (in_id, nin_id) vs single ops (eq_id, neq_id)
+    // If prevOp is unknown (page just loaded, syncFilterPrevComparisonOps
+    // didn't have this filter yet), clear defensively to avoid stale
+    // record IDs being interpreted as count values.
+    const prevOp = filterPrevComparisonOp.value[getFilterKey(filter)]
+    const currOp = filter.comparison_op!
+    const currIsRecord = RECORD_FILTER_OPS.has(currOp)
+    const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
+    if (!prevOp) {
+      filter.value = null
+    } else {
+      const prevIsRecord = RECORD_FILTER_OPS.has(prevOp)
+      const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
+      if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
+        filter.value = null
+      }
+    }
   }
 
   if (!isFilterDraft(filter, col)) {
     saveOrUpdate(filter, i)
   }
 
-  filterPrevComparisonOp.value[filter.id!] = filter.comparison_op!
+  filterPrevComparisonOp.value[getFilterKey(filter)] = filter.comparison_op!
   $e('a:filter:update', {
     logical: filter.logical_op,
     comparison: filter.comparison_op,

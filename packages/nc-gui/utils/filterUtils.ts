@@ -149,7 +149,7 @@ export const getDynamicColumns = (metaColumns: ColumnType[], column?: ColumnType
 }
 
 export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
-  // V2 MO/OO Links → filter by display value like LTAR
+  // BT-like Links → normalize to LTAR for uniform filter routing
   if (col.uidt === UITypes.Links && isBtLikeV2Junction(col)) {
     return UITypes.LinkToAnotherRecord
   }
@@ -162,10 +162,43 @@ export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
   }
   // if column is a lookup column, then use the lookup type extracted from the column
   else if (col.btLookupColumn) {
-    return col.btLookupColumn.uidt as UITypes
+    return getFilterUidt(col.btLookupColumn as ColumnTypeForFilter)
   } else {
     return col.uidt as UITypes
   }
+}
+
+/**
+ * Record-id filter operators for link columns.
+ *
+ * Link column type context:
+ *   - V2 (current): uses UITypes.LinkToAnotherRecord — all new link fields
+ *   - V1 (deprecated): uses UITypes.Links — legacy, kept for backward compat
+ *   Both types are handled uniformly via isLinksOrLTAR() throughout the filter
+ *   system. When you see both types listed together, that's why.
+ *
+ * These operators filter by the related record's primary key (not display
+ * value or count). The UI renders a record picker dropdown for them.
+ */
+export const RECORD_FILTER_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
+
+// Resolve the "real" column that a filter input should render for.
+// For lookup columns, follows the chain to the terminal column so the
+// filter input component matches the actual data type (e.g. a lookup
+// pointing to a Links field renders a record picker, not a text box).
+export const getFilterInputColumn = (column?: ColumnTypeForFilter | ColumnType): ColumnTypeForFilter | ColumnType | undefined => {
+  if (!column) return undefined
+
+  // Non-lookup columns: return as-is, no uidt override needed.
+  // Only lookup columns need resolution to their terminal column type.
+  if (!(column as ColumnTypeForFilter).btLookupColumn) return column
+
+  const filterColumn = { ...(column as ColumnTypeForFilter).btLookupColumn } as ColumnTypeForFilter
+  const filterUidt = (column as ColumnTypeForFilter).filterUidt ?? getFilterUidt(filterColumn as ColumnTypeForFilter)
+  ;(filterColumn as any).uidt = filterUidt
+  ;(filterColumn as any).filterUidt = filterUidt
+
+  return filterColumn
 }
 
 export const composeColumnsForFilter = async ({

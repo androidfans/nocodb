@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Draggable from 'vuedraggable'
-import { type FilterType, UITypes, parseProp } from 'nocodb-sdk'
+import { type FilterType, UITypes, isLinksOrLTAR, parseProp } from 'nocodb-sdk'
 import { type GroupEmits, type GroupProps } from './types'
 import { SmartsheetToolbarFilterGroupRow } from '#components'
 
@@ -16,7 +16,20 @@ const wrapperDomRef = ref<HTMLElement>()
 const addFiltersRowDomRef = ref<HTMLElement>()
 const filterPrevComparisonOp = ref<Record<string, string>>({})
 
-// #region utils & computed
+// Seed previous ops from existing filters so the first operator change
+// can correctly detect compatible vs incompatible transitions.
+watch(
+  () => vModel.value?.map((f) => f.id || (f as any).tmp_id).join(','),
+  () => {
+    for (const filter of vModel.value || []) {
+      const key = filter.id || (filter as any).tmp_id
+      if (key && filter.comparison_op && !filterPrevComparisonOp.value[key]) {
+        filterPrevComparisonOp.value[key] = filter.comparison_op
+      }
+    }
+  },
+  { immediate: true },
+)
 const slots = useSlots()
 
 const slotHasChildren = (name?: string) => {
@@ -64,7 +77,7 @@ const handleFilterChange = async (filter) => {
   if (!col) return
   if (
     col.uidt === UITypes.SingleSelect &&
-    ['anyof', 'nanyof'].includes(filterPrevComparisonOp.value[filter.id!]) &&
+    ['anyof', 'nanyof'].includes(filterPrevComparisonOp.value[filter.id! || (filter as any).tmp_id]) &&
     ['eq', 'neq'].includes(filter.comparison_op!)
   ) {
     // anyof and nanyof can allow multiple selections,
@@ -75,6 +88,20 @@ const handleFilterChange = async (filter) => {
     // hence remove the previous value
     filter.value = null
     filter.comparison_sub_op = null
+  } else if (isLinksOrLTAR(col)) {
+    const prevOp = filterPrevComparisonOp.value[filter.id! || (filter as any).tmp_id]
+    const currOp = filter.comparison_op!
+    const currIsRecord = RECORD_FILTER_OPS.has(currOp)
+    const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
+    if (!prevOp) {
+      filter.value = null
+    } else {
+      const prevIsRecord = RECORD_FILTER_OPS.has(prevOp)
+      const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
+      if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
+        filter.value = null
+      }
+    }
   } else if (isDateType((col.filterUidt ?? col.uidt) as UITypes)) {
     // for date / datetime,
     // the input type could be decimal or datepicker / datetime picker
@@ -101,7 +128,7 @@ const handleFilterChange = async (filter) => {
     }
   }
 
-  filterPrevComparisonOp.value[filter.id!] = filter.comparison_op!
+  filterPrevComparisonOp.value[filter.id! || (filter as any).tmp_id] = filter.comparison_op!
   $e('a:filter:update', {
     logical: filter.logical_op,
     comparison: filter.comparison_op,

@@ -1,6 +1,7 @@
 import {
   extractFilterFromXwhere,
   FormulaDataTypes,
+  isBtLikeV2Junction,
   isLinksOrLTAR,
   isSystemColumn,
   UITypes,
@@ -147,7 +148,46 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             'Group by using Button column is not supported',
           );
           break;
+        // Links (deprecated V1) — V2 uses LTAR case below.
+        // Pattern duplicated ~4x in this file (mirrors upstream structure;
+        // extracting would diverge from upstream and complicate rebase).
         case UITypes.Links:
+          // BT-like: group by display value; otherwise: group by count.
+          // V2 OM/MM and V1: group by link count via rollup.
+          // This mirrors the sort logic in sortV2.ts.
+          // Note: the two branches push to selectors differently because
+          // generateLookupSelectQuery returns a Raw (needs raw alias),
+          // while genRollupSelectv2 returns a QueryBuilder (has .as()).
+          if (isBtLikeV2Junction(column)) {
+            const selectQb = await generateLookupSelectQuery({
+              baseModelSqlv2: baseModel,
+              column,
+              alias: null,
+              model: baseModel.model,
+            });
+            columnQuery = baseModel.dbDriver
+              .raw(selectQb.builder)
+              .wrap('(', ')');
+            if (!isSubGroup) {
+              selectors.push(
+                baseModel.dbDriver.raw(`?? as ??`, [columnQuery, alias]),
+              );
+            }
+          } else {
+            columnQuery = (
+              await genRollupSelectv2({
+                baseModelSqlv2: baseModel,
+                knex: baseModel.dbDriver,
+                columnOptions: (await column.getColOptions(
+                  baseModel.context,
+                )) as RollupColumn,
+              })
+            ).builder;
+            if (!isSubGroup) {
+              selectors.push(columnQuery.as(alias));
+            }
+          }
+          break;
         case UITypes.Rollup:
           columnQuery = (
             await genRollupSelectv2({
@@ -566,23 +606,38 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
           }
           case UITypes.Rollup:
           case UITypes.Links: {
-            const rollupColOptions = (await column.getColOptions(
-              baseModel.context,
-            )) as RollupColumn;
-            if (rollupColOptions?.error) {
+            if (column.uidt === UITypes.Links && isBtLikeV2Junction(column)) {
+              const selectQb = await generateLookupSelectQuery({
+                baseModelSqlv2: baseModel,
+                column,
+                alias: null,
+                model: baseModel.model,
+              });
               selectors.push(
-                baseModel.dbDriver.raw(`? as ??`, [null, getAs(column)]),
+                baseModel.dbDriver.raw(`?? as ??`, [
+                  baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')'),
+                  getAs(column),
+                ]),
               );
             } else {
-              selectors.push(
-                (
-                  await genRollupSelectv2({
-                    baseModelSqlv2: baseModel,
-                    knex: baseModel.dbDriver,
-                    columnOptions: rollupColOptions,
-                  })
-                ).builder.as(getAs(column)),
-              );
+              const rollupColOptions = (await column.getColOptions(
+                baseModel.context,
+              )) as RollupColumn;
+              if (rollupColOptions?.error) {
+                selectors.push(
+                  baseModel.dbDriver.raw(`? as ??`, [null, getAs(column)]),
+                );
+              } else {
+                selectors.push(
+                  (
+                    await genRollupSelectv2({
+                      baseModelSqlv2: baseModel,
+                      knex: baseModel.dbDriver,
+                      columnOptions: rollupColOptions,
+                    })
+                  ).builder.as(getAs(column)),
+                );
+              }
             }
             groupBySelectors.push(getAs(column));
             break;
@@ -898,23 +953,41 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               }
               case UITypes.Links:
               case UITypes.Rollup: {
-                const rollupColOptions = (await column.getColOptions(
-                  baseModel.context,
-                )) as RollupColumn;
-                if (rollupColOptions?.error) {
+                if (
+                  column.uidt === UITypes.Links &&
+                  isBtLikeV2Junction(column)
+                ) {
+                  const selectQb = await generateLookupSelectQuery({
+                    baseModelSqlv2: baseModel,
+                    column,
+                    alias: null,
+                    model: baseModel.model,
+                  });
                   colSelectors.push(
-                    baseModel.dbDriver.raw(`? as ??`, [null, getAs(column)]),
+                    baseModel.dbDriver.raw(`?? as ??`, [
+                      baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')'),
+                      getAs(column),
+                    ]),
                   );
                 } else {
-                  colSelectors.push(
-                    (
-                      await genRollupSelectv2({
-                        baseModelSqlv2: baseModel,
-                        knex: baseModel.dbDriver,
-                        columnOptions: rollupColOptions,
-                      })
-                    ).builder.as(getAs(column)),
-                  );
+                  const rollupColOptions = (await column.getColOptions(
+                    baseModel.context,
+                  )) as RollupColumn;
+                  if (rollupColOptions?.error) {
+                    colSelectors.push(
+                      baseModel.dbDriver.raw(`? as ??`, [null, getAs(column)]),
+                    );
+                  } else {
+                    colSelectors.push(
+                      (
+                        await genRollupSelectv2({
+                          baseModelSqlv2: baseModel,
+                          knex: baseModel.dbDriver,
+                          columnOptions: rollupColOptions,
+                        })
+                      ).builder.as(getAs(column)),
+                    );
+                  }
                 }
                 groupBySelectors.push(getAs(column));
                 break;
@@ -1266,23 +1339,41 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               }
               case UITypes.Links:
               case UITypes.Rollup: {
-                const rollupColOptions = (await column.getColOptions(
-                  baseModel.context,
-                )) as RollupColumn;
-                if (rollupColOptions?.error) {
+                if (
+                  column.uidt === UITypes.Links &&
+                  isBtLikeV2Junction(column)
+                ) {
+                  const selectQb = await generateLookupSelectQuery({
+                    baseModelSqlv2: baseModel,
+                    column,
+                    alias: null,
+                    model: baseModel.model,
+                  });
                   colSelectors.push(
-                    baseModel.dbDriver.raw(`? as ??`, [null, getAs(column)]),
+                    baseModel.dbDriver.raw(`?? as ??`, [
+                      baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')'),
+                      getAs(column),
+                    ]),
                   );
                 } else {
-                  colSelectors.push(
-                    (
-                      await genRollupSelectv2({
-                        baseModelSqlv2: baseModel,
-                        knex: baseModel.dbDriver,
-                        columnOptions: rollupColOptions,
-                      })
-                    ).builder.as(getAs(column)),
-                  );
+                  const rollupColOptions = (await column.getColOptions(
+                    baseModel.context,
+                  )) as RollupColumn;
+                  if (rollupColOptions?.error) {
+                    colSelectors.push(
+                      baseModel.dbDriver.raw(`? as ??`, [null, getAs(column)]),
+                    );
+                  } else {
+                    colSelectors.push(
+                      (
+                        await genRollupSelectv2({
+                          baseModelSqlv2: baseModel,
+                          knex: baseModel.dbDriver,
+                          columnOptions: rollupColOptions,
+                        })
+                      ).builder.as(getAs(column)),
+                    );
+                  }
                 }
                 groupBySelectors.push(getAs(column));
                 break;

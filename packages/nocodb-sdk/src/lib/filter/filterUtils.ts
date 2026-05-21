@@ -240,6 +240,11 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
+      // Both link types excluded (by design): record filtering uses
+      // _id operators with a record picker; count eq/neq intentionally
+      // removed — use Rollup for exact count, gt/lt for ranges.
+      UITypes.Links,
+      UITypes.LinkToAnotherRecord,
     ],
     semanticType: 'equality',
     typeSpecificSemantic: (fieldUiType) =>
@@ -256,6 +261,8 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
+      UITypes.Links,
+      UITypes.LinkToAnotherRecord,
     ],
     semanticType: 'inequality',
     typeSpecificSemantic: (fieldUiType) =>
@@ -279,6 +286,9 @@ export const comparisonOpList = (
       UITypes.LastModifiedTime,
       UITypes.Time,
       UITypes.Colour,
+      // Link types use record picker (eq_id) instead of text search
+      UITypes.Links,
+      UITypes.LinkToAnotherRecord,
       ...numericUITypes,
     ],
     semanticType: 'pattern_match',
@@ -303,6 +313,9 @@ export const comparisonOpList = (
       UITypes.LastModifiedTime,
       UITypes.Time,
       UITypes.Colour,
+      // Link types use record picker (neq_id) instead of text search
+      UITypes.Links,
+      UITypes.LinkToAnotherRecord,
       ...numericUITypes,
     ],
     semanticType: 'pattern_not_match',
@@ -530,6 +543,36 @@ export const comparisonOpList = (
       UITypes.CreatedTime,
     ],
     semanticType: 'date_range',
+  },
+  // Record-id operators for both link types. Filter by related record's
+  // PK; UI renders a record picker. Labels reuse "is"/"is not" text.
+  {
+    text: getEqText(fieldUiType),
+    value: 'eq_id',
+    ignoreVal: false,
+    includedTypes: [UITypes.LinkToAnotherRecord, UITypes.Links],
+    semanticType: 'record_equality',
+  },
+  {
+    text: getNeqText(fieldUiType),
+    value: 'neq_id',
+    ignoreVal: false,
+    includedTypes: [UITypes.LinkToAnotherRecord, UITypes.Links],
+    semanticType: 'record_inequality',
+  },
+  {
+    text: 'has any of',
+    value: 'in_id',
+    ignoreVal: false,
+    includedTypes: [UITypes.LinkToAnotherRecord, UITypes.Links],
+    semanticType: 'record_inclusion',
+  },
+  {
+    text: 'has none of',
+    value: 'nin_id',
+    ignoreVal: false,
+    includedTypes: [UITypes.LinkToAnotherRecord, UITypes.Links],
+    semanticType: 'record_exclusion',
   },
   {
     text: 'is blank',
