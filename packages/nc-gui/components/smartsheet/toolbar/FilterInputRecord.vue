@@ -116,6 +116,10 @@ async function fetchRecords(search?: string) {
       displayValue: String(row[displayValueColumnTitle.value] ?? row[pkColumnTitle.value] ?? ''),
     }))
 
+    // Ensure selected records always appear in the options list so
+    // ant-select can display their label (not just raw PK).
+    mergeSelectedIntoOptions()
+
     if (search) {
       const searchLower = search.toLowerCase()
       records.value.sort((a, b) => {
@@ -139,6 +143,15 @@ async function fetchRecords(search?: string) {
 
 const pkToDisplayMap = ref<Map<string, string>>(new Map())
 
+function mergeSelectedIntoOptions() {
+  const loadedPks = new Set(records.value.map((r) => r.pk))
+  for (const [pk, dv] of pkToDisplayMap.value) {
+    if (!loadedPks.has(pk)) {
+      records.value.push({ pk, displayValue: dv })
+    }
+  }
+}
+
 async function resolveSelectedDisplayValues() {
   const pks = props.modelValue ? String(props.modelValue).split(',').filter(Boolean) : []
   if (!pks.length || !relatedTableId.value || !relatedBaseId.value) return
@@ -158,6 +171,7 @@ async function resolveSelectedDisplayValues() {
       const dv = String(row[displayValueColumnTitle.value] ?? pk)
       pkToDisplayMap.value.set(pk, dv)
     }
+    mergeSelectedIntoOptions()
   } catch (e) {
     console.error('Failed to resolve display values', e)
   }
