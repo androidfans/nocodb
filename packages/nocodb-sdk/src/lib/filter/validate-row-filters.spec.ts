@@ -41,11 +41,20 @@ const mockColumns: ColumnType[] = [
   { id: '7', title: 'JsonData', uidt: UITypes.JSON },
   { id: '8', title: 'TimeData', uidt: UITypes.Time },
   { id: '9', title: 'DateData', uidt: UITypes.Date },
+  {
+    id: '10',
+    title: 'RecordLinks',
+    uidt: UITypes.Links,
+    colOptions: {
+      fk_related_model_id: 'relatedModel',
+    } as LinkToAnotherRecordType,
+  },
 ];
 
 const mockMetas = {
   relatedModel: {
     columns: [
+      { id: 'r0', title: 'Id', pk: true, uidt: UITypes.ID },
       { id: 'r1', title: 'Primary', pv: true, uidt: UITypes.SingleLineText },
     ],
   },
@@ -964,6 +973,45 @@ describe('validateRowFilters', () => {
         })
       ).toBe(false);
     });
+  });
+
+  describe('Links record-id filters', () => {
+    const data = {
+      RecordLinks: [
+        { Id: 'recA', Primary: 'RecordA' },
+        { Id: 'recB', Primary: 'RecordB' },
+      ],
+    };
+
+    it.each([
+      ['eq_id', 'recA', true],
+      ['eq_id', 'recC', false],
+      ['neq_id', 'recC', true],
+      ['neq_id', 'recA', false],
+      ['in_id', 'recC,recB', true],
+      ['in_id', 'recC,recD', false],
+      ['nin_id', 'recC,recD', true],
+      ['nin_id', 'recA,recD', false],
+    ])(
+      'should evaluate "%s" against related record ids',
+      (comparisonOp, value, expected) => {
+        expect(
+          validateRowFilters({
+            filters: [
+              {
+                fk_column_id: '10',
+                comparison_op: comparisonOp as any,
+                value,
+              },
+            ],
+            data,
+            columns: mockColumns,
+            client: mockClient,
+            metas: mockMetas,
+          })
+        ).toBe(expected);
+      }
+    );
   });
 
   // Edge cases

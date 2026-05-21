@@ -332,7 +332,11 @@ export class RowFilterValidator {
               default:
                 res = false; // Unsupported operation for User fields
             }
-          } else if (column.uidt === UITypes.LinkToAnotherRecord) {
+          } else if (
+            [UITypes.LinkToAnotherRecord, UITypes.Links].includes(
+              column.uidt as UITypes
+            )
+          ) {
             let linkData = data[field];
 
             linkData = Array.isArray(linkData) ? linkData : [linkData];
