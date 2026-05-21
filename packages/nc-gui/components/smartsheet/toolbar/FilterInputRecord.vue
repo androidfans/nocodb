@@ -291,7 +291,7 @@ const handleSearchInput = (e: Event) => {
 
 <style lang="scss" scoped>
 .nc-filter-record-trigger {
-  @apply flex items-center justify-between gap-1 min-h-8 w-40 px-2 py-0.5
+  @apply flex items-center justify-between gap-1 min-h-8 w-56 px-2 py-0.5
     rounded-lg cursor-pointer border-1 border-nc-border-gray-medium
     bg-nc-bg-default hover:border-nc-border-brand transition-colors overflow-hidden;
 
