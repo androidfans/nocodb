@@ -333,10 +333,16 @@ export class RowFilterValidator {
                 res = false; // Unsupported operation for User fields
             }
           } else if (
+            column.uidt === UITypes.Links &&
+            !isBtLikeV2Junction(column) &&
+            filter.comparison_op?.endsWith('_id')
+          ) {
+            // HM/MM Links with _id operators: client only has count, not
+            // record objects. Skip validation and let the server SQL decide.
+            res = true;
+          } else if (
             column.uidt === UITypes.LinkToAnotherRecord ||
-            (column.uidt === UITypes.Links &&
-              (isBtLikeV2Junction(column) ||
-                filter.comparison_op?.endsWith('_id')))
+            (column.uidt === UITypes.Links && isBtLikeV2Junction(column))
           ) {
             let linkData = data[field];
 
