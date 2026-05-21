@@ -2,6 +2,7 @@
 import type { Select as AntSelect } from 'ant-design-vue'
 import type { ColumnType, LinkToAnotherRecordType } from 'nocodb-sdk'
 import { isDateOrDateTimeCol } from 'nocodb-sdk'
+import dayjs from 'dayjs'
 
 interface Props {
   modelValue?: string | null
@@ -84,7 +85,9 @@ async function fetchRecords(search?: string) {
       const clauses: string[] = []
       if (displayValueColumn.value) {
         if (isDateOrDateTimeCol(displayValueColumn.value)) {
-          clauses.push(`(${displayValueColumn.value.title},eq,exactDate,${search})`)
+          if (dayjs(search).isValid()) {
+            clauses.push(`(${displayValueColumn.value.title},eq,exactDate,${search})`)
+          }
         } else {
           const dvClause = getValidSearchQueryForColumn(displayValueColumn.value, search, relatedTableMeta.value, {
             getWhereQueryAs: 'string',
