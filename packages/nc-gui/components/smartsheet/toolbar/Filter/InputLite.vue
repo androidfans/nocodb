@@ -135,8 +135,8 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     isLinks: RECORD_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
       : column.value?.uidt === UITypes.Links
-        ? Integer
-        : Text,
+      ? Integer
+      : Text,
     isUser: User,
     isReadonlyUser: User,
   }
