@@ -151,7 +151,19 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
 })
 
 const filterType = computed(() => {
-  return Object.keys(componentMap.value).find((key) => checkType(key as FilterType))
+  const result = Object.keys(componentMap.value).find((key) => checkType(key as FilterType))
+  console.log('[FilterInput] filterType resolution:', {
+    filterType: result,
+    columnUidt: columnRef.value?.uidt,
+    columnTitle: columnRef.value?.title,
+    comparisonOp: props.filter.comparison_op,
+    isRecordOp: RECORD_OPS.has(props.filter.comparison_op!),
+    isLinksOrLTAR: columnRef.value ? isLinksOrLTAR(columnRef.value) : false,
+    rawColumnUidt: rawColumn.value?.uidt,
+    colOptions: columnRef.value?.colOptions,
+    component: result ? componentMap.value[result]?.name || componentMap.value[result] : 'Text (fallback)',
+  })
+  return result
 })
 
 const componentProps = computed(() => {
