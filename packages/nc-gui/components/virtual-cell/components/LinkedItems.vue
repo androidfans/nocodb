@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { type ColumnType, type LinkToAnotherRecordType, isDateOrDateTimeCol } from 'nocodb-sdk'
 import { PermissionEntity, PermissionKey, RelationTypes, isLinksOrLTAR } from 'nocodb-sdk'
+import { getRelatedRecordView } from '~/composables/useExpandedFormSiblingNavigation'
 
 interface Prop {
   modelValue?: boolean
@@ -133,12 +134,7 @@ const expandedFormRow = ref({})
 
 const expandedFormRowIndex = ref(-1)
 
-const relatedRecordView = computed(() => {
-  const colOptions = (injectedColumn.value?.colOptions ?? {}) as LinkToAnotherRecordType & { fk_target_view_id?: string | null }
-  const views = relatedTableMeta.value?.views ?? []
-
-  return (colOptions.fk_target_view_id ? views.find((view) => view.id === colOptions.fk_target_view_id) : undefined) ?? views[0]
-})
+const relatedRecordView = computed(() => getRelatedRecordView(injectedColumn.value, relatedTableMeta.value))
 
 const expandedFormView = computed(() => (isNewRecord.value ? undefined : relatedRecordView.value))
 

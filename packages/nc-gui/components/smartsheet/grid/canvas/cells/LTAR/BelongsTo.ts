@@ -2,6 +2,7 @@ import type { ColumnType, LinkToAnotherRecordType, TableType } from 'nocodb-sdk'
 import { isBoxHovered } from '../../utils/canvas'
 import { PlainCellRenderer } from '../Plain'
 import { renderAsCellLookupOrLtarValue } from '../../utils/cell'
+import { getRelatedRecordView } from '~/composables/useExpandedFormSiblingNavigation'
 
 export const BelongsToCellRenderer: CellRenderer = {
   render: (ctx, props) => {
@@ -119,20 +120,12 @@ export const BelongsToCellRenderer: CellRenderer = {
           y: btnY,
           icon: 'ncXCircle',
           size: 15,
-          color: isBoxHovered(
-            { x: xCircleX, y: btnY, height: 15, width: 15 },
-            mousePosition,
-          )
+          color: isBoxHovered({ x: xCircleX, y: btnY, height: 15, width: 15 }, mousePosition)
             ? getColor(themeV4Colors.gray['500'])
             : getColor(themeV4Colors.gray['500'], undefined, 0.5),
         })
 
-        if (
-          isBoxHovered(
-            { x: xCircleX, y: btnY, height: 15, width: 15 },
-            mousePosition,
-          )
-        ) {
+        if (isBoxHovered({ x: xCircleX, y: btnY, height: 15, width: 15 }, mousePosition)) {
           setCursor('pointer')
         }
       }
@@ -190,9 +183,7 @@ export const BelongsToCellRenderer: CellRenderer = {
 
     const xCircleX = cellRenderStore?.x ? cellRenderStore.x + 2 : null
     const isClickedOnXCircleIcon =
-      xCircleX != null &&
-      selected &&
-      isBoxHovered({ x: xCircleX, y: y + 7, height: size, width: size }, mousePosition)
+      xCircleX != null && selected && isBoxHovered({ x: xCircleX, y: y + 7, height: size, width: size }, mousePosition)
 
     if (isClickedOnPlusIcon || isClickedOnXCircleIcon) {
       makeCellEditable(row, column)
@@ -223,13 +214,15 @@ export const BelongsToCellRenderer: CellRenderer = {
        */
       if (isPublic) return true
 
-      const rowId = extractPkFromRow(value, (column.relatedTableMeta?.columns || []) as ColumnType[])
+      const relatedMeta = column.relatedTableMeta || relatedTableMeta
+      const rowId = extractPkFromRow(value, (relatedMeta?.columns || []) as ColumnType[])
 
       if (rowId) {
         openDetachedExpandedForm({
           isOpen: true,
           row: { row: value, rowMeta: {}, oldRow: { ...value } },
-          meta: column.relatedTableMeta || ({} as TableType),
+          meta: relatedMeta || ({} as TableType),
+          view: getRelatedRecordView(column as ColumnType, relatedMeta),
           rowId,
           useMetaFields: true,
           maintainDefaultViewOrder: true,

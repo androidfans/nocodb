@@ -1,7 +1,8 @@
 <script lang="ts" setup>
-import type { ColumnType, LinkToAnotherRecordType } from 'nocodb-sdk'
+import type { ColumnType } from 'nocodb-sdk'
 import { UITypes, isVirtualCol } from 'nocodb-sdk'
 import type { UseExpandedFormDetachedProps } from '~/composables/useExpandedFormDetached'
+import { getRelatedRecordView, useExpandedFormSiblingNavigation } from '~/composables/useExpandedFormSiblingNavigation'
 
 interface Props {
   value: string | number | boolean
@@ -61,12 +62,7 @@ const isClickDisabled = computed(() => {
 
 const { open } = useExpandedFormDetached()
 
-const relatedRecordView = computed(() => {
-  const colOptions = (injectedColumn.value?.colOptions ?? {}) as LinkToAnotherRecordType & { fk_target_view_id?: string | null }
-  const views = relatedTableMeta.value?.views ?? []
-
-  return (colOptions.fk_target_view_id ? views.find((view) => view.id === colOptions.fk_target_view_id) : undefined) ?? views[0]
-})
+const relatedRecordView = computed(() => getRelatedRecordView(injectedColumn.value, relatedTableMeta.value))
 
 /**
  * Open the blueprint editor for this chip's blueprint data.

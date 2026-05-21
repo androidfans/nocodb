@@ -2,6 +2,7 @@ import type { ColumnType, LinkToAnotherRecordType, TableType } from 'nocodb-sdk'
 import { isBoxHovered } from '../../utils/canvas'
 import { PlainCellRenderer } from '../Plain'
 import { renderAsCellLookupOrLtarValue } from '../../utils/cell'
+import { getRelatedRecordView } from '~/composables/useExpandedFormSiblingNavigation'
 
 export const OneToOneCellRenderer: CellRenderer = {
   render: (ctx, props) => {
@@ -219,13 +220,15 @@ export const OneToOneCellRenderer: CellRenderer = {
        */
       if (isPublic) return true
 
-      const rowId = extractPkFromRow(value, (column.relatedTableMeta?.columns || []) as ColumnType[])
+      const relatedMeta = column.relatedTableMeta || relatedTableMeta
+      const rowId = extractPkFromRow(value, (relatedMeta?.columns || []) as ColumnType[])
 
       if (rowId) {
         openDetachedExpandedForm({
           isOpen: true,
           row: { row: value, rowMeta: {}, oldRow: { ...value } },
-          meta: column.relatedTableMeta || ({} as TableType),
+          meta: relatedMeta || ({} as TableType),
+          view: getRelatedRecordView(column as ColumnType, relatedMeta),
           rowId,
           useMetaFields: true,
           maintainDefaultViewOrder: true,

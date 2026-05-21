@@ -1,10 +1,20 @@
-import type { ColumnType } from 'nocodb-sdk'
+import type { ColumnType, LinkToAnotherRecordType, TableType, ViewType } from 'nocodb-sdk'
 import type { UseExpandedFormDetachedProps } from './useExpandedFormDetached'
 
 interface UseExpandedFormSiblingNavigationOptions {
   state: UseExpandedFormDetachedProps
   siblings: Record<string, any>[]
   columns: ColumnType[]
+}
+
+export function getRelatedRecordView(
+  column: ColumnType | undefined | null,
+  relatedTableMeta: TableType | undefined | null,
+): ViewType | undefined {
+  const colOptions = (column?.colOptions ?? {}) as LinkToAnotherRecordType & { fk_target_view_id?: string | null }
+  const views = relatedTableMeta?.views ?? []
+
+  return (colOptions.fk_target_view_id ? views.find((view) => view.id === colOptions.fk_target_view_id) : undefined) ?? views[0]
 }
 
 // Shared by DOM chips and canvas chips so detached expanded forms navigate the

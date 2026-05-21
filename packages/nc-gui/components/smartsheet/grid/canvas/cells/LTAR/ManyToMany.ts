@@ -3,6 +3,7 @@ import { defaultOffscreen2DContext, isBoxHovered, renderIconButton, renderSingle
 import { PlainCellRenderer } from '../Plain'
 import { renderAsCellLookupOrLtarValue } from '../../utils/cell'
 import type { UseExpandedFormDetachedProps } from '~/composables/useExpandedFormDetached'
+import { getRelatedRecordView, useExpandedFormSiblingNavigation } from '~/composables/useExpandedFormSiblingNavigation'
 
 const ellipsisWidth = 15
 const buttonSize = 20
@@ -24,9 +25,10 @@ export const ManyToManyCellRenderer: CellRenderer = {
       cellRenderStore,
       selected,
       getColor,
+      column,
     } = props
 
-    const fkDisplayValueColumnId = (props.column?.colOptions as LinkToAnotherRecordType)?.fk_display_value_column_id
+    const fkDisplayValueColumnId = (column?.colOptions as LinkToAnotherRecordType)?.fk_display_value_column_id
 
     const relatedTableDisplayValueProp = fkDisplayValueColumnId
       ? relatedTableMeta?.columns?.find((c) => c.id === fkDisplayValueColumnId)?.title || ''
@@ -407,9 +409,10 @@ export const ManyToManyCellRenderer: CellRenderer = {
            */
           if (isPublic) return true
 
-          const rowId = extractPkFromRow(cellItem.value, (column.relatedTableMeta?.columns || []) as ColumnType[])
+          const relatedMeta = column.relatedTableMeta || relatedTableMeta
+          const rowId = extractPkFromRow(cellItem.value, (relatedMeta?.columns || []) as ColumnType[])
           if (rowId) {
-            const relatedColumns = (column.relatedTableMeta?.columns || []) as ColumnType[]
+            const relatedColumns = (relatedMeta?.columns || []) as ColumnType[]
             const fullCellValue = column.title ? row.row[column.title] : undefined
             // Prefer the full cell value so keyboard navigation can reach
             // linked records that were not rendered as visible canvas chips.
@@ -419,7 +422,8 @@ export const ManyToManyCellRenderer: CellRenderer = {
             const state = reactive<UseExpandedFormDetachedProps>({
               isOpen: true,
               row: { row: cellItem.value, rowMeta: {}, oldRow: { ...cellItem.value } },
-              meta: column.relatedTableMeta || ({} as TableType),
+              meta: relatedMeta || ({} as TableType),
+              view: getRelatedRecordView(column as ColumnType, relatedMeta),
               rowId,
               useMetaFields: true,
               maintainDefaultViewOrder: true,
