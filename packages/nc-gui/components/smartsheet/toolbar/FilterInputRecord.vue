@@ -208,11 +208,15 @@ const onSearch = useDebounceFn((val: string) => {
   fetchRecords(val || undefined)
 }, 300)
 
-const search = () => {
-  const val = aselect.value?.$el?.querySelector('.ant-select-selection-search-input')?.value
+const handleSearch = (val: string) => {
   searchVal.value = val
   onSearch(val)
 }
+
+const hasSelection = computed(() => {
+  if (isMulti.value) return false
+  return !!props.modelValue
+})
 </script>
 
 <template>
@@ -221,13 +225,14 @@ const search = () => {
     v-model:value="selectedValue"
     :mode="isMulti ? 'multiple' : undefined"
     class="w-full nc-filter-record-select"
+    :class="{ 'has-selection': hasSelection }"
     :placeholder="$t('general.select')"
     :open="isOpen"
     :loading="loading"
     show-search
     :filter-option="false"
     :allow-clear="true"
-    @search="search"
+    @search="handleSearch"
     @dropdown-visible-change="(v: boolean) => (isOpen = v)"
   >
     <a-select-option v-for="record in records" :key="record.pk" :value="record.pk">
@@ -260,6 +265,12 @@ const search = () => {
 
   :deep(.ant-select-selection-item) {
     @apply !flex items-center !border-none !bg-nc-bg-brand !text-xs !text-nc-content-brand !font-medium !rounded-lg !px-2 !py-[3px] !max-w-32;
+  }
+
+  &.has-selection {
+    :deep(.ant-select-selection-search) {
+      @apply !w-0 !overflow-hidden;
+    }
   }
 }
 </style>
