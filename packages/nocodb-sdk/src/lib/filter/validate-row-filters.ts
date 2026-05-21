@@ -10,7 +10,7 @@ import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import { isDateMonthFormat } from '~/lib/dateTimeHelper';
 import { buildFilterTree } from '~/lib/filterHelpers';
 import { parseProp } from '~/lib/helperFunctions';
-import UITypes from '~/lib/UITypes';
+import UITypes, { isBtLikeV2Junction } from '~/lib/UITypes';
 import { getLookupColumnType } from '~/lib/columnHelper/utils/get-lookup-column-type';
 import { getNodejsTimezone } from '~/lib/timezoneUtils';
 import { ColumnHelper } from '~/lib/columnHelper/column-helper';
@@ -335,7 +335,8 @@ export class RowFilterValidator {
           } else if (
             column.uidt === UITypes.LinkToAnotherRecord ||
             (column.uidt === UITypes.Links &&
-              filter.comparison_op?.endsWith('_id'))
+              (isBtLikeV2Junction(column) ||
+                filter.comparison_op?.endsWith('_id')))
           ) {
             let linkData = data[field];
 
@@ -384,20 +385,18 @@ export class RowFilterValidator {
                     res = !childValues.includes(ncToString(filter.value));
                     break;
                   case 'in': {
-                    const inValues =
-                      ncToString(filter.value)
-                        .split(',')
-                        .map((v) => v.trim())
-                        .filter(Boolean);
+                    const inValues = ncToString(filter.value)
+                      .split(',')
+                      .map((v) => v.trim())
+                      .filter(Boolean);
                     res = childValues.some((val) => inValues.includes(val));
                     break;
                   }
                   case 'nin': {
-                    const ninValues =
-                      ncToString(filter.value)
-                        .split(',')
-                        .map((v) => v.trim())
-                        .filter(Boolean);
+                    const ninValues = ncToString(filter.value)
+                      .split(',')
+                      .map((v) => v.trim())
+                      .filter(Boolean);
                     res = !childValues.some((val) => ninValues.includes(val));
                     break;
                   }

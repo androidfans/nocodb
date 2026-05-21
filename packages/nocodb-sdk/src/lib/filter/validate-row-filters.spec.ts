@@ -4,6 +4,7 @@ import {
 } from '~/lib/filter/validate-row-filters';
 import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import UITypes from '~/lib/UITypes';
+import { LinksVersion, RelationTypes } from '~/lib/globals';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
@@ -1065,6 +1066,57 @@ describe('validateRowFilters', () => {
         ).toBe(expected);
       }
     );
+
+    it('should keep non-BT Links count filters on the numeric path', () => {
+      expect(
+        validateRowFilters({
+          filters: [
+            {
+              fk_column_id: '10',
+              comparison_op: 'gt',
+              value: 0,
+            },
+          ],
+          data: {
+            RecordLinks: 2,
+          },
+          columns: mockColumns,
+          client: mockClient,
+          metas: mockMetas,
+        })
+      ).toBe(true);
+    });
+
+    it('should evaluate BT-like Links filters against related display values', () => {
+      expect(
+        validateRowFilters({
+          filters: [
+            {
+              fk_column_id: 'btLikeLinks',
+              comparison_op: 'eq',
+              value: 'RecordA',
+            },
+          ],
+          data: {
+            BtLikeLinks: { Id: 'recA', Primary: 'RecordA' },
+          },
+          columns: [
+            {
+              id: 'btLikeLinks',
+              title: 'BtLikeLinks',
+              uidt: UITypes.Links,
+              colOptions: {
+                fk_related_model_id: 'relatedModel',
+                version: LinksVersion.V2,
+                type: RelationTypes.MANY_TO_ONE,
+              } as LinkToAnotherRecordType,
+            },
+          ],
+          client: mockClient,
+          metas: mockMetas,
+        })
+      ).toBe(true);
+    });
   });
 
   // Edge cases
