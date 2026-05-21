@@ -78,6 +78,7 @@ async function loadRelatedTableMeta() {
 }
 
 async function fetchRecords(search?: string) {
+  console.log('[FilterInputRecord] fetchRecords called:', { search, relatedTableId: relatedTableId.value, metaLoaded: metaLoaded.value })
   if (!relatedTableId.value || !relatedBaseId.value || !metaLoaded.value) return
   loading.value = true
   try {
@@ -209,9 +210,14 @@ const onSearch = useDebounceFn((val: string) => {
 }, 300)
 
 const handleSearch = (val: string) => {
+  console.log('[FilterInputRecord] handleSearch called:', val)
   searchVal.value = val
   onSearch(val)
 }
+
+watch(searchVal, (val) => {
+  console.log('[FilterInputRecord] searchVal changed:', val)
+})
 
 const hasSelection = computed(() => {
   if (isMulti.value) return false
