@@ -235,40 +235,19 @@ const handleSearchInput = (e: Event) => {
 <template>
   <NcDropdown v-model:visible="isOpen" placement="bottomLeft">
     <!-- Trigger: fixed-width button with chips, overflow hidden -->
-    <div
-      class="nc-filter-record-trigger group"
-      :class="{ 'is-open': isOpen }"
-      @click.stop
-    >
+    <div class="nc-filter-record-trigger group" :class="{ 'is-open': isOpen }" @click.stop>
       <div class="trigger-chips">
         <template v-if="selectedPks.length">
-          <span
-            v-for="pk in selectedPks"
-            :key="pk"
-            class="nc-record-chip"
-          >
+          <span v-for="pk in selectedPks" :key="pk" class="nc-record-chip">
             <span class="truncate">{{ getDisplayLabel(pk) }}</span>
-            <component
-              :is="iconMap.closeThick"
-              class="chip-close"
-              @click.stop="removeRecord(pk)"
-            />
+            <component :is="iconMap.closeThick" class="chip-close" @click.stop="removeRecord(pk)" />
           </span>
         </template>
         <span v-else class="trigger-placeholder">Select record</span>
       </div>
       <div class="trigger-actions">
-        <component
-          :is="iconMap.close"
-          v-if="selectedPks.length"
-          class="action-icon clear-icon"
-          @click.stop="clearAll"
-        />
-        <component
-          :is="iconMap.chevronDown"
-          class="action-icon chevron-icon"
-          :class="{ 'rotate-180': isOpen }"
-        />
+        <component :is="iconMap.close" v-if="selectedPks.length" class="action-icon clear-icon" @click.stop="clearAll" />
+        <component :is="iconMap.chevronDown" class="action-icon chevron-icon" :class="{ 'rotate-180': isOpen }" />
       </div>
     </div>
 
@@ -299,16 +278,7 @@ const handleSearchInput = (e: Event) => {
               :class="{ 'is-selected': selectedPks.includes(record.pk) }"
               @click.stop="toggleRecord(record.pk)"
             >
-              <div
-                class="record-check"
-                :class="{ checked: selectedPks.includes(record.pk) }"
-              >
-                <component
-                  :is="iconMap.check"
-                  v-if="selectedPks.includes(record.pk)"
-                  class="check-icon"
-                />
-              </div>
+              <NcCheckbox :checked="selectedPks.includes(record.pk)" size="small" class="!-mt-0" />
               <span class="record-label">{{ record.displayValue }}</span>
             </div>
           </template>
@@ -388,19 +358,6 @@ const handleSearchInput = (e: Event) => {
   &.is-selected {
     @apply bg-nc-bg-brand/5;
   }
-}
-
-.record-check {
-  @apply w-4 h-4 rounded border-1 flex items-center justify-center flex-none
-    border-nc-border-gray-medium transition-colors;
-
-  &.checked {
-    @apply bg-nc-fill-brand border-nc-border-brand;
-  }
-}
-
-.check-icon {
-  @apply text-white w-3 h-3;
 }
 
 .record-label {
