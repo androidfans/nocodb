@@ -116,8 +116,6 @@ async function fetchRecords(search?: string) {
       displayValue: String(row[displayValueColumnTitle.value] ?? row[pkColumnTitle.value] ?? ''),
     }))
 
-    // Ensure selected records always appear in the options list so
-    // ant-select can display their label (not just raw PK).
     mergeSelectedIntoOptions()
 
     if (search) {
@@ -235,15 +233,22 @@ const search = () => {
   >
     <a-select-option v-for="record in records" :key="record.pk" :value="record.pk">
       <div class="flex items-center gap-1">
-        <span class="truncate">{{ record.displayValue }}</span>
-        <span class="text-nc-content-gray-muted text-xs">#{{ record.pk }}</span>
+        <span class="truncate text-nc-content-brand font-medium">{{ record.displayValue }}</span>
       </div>
     </a-select-option>
 
     <template #tagRender="{ value: val, closable, onClose }">
-      <a-tag :closable="closable" class="nc-filter-record-tag" @close="onClose">
-        {{ getDisplayLabel(val) }}
-      </a-tag>
+      <span
+        class="inline-flex items-center gap-1 border-1 border-nc-border-gray-medium rounded px-1.5 py-0.25 mr-0.5 my-0.25 text-xs text-nc-content-brand font-medium blue-chip max-w-32 truncate"
+      >
+        <span class="truncate">{{ getDisplayLabel(val) }}</span>
+        <component
+          :is="iconMap.closeThick"
+          v-if="closable"
+          class="text-gray-500 cursor-pointer hover:text-gray-700 w-3 h-3 flex-none"
+          @click.stop="onClose"
+        />
+      </span>
     </template>
   </a-select>
 </template>
@@ -251,11 +256,15 @@ const search = () => {
 <style lang="scss" scoped>
 .nc-filter-record-select {
   :deep(.ant-select-selector) {
-    @apply !min-h-8;
+    @apply !min-h-8 flex items-center flex-wrap;
+  }
+
+  :deep(.ant-select-selection-item) {
+    @apply !flex items-center gap-1 !border-1 !border-nc-border-gray-medium !rounded !bg-white !text-xs !text-nc-content-brand !font-medium !max-w-32;
   }
 }
 
-.nc-filter-record-tag {
-  @apply flex items-center gap-1 max-w-40 truncate;
+.blue-chip {
+  @apply bg-white;
 }
 </style>
