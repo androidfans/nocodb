@@ -13,6 +13,7 @@ const emit = defineEmits(['update:modelValue'])
 
 const { $api } = useNuxtApp()
 const { getMeta } = useMetas()
+const { getValidSearchQueryForColumn } = useFieldQuery()
 
 const column = toRef(props, 'column')
 
@@ -50,15 +51,19 @@ const selectedValue = computed({
 })
 
 const displayValueColumnTitle = ref<string>('')
+const displayValueColumn = ref<ColumnType | null>(null)
 const pkColumnTitle = ref<string>('')
+const relatedTableMeta = ref<any>(null)
 
 async function loadRelatedTableMeta() {
   if (!relatedTableId.value || !relatedBaseId.value) return
   const meta = await getMeta(relatedBaseId.value, relatedTableId.value)
   if (!meta) return
+  relatedTableMeta.value = meta
 
   const pvCol = (meta.columns || []).find((c: ColumnType) => c.pv)
-  displayValueColumnTitle.value = pvCol?.title || (meta.columns || [])[0]?.title || ''
+  displayValueColumn.value = pvCol || (meta.columns || [])[0] || null
+  displayValueColumnTitle.value = displayValueColumn.value?.title || ''
 
   const pkCol = (meta.columns || []).find((c: ColumnType) => c.pk)
   pkColumnTitle.value = pkCol?.title || 'Id'
@@ -71,8 +76,14 @@ async function fetchRecords(search?: string) {
     let where: string | undefined
     if (search) {
       const clauses: string[] = []
-      if (displayValueColumnTitle.value) {
-        clauses.push(`(${displayValueColumnTitle.value},like,%${search}%)`)
+      if (displayValueColumn.value) {
+        const dvClause = getValidSearchQueryForColumn(
+          displayValueColumn.value,
+          search,
+          relatedTableMeta.value,
+          { getWhereQueryAs: 'string' },
+        ) as string
+        if (dvClause) clauses.push(dvClause)
       }
       if (pkColumnTitle.value) {
         clauses.push(`(${pkColumnTitle.value},eq,${search})`)
