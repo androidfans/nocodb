@@ -382,6 +382,12 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     if (!filter.meta.timezone) {
       filter.meta.timezone = getTimezoneFromColumn(col)
     }
+  } else if (col.uidt === UITypes.Links) {
+    const prevIsRecord = ['eq_id', 'neq_id', 'in_id', 'nin_id'].includes(filterPrevComparisonOp.value[filter.id!])
+    const currIsRecord = ['eq_id', 'neq_id', 'in_id', 'nin_id'].includes(filter.comparison_op!)
+    if (prevIsRecord !== currIsRecord) {
+      filter.value = null
+    }
   }
 
   if (!isFilterDraft(filter, col)) {

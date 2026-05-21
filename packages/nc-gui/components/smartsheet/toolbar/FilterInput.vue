@@ -16,6 +16,9 @@ import Float from '~/components/cell/Float/index.vue'
 import Text from '~/components/cell/Text/index.vue'
 import User from '~/components/cell/User/index.vue'
 import ColourFilter from '~/components/cell/Colour/FilterInput.vue'
+import FilterInputRecord from '~/components/smartsheet/toolbar/FilterInputRecord.vue'
+
+const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
 interface Props {
   // column could be possibly undefined when the filter is created
@@ -130,7 +133,7 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
-    isLinks: Integer,
+    isLinks: RECORD_OPS.has(props.filter.comparison_op!) ? FilterInputRecord : Integer,
     isUser: User,
     isReadonlyUser: User,
     isColour: ColourFilter,
@@ -150,7 +153,12 @@ const componentProps = computed(() => {
     case 'isPercent':
     case 'isDecimal':
     case 'isFloat':
-    case 'isLinks':
+    case 'isLinks': {
+      if (RECORD_OPS.has(props.filter.comparison_op!)) {
+        return { column: column.value, comparisonOp: props.filter.comparison_op }
+      }
+      return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
+    }
     case 'isInt': {
       return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
     }
