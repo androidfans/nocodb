@@ -78,7 +78,6 @@ async function loadRelatedTableMeta() {
 }
 
 async function fetchRecords(search?: string) {
-  console.log('[FilterInputRecord] fetchRecords called:', { search, relatedTableId: relatedTableId.value, metaLoaded: metaLoaded.value })
   if (!relatedTableId.value || !relatedBaseId.value || !metaLoaded.value) return
   loading.value = true
   try {
@@ -97,7 +96,10 @@ async function fetchRecords(search?: string) {
           if (dvClause) clauses.push(dvClause)
         }
       }
-      if (pkColumn.value) {
+      // Only add PK clause if search looks like a valid PK value.
+      // Numeric PK + non-numeric search would cause PG type error
+      // and fail the entire ~or query.
+      if (pkColumn.value && /^\d+$/.test(search)) {
         const pkClause = getValidSearchQueryForColumn(pkColumn.value, search, relatedTableMeta.value, {
           getWhereQueryAs: 'string',
         }) as string
@@ -210,14 +212,9 @@ const onSearch = useDebounceFn((val: string) => {
 }, 300)
 
 const handleSearch = (val: string) => {
-  console.log('[FilterInputRecord] handleSearch called:', val)
   searchVal.value = val
   onSearch(val)
 }
-
-watch(searchVal, (val) => {
-  console.log('[FilterInputRecord] searchVal changed:', val)
-})
 
 const hasSelection = computed(() => {
   if (isMulti.value) return false
