@@ -72,6 +72,10 @@ import type { NcContext } from '~/interface/config';
 import type LookupColumn from '~/models/LookupColumn';
 import type { ResolverObj } from '~/utils';
 import type {
+  DataReadTrace,
+  DataReadTraceResolverContext,
+} from '~/helpers/dataReadTrace';
+import type {
   FormulaColumn,
   LinkToAnotherRecordColumn,
   SelectOption,
@@ -119,6 +123,13 @@ import {
 import { defaultLimitConfig } from '~/helpers/extractLimitAndOffset';
 import { extractProps } from '~/helpers/extractProps';
 import getAst from '~/helpers/getAst';
+import {
+  finishDataReadTraceStage,
+  getDataReadTraceContext,
+  getDataReadTraceDurationMs,
+  getDataReadTraceElapsedMs,
+  startDataReadTraceStage,
+} from '~/helpers/dataReadTrace';
 import { sanitize, unsanitize } from '~/helpers/sqlSanitize';
 import {
   Audit,
@@ -185,6 +196,7 @@ export interface ExecAndParseOptions {
   first?: boolean;
   bulkAggregate?: boolean;
   apiVersion?: NcApiVersion;
+  trace?: DataReadTrace;
 }
 
 /** Args stashed on DataLoader instances for relation queries (hm/mm/bt/oo). */
@@ -198,6 +210,7 @@ interface RelationLoaderArgs {
 /** DataLoader with a typed side-channel for query args. */
 class DataLoaderWithArgs<K, V> extends DataLoader<K, V> {
   args?: RelationLoaderArgs;
+  traceContext?: DataReadTraceResolverContext;
 }
 
 // Stable key for `fetchDisplayValueMap`. Two LTAR columns can resolve to the
@@ -251,6 +264,53 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
    */
   public get dbDriver() {
     return this._activeTransaction || this._dbDriver;
+  }
+
+  private traceRelationQueue<T>(
+    traceContext: DataReadTraceResolverContext | undefined,
+    meta: {
+      column: Column<any>;
+      relationType?: string;
+      loader: string;
+      ids: readonly unknown[];
+    },
+    runner: () => Promise<T>,
+  ): Promise<T> {
+    const trace = traceContext?.trace;
+
+    if (!trace?.enabled) {
+      return this._queryQueue.add(runner) as Promise<T>;
+    }
+
+    const queuedAt = startDataReadTraceStage(trace);
+    const queueSizeAtEnqueue = this._queryQueue?.size;
+    const queuePendingAtEnqueue = this._queryQueue?.pending;
+
+    return this._queryQueue.add(async () => {
+      const runStartedAt = startDataReadTraceStage(trace);
+      const queueSizeAtRunStart = this._queryQueue?.size;
+      const queuePendingAtRunStart = this._queryQueue?.pending;
+
+      try {
+        return await runner();
+      } finally {
+        finishDataReadTraceStage(trace, 'nocoExecute.relationQueue', queuedAt, {
+          fieldKey: traceContext.fieldKey,
+          path: traceContext.path.join('.'),
+          columnId: meta.column.id,
+          columnTitle: meta.column.title,
+          relationType: meta.relationType,
+          loader: meta.loader,
+          idsCount: meta.ids.length,
+          waitMs: getDataReadTraceDurationMs(queuedAt, runStartedAt),
+          runMs: getDataReadTraceElapsedMs(runStartedAt),
+          queueSizeAtEnqueue,
+          queuePendingAtEnqueue,
+          queueSizeAtRunStart,
+          queuePendingAtRunStart,
+        });
+      }
+    }) as Promise<T>;
   }
 
   /**
@@ -322,6 +382,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       extractOrderColumn = false,
       ignoreRls = false,
       fk_display_value_column_id,
+      trace,
     }: {
       ignoreView?: boolean;
       getHiddenColumn?: boolean;
@@ -331,9 +392,11 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       extractOrderColumn?: boolean;
       ignoreRls?: boolean;
       fk_display_value_column_id?: string | null;
+      trace?: DataReadTrace;
     } = {},
   ): Promise<any> {
     const qb = this.dbDriver(this.tnPath);
+    const getAstStartedAt = startDataReadTraceStage(trace);
     const { ast, dependencyFields, parsedQuery } = await getAst(this.context, {
       query,
       model: this.model,
@@ -350,37 +413,68 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         this.context.api_version === NcApiVersion.V3 &&
         query?.[QUERY_STRING_FIELD_ID_ON_RESULT] === 'true',
     });
+    finishDataReadTraceStage(trace, 'readByPk.getAst', getAstStartedAt, {
+      astKeys: Object.keys(ast ?? {}).length,
+      dependencyFields: dependencyFields?.fieldsSet?.size ?? 0,
+      hasNestedQuery: !!query?.nested,
+      hasFieldsQuery: !!(query?.fields || query?.f),
+    });
 
     const linksAsLtar =
       apiVersion === NcApiVersion.V3 &&
       query?.[QUERY_STRING_LINKS_AS_LTAR] === 'true';
 
+    const selectObjectStartedAt = startDataReadTraceStage(trace);
     await this.selectObject({
       ...(dependencyFields ?? {}),
       qb,
       validateFormula,
       linksAsLtar,
     });
+    finishDataReadTraceStage(
+      trace,
+      'readByPk.selectObject',
+      selectObjectStartedAt,
+      {
+        queryQueueSize: this._queryQueue?.size,
+        queryQueuePending: this._queryQueue?.pending,
+      },
+    );
 
     qb.where(_wherePk(this.model.primaryKeys, id));
 
     // Apply RLS conditions to readByPk
+    const rlsStartedAt = startDataReadTraceStage(trace);
     const rlsConditionsReadByPk = ignoreRls
       ? []
       : await this.getRlsConditions();
+    finishDataReadTraceStage(trace, 'readByPk.rls.get', rlsStartedAt, {
+      count: rlsConditionsReadByPk.length,
+    });
     if (rlsConditionsReadByPk.length) {
+      const applyRlsStartedAt = startDataReadTraceStage(trace);
       await conditionV2(
         this,
         [new Filter({ children: rlsConditionsReadByPk, is_group: true })],
         qb,
       );
+      finishDataReadTraceStage(trace, 'readByPk.rls.apply', applyRlsStartedAt);
     }
 
     // Exclude soft-deleted records
+    const softDeleteStartedAt = startDataReadTraceStage(trace);
     const softDeleteFilterReadByPk = await this.getSoftDeleteFilter();
     if (softDeleteFilterReadByPk) {
       qb.where(softDeleteFilterReadByPk);
     }
+    finishDataReadTraceStage(
+      trace,
+      'readByPk.softDeleteFilter',
+      softDeleteStartedAt,
+      {
+        applied: !!softDeleteFilterReadByPk,
+      },
+    );
 
     let data;
 
@@ -391,6 +485,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         skipSubstitutingColumnIds:
           this.context.api_version === NcApiVersion.V3 &&
           query?.[QUERY_STRING_FIELD_ID_ON_RESULT] === 'true',
+        trace,
       });
     } catch (e) {
       const isTransient = isTransientError(e);
@@ -402,19 +497,47 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       )
         throw e;
       logger.log(e);
-      return this.readByPk(id, true, query, {
+      const retryStartedAt = startDataReadTraceStage(trace);
+      const retryResult = await this.readByPk(id, true, query, {
         apiVersion,
+        trace,
       });
+      finishDataReadTraceStage(
+        trace,
+        'readByPk.retryWithFormulaValidation',
+        retryStartedAt,
+      );
+      return retryResult;
     }
 
     if (data) {
+      const getProtoStartedAt = startDataReadTraceStage(trace);
       const proto = await this.getProto({ linksAsLtar });
       data.__proto__ = proto;
+      finishDataReadTraceStage(trace, 'readByPk.getProto', getProtoStartedAt);
     }
 
-    return data
-      ? await nocoExecute(ast, data as ResolverObj, {}, parsedQuery)
-      : null;
+    if (!data) return null;
+
+    const nocoExecuteStartedAt = startDataReadTraceStage(trace);
+    const resolvedData = await nocoExecute(
+      ast,
+      data as ResolverObj,
+      {},
+      parsedQuery,
+      { trace },
+    );
+    finishDataReadTraceStage(
+      trace,
+      'readByPk.nocoExecute',
+      nocoExecuteStartedAt,
+      {
+        queryQueueSize: this._queryQueue?.size,
+        queryQueuePending: this._queryQueue?.pending,
+      },
+    );
+
+    return resolvedData;
   }
 
   public async readByPkFromModel(
@@ -2090,35 +2213,44 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 // to serialize actual DB execution across all relation types.
                 const listLoader = new DataLoaderWithArgs(
                   (ids: readonly string[]) =>
-                    this._queryQueue.add(async () => {
-                      if (ids.length > 1) {
-                        const data = await this.multipleHmList(
-                          {
-                            colId: column.id,
-                            ids: ids as string[],
-                            apiVersion,
-                            linksAsLtar,
-                          },
-                          listLoader.args,
-                        );
-                        return ids.map((id: string) =>
-                          data[id] ? data[id] : [],
-                        );
-                      } else {
-                        return [
-                          await this.hmList(
+                    this.traceRelationQueue(
+                      listLoader.traceContext,
+                      {
+                        column,
+                        relationType: colOptions.type,
+                        loader: ids.length > 1 ? 'multipleHmList' : 'hmList',
+                        ids,
+                      },
+                      async () => {
+                        if (ids.length > 1) {
+                          const data = await this.multipleHmList(
                             {
                               colId: column.id,
-                              id: ids[0],
+                              ids: ids as string[],
                               apiVersion,
-                              nested: true,
                               linksAsLtar,
                             },
                             listLoader.args,
-                          ),
-                        ];
-                      }
-                    }),
+                          );
+                          return ids.map((id: string) =>
+                            data[id] ? data[id] : [],
+                          );
+                        } else {
+                          return [
+                            await this.hmList(
+                              {
+                                colId: column.id,
+                                id: ids[0],
+                                apiVersion,
+                                nested: true,
+                                linksAsLtar,
+                              },
+                              listLoader.args,
+                            ),
+                          ];
+                        }
+                      },
+                    ),
                   {
                     cache: false,
                   },
@@ -2131,6 +2263,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                     : column.title
                 ] = async function (args?: RelationLoaderArgs): Promise<any> {
                   listLoader.args = args;
+                  listLoader.traceContext = getDataReadTraceContext(args);
                   return listLoader.load(
                     getCompositePkValue(self.model.primaryKeys, this),
                   );
@@ -2140,25 +2273,35 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 // Use multipleMmList for batching, take first record per parent
                 const readLoader = new DataLoaderWithArgs(
                   (ids: readonly string[]) =>
-                    this._queryQueue.add(async () => {
-                      if (ids?.length > 1) {
-                        const lists = await this.multipleMmList(
-                          {
-                            parentIds: ids as string[],
-                            colId: column.id,
-                          },
-                          readLoader.args,
-                        );
-                        return lists.map((list) => list?.[0] ?? null);
-                      } else {
-                        return [
-                          await this.mmRead(
-                            { parentId: ids[0], colId: column.id },
+                    this.traceRelationQueue(
+                      readLoader.traceContext,
+                      {
+                        column,
+                        relationType: colOptions.type,
+                        loader:
+                          ids?.length > 1 ? 'multipleMmList:first' : 'mmRead',
+                        ids,
+                      },
+                      async () => {
+                        if (ids?.length > 1) {
+                          const lists = await this.multipleMmList(
+                            {
+                              parentIds: ids as string[],
+                              colId: column.id,
+                            },
                             readLoader.args,
-                          ),
-                        ];
-                      }
-                    }),
+                          );
+                          return lists.map((list) => list?.[0] ?? null);
+                        } else {
+                          return [
+                            await this.mmRead(
+                              { parentId: ids[0], colId: column.id },
+                              readLoader.args,
+                            ),
+                          ];
+                        }
+                      },
+                    ),
                   {
                     cache: false,
                   },
@@ -2169,6 +2312,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                   args?: RelationLoaderArgs,
                 ) {
                   readLoader.args = args;
+                  readLoader.traceContext = getDataReadTraceContext(args);
                   return await readLoader.load(
                     getCompositePkValue(self.model.primaryKeys, this),
                   );
@@ -2176,35 +2320,44 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
               } else if (colOptions.type === 'mm' || isMMLike) {
                 const listLoader = new DataLoaderWithArgs(
                   (ids: readonly string[]) =>
-                    this._queryQueue.add(async () => {
-                      if (ids?.length > 1) {
-                        const data = await this.multipleMmList(
-                          {
-                            parentIds: ids as string[],
-                            colId: column.id,
-                            apiVersion,
-                            nested: true,
-                            linksAsLtar,
-                          },
-                          listLoader.args,
-                        );
-
-                        return data;
-                      } else {
-                        return [
-                          await this.mmList(
+                    this.traceRelationQueue(
+                      listLoader.traceContext,
+                      {
+                        column,
+                        relationType: colOptions.type,
+                        loader: ids?.length > 1 ? 'multipleMmList' : 'mmList',
+                        ids,
+                      },
+                      async () => {
+                        if (ids?.length > 1) {
+                          const data = await this.multipleMmList(
                             {
-                              parentId: ids[0],
+                              parentIds: ids as string[],
                               colId: column.id,
                               apiVersion,
                               nested: true,
                               linksAsLtar,
                             },
                             listLoader.args,
-                          ),
-                        ];
-                      }
-                    }),
+                          );
+
+                          return data;
+                        } else {
+                          return [
+                            await this.mmList(
+                              {
+                                parentId: ids[0],
+                                colId: column.id,
+                                apiVersion,
+                                nested: true,
+                                linksAsLtar,
+                              },
+                              listLoader.args,
+                            ),
+                          ];
+                        }
+                      },
+                    ),
                   {
                     cache: false,
                   },
@@ -2217,6 +2370,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                     : column.title
                 ] = async function (args?: RelationLoaderArgs): Promise<any> {
                   listLoader.args = args;
+                  listLoader.traceContext = getDataReadTraceContext(args);
                   return await listLoader.load(
                     getCompositePkValue(self.model.primaryKeys, this),
                   );
@@ -2240,102 +2394,15 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 // this way all parents data extracted together
                 const readLoader = new DataLoaderWithArgs(
                   (_ids: readonly string[]) =>
-                    this._queryQueue.add(async () => {
-                      // handle binary(16) foreign keys
-                      const ids = _ids.map((id) => {
-                        if (pCol.ct !== 'binary(16)') return id;
-
-                        // Cast the id to string.
-                        const idAsString = id + '';
-                        // Check if the id is a UUID and the column is binary(16)
-                        const isUUIDBinary16 =
-                          idAsString.length === 36 || idAsString.length === 32;
-                        // If the id is a UUID and the column is binary(16), convert the id to a Buffer. Otherwise, return null to indicate that the id is not a UUID.
-                        const idAsUUID = isUUIDBinary16
-                          ? idAsString.length === 32
-                            ? idAsString.replace(
-                                /(.{8})(.{4})(.{4})(.{4})(.{12})/,
-                                '$1-$2-$3-$4-$5',
-                              )
-                            : idAsString
-                          : null;
-
-                        return idAsUUID
-                          ? Buffer.from(idAsUUID.replace(/-/g, ''), 'hex')
-                          : id;
-                      });
-
-                      const data = await (
-                        await Model.getBaseModelSQL(refContext, {
-                          id: pCol.fk_model_id,
-                          dbDriver: this.dbDriver,
-                          queryQueue: this._queryQueue,
-                        })
-                      ).list(
-                        {
-                          fieldsSet: readLoader.args?.fieldsSet,
-                          filterArr: [
-                            new Filter({
-                              id: null,
-                              fk_column_id: pCol.id,
-                              fk_model_id: pCol.fk_model_id,
-                              value: ids as any[],
-                              comparison_op: 'in',
-                            }),
-                          ],
-                        },
-                        {
-                          ignoreViewFilterAndSort: true,
-                          ignorePagination: true,
-                        },
-                      );
-
-                      const groupedList = groupBy(data, pCol.title);
-                      return _ids.map(
-                        async (id: string) => groupedList?.[id]?.[0],
-                      );
-                    }),
-                  {
-                    cache: false,
-                  },
-                );
-
-                // defining BelongsTo read resolver method
-                proto[column.title] = async function (
-                  args?: RelationLoaderArgs,
-                ) {
-                  if (
-                    this?.[cCol?.title] === null ||
-                    this?.[cCol?.title] === undefined
-                  )
-                    return null;
-
-                  readLoader.args = args;
-
-                  return await readLoader.load(this?.[cCol?.title]);
-                };
-              } else if (colOptions.type === 'oo' && !isMMLike) {
-                const isBt = column.meta?.bt;
-
-                if (isBt) {
-                  // @ts-ignore
-                  const colOptions = (await column.getColOptions(
-                    this.context,
-                  )) as LinkToAnotherRecordColumn;
-                  const pCol = await Column.get(refContext, {
-                    colId: colOptions.fk_parent_column_id,
-                  });
-                  const cCol = await Column.get(this.context, {
-                    colId: colOptions.fk_child_column_id,
-                  });
-
-                  // use dataloader to get batches of parent data together rather than getting them individually
-                  // it takes individual keys and callback is invoked with an array of values and we can get the
-                  // result for all those together and return the value in the same order as in the array
-                  // this way all parents data extracted together
-                  const readLoader = new DataLoaderWithArgs(
-                    (_ids: readonly string[]) =>
-                      this._queryQueue.add(async () => {
+                    this.traceRelationQueue(
+                      readLoader.traceContext,
+                      {
+                        column,
+                        relationType: colOptions.type,
+                        loader: 'btList',
+                        ids: _ids,
+                      },
+                      async () => {
                         // handle binary(16) foreign keys
                         const ids = _ids.map((id) => {
                           if (pCol.ct !== 'binary(16)') return id;
@@ -2390,7 +2457,114 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                         return _ids.map(
                           async (id: string) => groupedList?.[id]?.[0],
                         );
-                      }),
+                      },
+                    ),
+                  {
+                    cache: false,
+                  },
+                );
+
+                // defining BelongsTo read resolver method
+                proto[column.title] = async function (
+                  args?: RelationLoaderArgs,
+                ) {
+                  if (
+                    this?.[cCol?.title] === null ||
+                    this?.[cCol?.title] === undefined
+                  )
+                    return null;
+
+                  readLoader.args = args;
+                  readLoader.traceContext = getDataReadTraceContext(args);
+
+                  return await readLoader.load(this?.[cCol?.title]);
+                };
+              } else if (colOptions.type === 'oo' && !isMMLike) {
+                const isBt = column.meta?.bt;
+
+                if (isBt) {
+                  // @ts-ignore
+                  const colOptions = (await column.getColOptions(
+                    this.context,
+                  )) as LinkToAnotherRecordColumn;
+                  const pCol = await Column.get(refContext, {
+                    colId: colOptions.fk_parent_column_id,
+                  });
+                  const cCol = await Column.get(this.context, {
+                    colId: colOptions.fk_child_column_id,
+                  });
+
+                  // use dataloader to get batches of parent data together rather than getting them individually
+                  // it takes individual keys and callback is invoked with an array of values and we can get the
+                  // result for all those together and return the value in the same order as in the array
+                  // this way all parents data extracted together
+                  const readLoader = new DataLoaderWithArgs(
+                    (_ids: readonly string[]) =>
+                      this.traceRelationQueue(
+                        readLoader.traceContext,
+                        {
+                          column,
+                          relationType: colOptions.type,
+                          loader: 'ooBtList',
+                          ids: _ids,
+                        },
+                        async () => {
+                          // handle binary(16) foreign keys
+                          const ids = _ids.map((id) => {
+                            if (pCol.ct !== 'binary(16)') return id;
+
+                            // Cast the id to string.
+                            const idAsString = id + '';
+                            // Check if the id is a UUID and the column is binary(16)
+                            const isUUIDBinary16 =
+                              idAsString.length === 36 ||
+                              idAsString.length === 32;
+                            // If the id is a UUID and the column is binary(16), convert the id to a Buffer. Otherwise, return null to indicate that the id is not a UUID.
+                            const idAsUUID = isUUIDBinary16
+                              ? idAsString.length === 32
+                                ? idAsString.replace(
+                                    /(.{8})(.{4})(.{4})(.{4})(.{12})/,
+                                    '$1-$2-$3-$4-$5',
+                                  )
+                                : idAsString
+                              : null;
+
+                            return idAsUUID
+                              ? Buffer.from(idAsUUID.replace(/-/g, ''), 'hex')
+                              : id;
+                          });
+
+                          const data = await (
+                            await Model.getBaseModelSQL(refContext, {
+                              id: pCol.fk_model_id,
+                              dbDriver: this.dbDriver,
+                              queryQueue: this._queryQueue,
+                            })
+                          ).list(
+                            {
+                              fieldsSet: readLoader.args?.fieldsSet,
+                              filterArr: [
+                                new Filter({
+                                  id: null,
+                                  fk_column_id: pCol.id,
+                                  fk_model_id: pCol.fk_model_id,
+                                  value: ids as any[],
+                                  comparison_op: 'in',
+                                }),
+                              ],
+                            },
+                            {
+                              ignoreViewFilterAndSort: true,
+                              ignorePagination: true,
+                            },
+                          );
+
+                          const groupedList = groupBy(data, pCol.title);
+                          return _ids.map(
+                            async (id: string) => groupedList?.[id]?.[0],
+                          );
+                        },
+                      ),
                     {
                       cache: false,
                     },
@@ -2407,38 +2581,51 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                       return null;
 
                     readLoader.args = args;
+                    readLoader.traceContext = getDataReadTraceContext(args);
 
                     return await readLoader.load(this?.[cCol?.title]);
                   };
                 } else {
                   const listLoader = new DataLoaderWithArgs(
                     (ids: readonly string[]) =>
-                      this._queryQueue.add(async () => {
-                        if (ids.length > 1) {
-                          const data = await this.multipleHmList(
-                            {
-                              colId: column.id,
-                              ids: ids as string[],
-                            },
-                            listLoader.args,
-                          );
-                          return ids.map((id: string) =>
-                            data[id] ? data[id]?.[0] : null,
-                          );
-                        } else {
-                          return [
-                            (
-                              await this.hmList(
-                                {
-                                  colId: column.id,
-                                  id: ids[0],
-                                },
-                                listLoader.args,
-                              )
-                            )?.[0] ?? null,
-                          ];
-                        }
-                      }),
+                      this.traceRelationQueue(
+                        listLoader.traceContext,
+                        {
+                          column,
+                          relationType: colOptions.type,
+                          loader:
+                            ids.length > 1
+                              ? 'multipleHmList:first'
+                              : 'hmList:first',
+                          ids,
+                        },
+                        async () => {
+                          if (ids.length > 1) {
+                            const data = await this.multipleHmList(
+                              {
+                                colId: column.id,
+                                ids: ids as string[],
+                              },
+                              listLoader.args,
+                            );
+                            return ids.map((id: string) =>
+                              data[id] ? data[id]?.[0] : null,
+                            );
+                          } else {
+                            return [
+                              (
+                                await this.hmList(
+                                  {
+                                    colId: column.id,
+                                    id: ids[0],
+                                  },
+                                  listLoader.args,
+                                )
+                              )?.[0] ?? null,
+                            ];
+                          }
+                        },
+                      ),
                     {
                       cache: false,
                     },
@@ -2451,6 +2638,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                       : column.title
                   ] = async function (args?: RelationLoaderArgs): Promise<any> {
                     listLoader.args = args;
+                    listLoader.traceContext = getDataReadTraceContext(args);
                     return listLoader.load(
                       getCompositePkValue(self.model.primaryKeys, this),
                     );
@@ -3385,10 +3573,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
             if (refDisplayColCache.has(cacheKey)) continue;
             refDisplayColCache.set(
               cacheKey,
-              await this.resolveLtarDisplayCol(
-                entry.columnId,
-                entry.refModel,
-              ),
+              await this.resolveLtarDisplayCol(entry.columnId, entry.refModel),
             );
           }
           const dvProps: {
@@ -6976,16 +7161,30 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
 
     const query = typeof qb === 'string' ? qb : qb.toQuery();
 
+    const trace = options.trace;
+    const sqlStartedAt = startDataReadTraceStage(trace);
     let data = await this.execAndGetRows(query);
+    finishDataReadTraceStage(trace, 'execAndParse.sql', sqlStartedAt, {
+      rowCount: Array.isArray(data) ? data.length : undefined,
+      first: !!options.first,
+      raw: !!options.raw,
+    });
 
     if (!this.model?.columns) {
+      const columnsStartedAt = startDataReadTraceStage(trace);
       await this.model.getColumns(this.context);
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.modelColumns',
+        columnsStartedAt,
+      );
     }
 
     // we need to post process lookup fields based on the looked up column instead of the lookup column
     const aliasColumns = {};
 
     if (!dependencyColumns) {
+      const lookupAliasStartedAt = startDataReadTraceStage(trace);
       const nestedColumns = this.model?.columns.filter(
         (col) => col.uidt === UITypes.Lookup,
       );
@@ -7001,32 +7200,66 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
           aliasColumns[col.id] = nestedColumn;
         }
       }
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.lookupAliasColumns',
+        lookupAliasStartedAt,
+        {
+          lookupColumnCount: nestedColumns?.length ?? 0,
+          aliasColumnCount: Object.keys(aliasColumns).length,
+        },
+      );
     }
 
     // update attachment fields
     if (!options.skipAttachmentConversion) {
+      const attachmentStartedAt = startDataReadTraceStage(trace);
       data = await this.convertAttachmentType(data, dependencyColumns);
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.convertAttachment',
+        attachmentStartedAt,
+      );
     }
 
     // update date time fields
     if (!options.skipDateConversion) {
+      const dateStartedAt = startDataReadTraceStage(trace);
       data = this.convertDateFormat(data, dependencyColumns);
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.convertDate',
+        dateStartedAt,
+      );
     }
 
     // update user fields
     if (!options.skipUserConversion) {
+      const userStartedAt = startDataReadTraceStage(trace);
       data = await this.convertUserFormat(
         data,
         dependencyColumns,
         options?.apiVersion,
       );
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.convertUser',
+        userStartedAt,
+      );
     }
 
     if (!options.skipJsonConversion) {
+      const jsonStartedAt = startDataReadTraceStage(trace);
       data = await this.convertJsonTypes(data, dependencyColumns);
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.convertJson',
+        jsonStartedAt,
+      );
     }
 
     if (options.bulkAggregate) {
+      const bulkAggregateStartedAt = startDataReadTraceStage(trace);
       data = data.map(async (d) => {
         for (const key in d) {
           let data = d[key];
@@ -7050,9 +7283,15 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         }
         return d;
       });
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.bulkAggregateParse',
+        bulkAggregateStartedAt,
+      );
     }
 
     if (options.apiVersion === NcApiVersion.V3) {
+      const v3ParseStartedAt = startDataReadTraceStage(trace);
       data = await this.convertMultiSelectTypes(data, dependencyColumns);
       await FieldHandler.fromBaseModel(this).parseDataDbValue({
         data,
@@ -7060,13 +7299,20 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
           additionalColumns: dependencyColumns,
         },
       });
+      finishDataReadTraceStage(trace, 'execAndParse.v3Parse', v3ParseStartedAt);
     }
 
     if (!options.skipSubstitutingColumnIds) {
+      const substituteStartedAt = startDataReadTraceStage(trace);
       data = await this.substituteColumnIdsWithColumnTitles(
         data,
         dependencyColumns,
         aliasColumns,
+      );
+      finishDataReadTraceStage(
+        trace,
+        'execAndParse.substituteColumnIds',
+        substituteStartedAt,
       );
     }
 

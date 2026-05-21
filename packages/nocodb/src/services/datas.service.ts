@@ -8,6 +8,12 @@ import type { Filter } from '~/models';
 import type LinkToAnotherRecordColumn from '../models/LinkToAnotherRecordColumn';
 import { NcBaseError, NcError } from '~/helpers/catchError';
 import { getViewAndModelByAliasOrId } from '~/helpers/dataHelpers';
+import {
+  createDataReadTrace,
+  finishDataReadTraceStage,
+  logDataReadTrace,
+  startDataReadTraceStage,
+} from '~/helpers/dataReadTrace';
 import getAst from '~/helpers/getAst';
 import { PagedResponseImpl } from '~/helpers/PagedResponse';
 import { Base, Column, FormView, Model, Source, View } from '~/models';
@@ -429,25 +435,75 @@ export class DatasService {
       getHiddenColumn?: boolean;
     },
   ) {
-    const { model, view } = await getViewAndModelByAliasOrId(context, param);
+    // Expanded form reads use getHiddenColumn=true. Only create trace state for
+    // those detail-dialog loads so normal row reads do not pay timing overhead.
+    const trace = param.getHiddenColumn
+      ? createDataReadTrace(
+          {
+            baseId: context.base_id,
+            baseName: param.baseName,
+            tableName: param.tableName,
+            viewName: param.viewName,
+            rowId: param.rowId,
+            getHiddenColumn: param.getHiddenColumn,
+          },
+          {
+            enabled: true,
+          },
+        )
+      : undefined;
 
-    const source = await Source.get(context, model.source_id);
+    try {
+      const resolveModelStartedAt = startDataReadTraceStage(trace);
+      const { model, view } = await getViewAndModelByAliasOrId(context, param);
+      finishDataReadTraceStage(
+        trace,
+        'dataRead.resolveModelAndView',
+        resolveModelStartedAt,
+        {
+          modelId: model.id,
+          viewId: view?.id,
+          viewType: view?.type,
+        },
+      );
 
-    const baseModel = await Model.getBaseModelSQL(context, {
-      id: model.id,
-      viewId: view?.id,
-      dbDriver: await NcConnectionMgrv2.get(source),
-      source,
-    });
-    const row = await baseModel.readByPk(param.rowId, false, param.query, {
-      getHiddenColumn: param.getHiddenColumn,
-    });
+      const sourceStartedAt = startDataReadTraceStage(trace);
+      const source = await Source.get(context, model.source_id);
+      finishDataReadTraceStage(trace, 'dataRead.sourceGet', sourceStartedAt, {
+        sourceId: source?.id,
+        sourceType: source?.type,
+      });
 
-    if (!row) {
-      NcError.get(context).recordNotFound(param.rowId);
+      const baseModelStartedAt = startDataReadTraceStage(trace);
+      const baseModel = await Model.getBaseModelSQL(context, {
+        id: model.id,
+        viewId: view?.id,
+        dbDriver: await NcConnectionMgrv2.get(source),
+        source,
+      });
+      finishDataReadTraceStage(
+        trace,
+        'dataRead.baseModelInit',
+        baseModelStartedAt,
+      );
+
+      const readByPkStartedAt = startDataReadTraceStage(trace);
+      const row = await baseModel.readByPk(param.rowId, false, param.query, {
+        getHiddenColumn: param.getHiddenColumn,
+        trace,
+      });
+      finishDataReadTraceStage(trace, 'dataRead.readByPk', readByPkStartedAt, {
+        rowFound: !!row,
+      });
+
+      if (!row) {
+        NcError.get(context).recordNotFound(param.rowId);
+      }
+
+      return row;
+    } finally {
+      if (trace) logDataReadTrace(this.logger, trace);
     }
-
-    return row;
   }
 
   async dataExist(

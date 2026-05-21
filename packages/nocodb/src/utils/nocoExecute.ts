@@ -1,4 +1,14 @@
 /** AST node: keys map to nested AST nodes (object) or leaf markers (1 / true) */
+import type {
+  DataReadTrace,
+  DataReadTraceResolverContext,
+} from '~/helpers/dataReadTrace';
+import {
+  attachDataReadTraceContext,
+  finishDataReadTraceStage,
+  startDataReadTraceStage,
+} from '~/helpers/dataReadTrace';
+
 interface FieldRequest {
   [key: string]: FieldRequest | 1 | true;
 }
@@ -16,6 +26,11 @@ export type ResolverObj =
     } & {
       [key: string]: null | ((args: any) => any) | any;
     };
+
+interface NocoExecuteOptions {
+  trace?: DataReadTrace;
+  tracePath?: string[];
+}
 
 /**
  * Recursive resolver that walks a request AST against a proto-decorated
@@ -36,13 +51,23 @@ const nocoExecute = async (
   resolverObj?: ResolverObj | ResolverObj[],
   cache = {},
   rootArgs = null,
+  options: NocoExecuteOptions = {},
 ): Promise<any> => {
+  const trace = options.trace;
+  const tracePath = options.tracePath ?? [];
+
   // Array of records: resolve all in parallel so every record's DataLoader
   // .load() calls land in the same microtick → optimal batching
   if (Array.isArray(resolverObj)) {
     return Promise.all(
       resolverObj.map((record, i) =>
-        nocoExecute(requestAST, record, (cache[i] = cache[i] || {}), rootArgs),
+        nocoExecute(
+          requestAST,
+          record,
+          (cache[i] = cache[i] || {}),
+          rootArgs,
+          options,
+        ),
       ),
     );
   }
@@ -62,6 +87,7 @@ const nocoExecute = async (
     cacheNode: any,
     sourceObj: any = {},
     args: any = {},
+    traceContext?: DataReadTraceResolverContext,
   ): any => {
     if (!path.length) {
       return Promise.resolve(cacheNode);
@@ -73,7 +99,9 @@ const nocoExecute = async (
     // Resolve the current key if not already cached
     if (cacheNode[key] === undefined || cacheNode[key] === null) {
       if (typeof sourceObj[key] === 'function') {
-        cacheNode[key] = sourceObj[key](args);
+        cacheNode[key] = sourceObj[key](
+          attachDataReadTraceContext(args, traceContext),
+        );
       } else if (typeof sourceObj[key] === 'object') {
         cacheNode[key] = Promise.resolve(sourceObj[key]);
       } else if (cacheNode?.__proto__?.__columnAliases?.[key]) {
@@ -83,6 +111,7 @@ const nocoExecute = async (
           cacheNode,
           {},
           args,
+          traceContext,
         );
       } else if (typeof cacheNode === 'object') {
         cacheNode[key] = Promise.resolve(sourceObj[key]);
@@ -99,11 +128,13 @@ const nocoExecute = async (
     return Promise.resolve(cacheNode[key]).then((resolved) => {
       if (Array.isArray(resolved)) {
         return Promise.all(
-          resolved.map((item) => resolvePath(remainingPath, item, {}, args)),
+          resolved.map((item) =>
+            resolvePath(remainingPath, item, {}, args, traceContext),
+          ),
         );
       }
       return resolved != null
-        ? resolvePath(remainingPath, resolved, {}, args)
+        ? resolvePath(remainingPath, resolved, {}, args, traceContext)
         : Promise.resolve(null);
     });
   };
@@ -115,12 +146,18 @@ const nocoExecute = async (
    */
   const fieldPromises: Record<string, any> = {};
 
-  function resolveField(key: string, args: any) {
+  function resolveField(
+    key: string,
+    args: any,
+    traceContext?: DataReadTraceResolverContext,
+  ) {
     if (!columnAliases?.[key]) {
       // Direct field: invoke proto function or wrap static value
       if (record) {
         if (typeof record[key] === 'function') {
-          fieldPromises[key] = record[key](args);
+          fieldPromises[key] = record[key](
+            attachDataReadTraceContext(args, traceContext),
+          );
         } else if (typeof record[key] === 'object') {
           fieldPromises[key] = Promise.resolve(record[key]);
         } else {
@@ -136,6 +173,7 @@ const nocoExecute = async (
         cache,
         record,
         args?.nested?.[key],
+        traceContext,
       ).then((resolved) =>
         Array.isArray(resolved) ? deepFlatten(resolved) : resolved,
       );
@@ -161,12 +199,27 @@ const nocoExecute = async (
 
   const output: any = {};
   const pendingPromises = [];
+  const shouldTraceRootFields = !!trace?.enabled && tracePath.length === 0;
 
   // Phase 1: Fire all resolveField() calls synchronously. This is where
   // DataLoader .load() calls are enqueued — doing them all before any await
   // ensures they land in a single batch per relation type.
   for (const key of requestedKeys) {
-    resolveField(key, rootArgs?.nested?.[key]);
+    const aliasPath = columnAliases?.[key]?.path;
+    const fieldTraceContext = trace?.enabled
+      ? {
+          trace,
+          fieldKey: key,
+          path: [...tracePath, key],
+          isAlias: !!aliasPath,
+          aliasPath,
+        }
+      : undefined;
+    const fieldStartedAt = shouldTraceRootFields
+      ? startDataReadTraceStage(trace)
+      : 0;
+
+    resolveField(key, rootArgs?.nested?.[key], fieldTraceContext);
 
     // Phase 2 (chained): For nested AST nodes, chain recursive nocoExecute
     // onto the resolved value. Promise.resolve() safely wraps non-Promise values.
@@ -185,6 +238,10 @@ const nocoExecute = async (
                   item,
                   cache?.[key]?.[i],
                   buildNestedArgs(key),
+                  {
+                    trace,
+                    tracePath: [...tracePath, key],
+                  },
                 ),
               ),
             ));
@@ -194,6 +251,10 @@ const nocoExecute = async (
               resolved,
               cache[key],
               buildNestedArgs(key),
+              {
+                trace,
+                tracePath: [...tracePath, key],
+              },
             ));
           }
           return resolved;
@@ -205,7 +266,30 @@ const nocoExecute = async (
     if (fieldPromises[key]) {
       pendingPromises.push(
         (async () => {
-          output[key] = await fieldPromises[key];
+          let value;
+          try {
+            value = await fieldPromises[key];
+            output[key] = value;
+          } finally {
+            if (shouldTraceRootFields) {
+              finishDataReadTraceStage(
+                trace,
+                'nocoExecute.field',
+                fieldStartedAt,
+                {
+                  key,
+                  isAlias: !!aliasPath,
+                  ...(aliasPath ? { aliasPath } : {}),
+                  hasNestedAst:
+                    !!requestAST[key] && typeof requestAST[key] === 'object',
+                  resultType: Array.isArray(value) ? 'array' : typeof value,
+                  ...(Array.isArray(value)
+                    ? { resultCount: value.length }
+                    : {}),
+                },
+              );
+            }
+          }
         })(),
       );
     }

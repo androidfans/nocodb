@@ -23,6 +23,7 @@ import type {
   NestedLinkLastModifiedEntry,
 } from '~/db/BaseModelSqlv2/nested-link-preparator';
 import type { ExecAndParseOptions } from 'src/db/BaseModelSqlv2';
+import type { DataReadTrace } from '~/helpers/dataReadTrace';
 
 export interface IBaseModelSqlV2 {
   context: NcContext;
@@ -40,6 +41,7 @@ export interface IBaseModelSqlV2 {
       extractOnlyPrimaries?: boolean;
       apiVersion?: NcApiVersion;
       extractOrderColumn?: boolean;
+      trace?: DataReadTrace;
     },
   ): Promise<any>;
   execAndParse(
@@ -113,6 +115,7 @@ export interface IBaseModelSqlV2 {
       extractOnlyPrimaries?: boolean;
       apiVersion?: NcApiVersion;
       extractOrderColumn?: boolean;
+      trace?: DataReadTrace;
     },
   ): Promise<any>;
 
