@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import type { Select as AntSelect } from 'ant-design-vue'
 import type { ColumnType, LinkToAnotherRecordType } from 'nocodb-sdk'
+import { isDateOrDateTimeCol } from 'nocodb-sdk'
 
 interface Props {
   modelValue?: string | null
@@ -62,7 +63,10 @@ async function loadRelatedTableMeta() {
   if (!meta) return
   relatedTableMeta.value = meta
 
-  const pvCol = (meta.columns || []).find((c: ColumnType) => c.pv)
+  const overrideId = (colOptions.value as any)?.fk_display_value_column_id
+  const pvCol = overrideId
+    ? (meta.columns || []).find((c: ColumnType) => c.id === overrideId) || (meta.columns || []).find((c: ColumnType) => c.pv)
+    : (meta.columns || []).find((c: ColumnType) => c.pv)
   displayValueColumn.value = pvCol || (meta.columns || [])[0] || null
   displayValueColumnTitle.value = displayValueColumn.value?.title || ''
 
@@ -79,21 +83,19 @@ async function fetchRecords(search?: string) {
     if (search) {
       const clauses: string[] = []
       if (displayValueColumn.value) {
-        const dvClause = getValidSearchQueryForColumn(
-          displayValueColumn.value,
-          search,
-          relatedTableMeta.value,
-          { getWhereQueryAs: 'string' },
-        ) as string
-        if (dvClause) clauses.push(dvClause)
+        if (isDateOrDateTimeCol(displayValueColumn.value)) {
+          clauses.push(`(${displayValueColumn.value.title},eq,exactDate,${search})`)
+        } else {
+          const dvClause = getValidSearchQueryForColumn(displayValueColumn.value, search, relatedTableMeta.value, {
+            getWhereQueryAs: 'string',
+          }) as string
+          if (dvClause) clauses.push(dvClause)
+        }
       }
       if (pkColumn.value) {
-        const pkClause = getValidSearchQueryForColumn(
-          pkColumn.value,
-          search,
-          relatedTableMeta.value,
-          { getWhereQueryAs: 'string' },
-        ) as string
+        const pkClause = getValidSearchQueryForColumn(pkColumn.value, search, relatedTableMeta.value, {
+          getWhereQueryAs: 'string',
+        }) as string
         if (pkClause) clauses.push(pkClause)
       }
       where = clauses.length ? clauses.join('~or') : undefined

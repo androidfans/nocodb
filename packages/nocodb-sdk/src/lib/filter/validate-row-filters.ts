@@ -348,137 +348,143 @@ export class RowFilterValidator {
             ) {
               res = true;
             } else {
-            let linkData = rawLinkData;
+              let linkData = rawLinkData;
 
-            linkData = Array.isArray(linkData) ? linkData : linkData != null ? [linkData] : [];
+              linkData = Array.isArray(linkData)
+                ? linkData
+                : linkData != null
+                ? [linkData]
+                : [];
 
-            const colOptions = column.colOptions as LinkToAnotherRecordType;
+              const colOptions = column.colOptions as LinkToAnotherRecordType;
 
-            const relatedModelId = colOptions?.fk_related_model_id;
-            const relatedBaseId =
-              (colOptions as any)?.fk_related_base_id || baseId;
+              const relatedModelId = colOptions?.fk_related_model_id;
+              const relatedBaseId =
+                (colOptions as any)?.fk_related_base_id || baseId;
 
-            const relatedMeta = getMetaWithCompositeKey(
-              metas,
-              relatedBaseId,
-              relatedModelId
-            );
+              const relatedMeta = getMetaWithCompositeKey(
+                metas,
+                relatedBaseId,
+                relatedModelId
+              );
 
-            if (!relatedMeta?.columns) {
-              res = false;
-            } else {
-              const isIdOp = filter.comparison_op?.endsWith('_id');
-              const pkColumn = relatedMeta.columns.find((col) => col.pk);
-              const overrideId = (colOptions as any)
-                ?.fk_display_value_column_id;
-              const displayColumn = overrideId
-                ? relatedMeta.columns.find((col) => col.id === overrideId) ||
-                  relatedMeta.columns.find((col) => col.pv)
-                : relatedMeta.columns.find((col) => col.pv);
-              const childColumn = isIdOp ? pkColumn : displayColumn;
-              if (!childColumn) {
+              if (!relatedMeta?.columns) {
                 res = false;
               } else {
-                const childFieldName = childColumn.title;
-                const childValues = linkData
-                  .map((item) => {
-                    return ncToString(item?.[childFieldName]);
-                  })
-                  .filter((val) => val !== '');
+                const isIdOp = filter.comparison_op?.endsWith('_id');
+                const pkColumn = relatedMeta.columns.find((col) => col.pk);
+                const overrideId = (colOptions as any)
+                  ?.fk_display_value_column_id;
+                const displayColumn = overrideId
+                  ? relatedMeta.columns.find((col) => col.id === overrideId) ||
+                    relatedMeta.columns.find((col) => col.pv)
+                  : relatedMeta.columns.find((col) => col.pv);
+                const childColumn = isIdOp ? pkColumn : displayColumn;
+                if (!childColumn) {
+                  res = false;
+                } else {
+                  const childFieldName = childColumn.title;
+                  const childValues = linkData
+                    .map((item) => {
+                      return ncToString(item?.[childFieldName]);
+                    })
+                    .filter((val) => val !== '');
 
-                const effectiveOp = isIdOp
-                  ? filter.comparison_op.replace(/_id$/, '')
-                  : filter.comparison_op;
+                  const effectiveOp = isIdOp
+                    ? filter.comparison_op.replace(/_id$/, '')
+                    : filter.comparison_op;
 
-                switch (effectiveOp as any) {
-                  case 'eq':
-                    res = childValues.includes(ncToString(filter.value));
-                    break;
-                  case 'neq':
-                    res = !childValues.includes(ncToString(filter.value));
-                    break;
-                  case 'in': {
-                    const inValues = ncToString(filter.value)
-                      .split(',')
-                      .map((v) => v.trim())
-                      .filter(Boolean);
-                    res = childValues.some((val) => inValues.includes(val));
-                    break;
-                  }
-                  case 'nin': {
-                    const ninValues = ncToString(filter.value)
-                      .split(',')
-                      .map((v) => v.trim())
-                      .filter(Boolean);
-                    res = !childValues.some((val) => ninValues.includes(val));
-                    break;
-                  }
-                  case 'like':
-                    res = childValues.some((val) =>
-                      val
-                        .toLowerCase()
-                        .includes(ncToString(filter.value).toLowerCase())
-                    );
-                    break;
-                  case 'nlike':
-                    res = !childValues.some((val) =>
-                      val
-                        .toLowerCase()
-                        .includes(ncToString(filter.value).toLowerCase())
-                    );
-                    break;
-                  case 'anyof': {
-                    const filterValues =
-                      ncToString(filter.value)
+                  switch (effectiveOp as any) {
+                    case 'eq':
+                      res = childValues.includes(ncToString(filter.value));
+                      break;
+                    case 'neq':
+                      res = !childValues.includes(ncToString(filter.value));
+                      break;
+                    case 'in': {
+                      const inValues = ncToString(filter.value)
                         .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = childValues.some((val) => filterValues.includes(val));
-                    break;
-                  }
-                  case 'nanyof': {
-                    const filterValues2 =
-                      ncToString(filter.value)
+                        .map((v) => v.trim())
+                        .filter(Boolean);
+                      res = childValues.some((val) => inValues.includes(val));
+                      break;
+                    }
+                    case 'nin': {
+                      const ninValues = ncToString(filter.value)
                         .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = !childValues.some((val) =>
-                      filterValues2.includes(val)
-                    );
-                    break;
+                        .map((v) => v.trim())
+                        .filter(Boolean);
+                      res = !childValues.some((val) => ninValues.includes(val));
+                      break;
+                    }
+                    case 'like':
+                      res = childValues.some((val) =>
+                        val
+                          .toLowerCase()
+                          .includes(ncToString(filter.value).toLowerCase())
+                      );
+                      break;
+                    case 'nlike':
+                      res = !childValues.some((val) =>
+                        val
+                          .toLowerCase()
+                          .includes(ncToString(filter.value).toLowerCase())
+                      );
+                      break;
+                    case 'anyof': {
+                      const filterValues =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = childValues.some((val) =>
+                        filterValues.includes(val)
+                      );
+                      break;
+                    }
+                    case 'nanyof': {
+                      const filterValues2 =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = !childValues.some((val) =>
+                        filterValues2.includes(val)
+                      );
+                      break;
+                    }
+                    case 'allof': {
+                      const filterValues3 =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = filterValues3.every((filterVal) =>
+                        childValues.includes(filterVal)
+                      );
+                      break;
+                    }
+                    case 'nallof': {
+                      const filterValues4 =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = !filterValues4.every((filterVal) =>
+                        childValues.includes(filterVal)
+                      );
+                      break;
+                    }
+                    case 'gb_null':
+                    case 'empty':
+                    case 'blank':
+                      res = linkData.length === 0;
+                      break;
+                    case 'notempty':
+                    case 'notblank':
+                      res = linkData.length > 0;
+                      break;
+                    default:
+                      res = false;
                   }
-                  case 'allof': {
-                    const filterValues3 =
-                      ncToString(filter.value)
-                        .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = filterValues3.every((filterVal) =>
-                      childValues.includes(filterVal)
-                    );
-                    break;
-                  }
-                  case 'nallof': {
-                    const filterValues4 =
-                      ncToString(filter.value)
-                        .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = !filterValues4.every((filterVal) =>
-                      childValues.includes(filterVal)
-                    );
-                    break;
-                  }
-                  case 'gb_null':
-                  case 'empty':
-                  case 'blank':
-                    res = linkData.length === 0;
-                    break;
-                  case 'notempty':
-                  case 'notblank':
-                    res = linkData.length > 0;
-                    break;
-                  default:
-                    res = false;
                 }
               }
-            }
             }
           } else if (
             [UITypes.JSON, UITypes.Time].includes(column.uidt as UITypes) &&
