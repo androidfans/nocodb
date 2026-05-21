@@ -240,10 +240,10 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
-      // Links excluded: eq_id replaces eq for record filtering;
+      // Links/LTAR excluded: eq_id replaces eq for record filtering;
       // count filtering uses gt/lt/gte/lte (or a Rollup field).
-      // LTAR (V1 BT) keeps eq for display-value text filtering.
       UITypes.Links,
+      UITypes.LinkToAnotherRecord,
     ],
     semanticType: 'equality',
     typeSpecificSemantic: (fieldUiType) =>
@@ -261,6 +261,7 @@ export const comparisonOpList = (
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
       UITypes.Links,
+      UITypes.LinkToAnotherRecord,
     ],
     semanticType: 'inequality',
     typeSpecificSemantic: (fieldUiType) =>
@@ -285,6 +286,7 @@ export const comparisonOpList = (
       UITypes.Time,
       UITypes.Colour,
       UITypes.Links,
+      UITypes.LinkToAnotherRecord,
       ...numericUITypes,
     ],
     semanticType: 'pattern_match',
@@ -310,6 +312,7 @@ export const comparisonOpList = (
       UITypes.Time,
       UITypes.Colour,
       UITypes.Links,
+      UITypes.LinkToAnotherRecord,
       ...numericUITypes,
     ],
     semanticType: 'pattern_not_match',
