@@ -63,7 +63,7 @@ const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: str
   isInt,
   isFloat,
   isTextArea,
-  isLinks: (col: ColumnType) => col.uidt === UITypes.Links,
+  isLinks: (col: ColumnType) => col.uidt === UITypes.Links || col.uidt === UITypes.LinkToAnotherRecord,
   isUser,
   isReadonlyUser,
   isColour,
