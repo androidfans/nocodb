@@ -344,10 +344,12 @@ export class RowFilterValidator {
             const colOptions = column.colOptions as LinkToAnotherRecordType;
 
             const relatedModelId = colOptions?.fk_related_model_id;
+            const relatedBaseId =
+              (colOptions as any)?.fk_related_base_id || baseId;
 
             const relatedMeta = getMetaWithCompositeKey(
               metas,
-              baseId,
+              relatedBaseId,
               relatedModelId
             );
 

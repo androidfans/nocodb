@@ -169,7 +169,9 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             ).builder;
           }
           if (!isSubGroup) {
-            selectors.push(columnQuery.as(alias));
+            selectors.push(
+              baseModel.dbDriver.raw(`?? as ??`, [columnQuery, alias]),
+            );
           }
           break;
         case UITypes.Rollup:
