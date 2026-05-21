@@ -238,13 +238,13 @@ const search = () => {
 
     <template #tagRender="{ value: val, closable, onClose }">
       <span
-        class="inline-flex items-center gap-1 border-1 border-nc-border-gray-medium rounded px-1.5 py-0.25 mr-0.5 my-0.25 text-xs text-nc-content-brand font-medium blue-chip max-w-32 truncate"
+        class="nc-filter-record-chip inline-flex items-center gap-1 bg-nc-bg-brand rounded-lg px-2 py-[3px] mr-0.5 my-0.25 text-xs text-nc-content-brand font-medium max-w-32"
       >
         <span class="truncate">{{ getDisplayLabel(val) }}</span>
         <component
           :is="iconMap.closeThick"
           v-if="closable"
-          class="text-gray-500 cursor-pointer hover:text-gray-700 w-3 h-3 flex-none"
+          class="text-nc-content-brand cursor-pointer hover:text-nc-content-brand-dark w-3 h-3 flex-none"
           @click.stop="onClose"
         />
       </span>
@@ -259,11 +259,7 @@ const search = () => {
   }
 
   :deep(.ant-select-selection-item) {
-    @apply !flex items-center gap-1 !border-1 !border-nc-border-gray-medium !rounded !bg-white !text-xs !text-nc-content-brand !font-medium !max-w-32;
+    @apply !flex items-center !border-none !bg-nc-bg-brand !text-xs !text-nc-content-brand !font-medium !rounded-lg !px-2 !py-[3px] !max-w-32;
   }
-}
-
-.blue-chip {
-  @apply bg-white;
 }
 </style>
