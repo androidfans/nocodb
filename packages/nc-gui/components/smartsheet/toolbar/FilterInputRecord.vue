@@ -323,8 +323,7 @@ const handleSearchInput = (e: Event) => {
 .nc-filter-record-trigger {
   @apply flex items-center justify-between gap-1 min-h-8 w-40 px-2 py-0.5
     rounded-lg cursor-pointer border-1 border-nc-border-gray-medium
-    bg-nc-bg-default dark:bg-nc-bg-dark
-    hover:border-nc-border-brand transition-colors overflow-hidden;
+    bg-nc-bg-default hover:border-nc-border-brand transition-colors overflow-hidden;
 
   &.is-open {
     @apply border-nc-border-brand;
@@ -337,8 +336,7 @@ const handleSearchInput = (e: Event) => {
 
 .nc-record-chip {
   @apply inline-flex items-center gap-0.5 flex-shrink-0
-    bg-nc-bg-brand dark:bg-nc-bg-gray-light
-    rounded-lg px-1.5 py-0.5 text-xs
+    bg-nc-bg-brand rounded-lg px-1.5 py-0.5 text-xs
     text-nc-content-brand font-medium max-w-28;
 }
 
@@ -348,7 +346,7 @@ const handleSearchInput = (e: Event) => {
 }
 
 .trigger-placeholder {
-  @apply text-nc-content-gray-muted dark:text-nc-content-gray-muted text-sm;
+  @apply text-nc-content-gray-muted text-sm;
 }
 
 .trigger-actions {
@@ -356,29 +354,27 @@ const handleSearchInput = (e: Event) => {
 }
 
 .action-icon {
-  @apply text-gray-400 dark:text-gray-500 w-3.5 h-3.5 transition-transform;
+  @apply text-nc-content-gray-muted w-3.5 h-3.5 transition-transform;
 }
 
 .clear-icon {
-  @apply cursor-pointer hover:text-gray-600 dark:hover:text-gray-300;
+  @apply cursor-pointer hover:text-nc-content-gray;
 }
 
 .nc-filter-record-panel {
-  @apply bg-white dark:bg-nc-bg-dark rounded-lg shadow-lg
-    border-1 border-gray-200 dark:border-gray-700
+  @apply bg-nc-bg-default rounded-lg shadow-lg
+    border-1 border-nc-border-gray-medium
     w-64 max-h-72 flex flex-col;
 }
 
 .panel-search {
-  @apply px-2 py-1.5 border-b-1 border-gray-100 dark:border-gray-700;
+  @apply px-2 py-1.5 border-b-1 border-nc-border-gray-light;
 }
 
 .search-input {
   @apply w-full text-sm px-2 py-1 rounded
-    bg-gray-50 dark:bg-gray-800
-    border-1 border-gray-200 dark:border-gray-600
-    text-nc-content-gray dark:text-nc-content-gray
-    outline-none focus:border-nc-border-brand;
+    bg-nc-bg-gray-extralight border-1 border-nc-border-gray-medium
+    text-nc-content-gray outline-none focus:border-nc-border-brand;
 }
 
 .panel-list {
@@ -387,16 +383,16 @@ const handleSearchInput = (e: Event) => {
 
 .record-item {
   @apply flex items-center gap-2 px-3 py-1.5 cursor-pointer text-sm
-    hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors;
+    hover:bg-nc-bg-gray-extralight transition-colors;
 
   &.is-selected {
-    @apply bg-nc-bg-brand/5 dark:bg-nc-bg-brand/10;
+    @apply bg-nc-bg-brand/5;
   }
 }
 
 .record-check {
   @apply w-4 h-4 rounded border-1 flex items-center justify-center flex-none
-    border-gray-300 dark:border-gray-600 transition-colors;
+    border-nc-border-gray-medium transition-colors;
 
   &.checked {
     @apply bg-nc-fill-brand border-nc-border-brand;
@@ -408,10 +404,10 @@ const handleSearchInput = (e: Event) => {
 }
 
 .record-label {
-  @apply truncate text-nc-content-gray dark:text-nc-content-gray;
+  @apply truncate text-nc-content-gray;
 }
 
 .panel-empty {
-  @apply flex items-center justify-center py-4 text-sm text-gray-400 dark:text-gray-500;
+  @apply flex items-center justify-center py-4 text-sm text-nc-content-gray-muted;
 }
 </style>
