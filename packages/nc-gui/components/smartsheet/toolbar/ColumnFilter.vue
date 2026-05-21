@@ -316,15 +316,18 @@ const getColumn = (filter: Filter) => {
 
 const filterPrevComparisonOp = ref<Record<string, string>>({})
 
+const getFilterKey = (filter: FilterType) => filter.id || (filter as any).tmp_id || ''
+
 const syncFilterPrevComparisonOps = () => {
   for (const filter of filters.value) {
-    if (filter.id && filter.comparison_op && !filterPrevComparisonOp.value[filter.id]) {
-      filterPrevComparisonOp.value[filter.id] = filter.comparison_op
+    const key = getFilterKey(filter)
+    if (key && filter.comparison_op && !filterPrevComparisonOp.value[key]) {
+      filterPrevComparisonOp.value[key] = filter.comparison_op
     }
   }
 }
 
-watch(() => filters.value.map((filter) => filter.id).join(','), syncFilterPrevComparisonOps, { immediate: true })
+watch(() => filters.value.map((filter) => getFilterKey(filter)).join(','), syncFilterPrevComparisonOps, { immediate: true })
 
 const isFilterDraft = (filter: Filter, col: ColumnType) => {
   if (filter.id) return false
@@ -357,7 +360,7 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
   if (!col) return
   if (
     col.uidt === UITypes.SingleSelect &&
-    ['anyof', 'nanyof'].includes(filterPrevComparisonOp.value[filter.id!]) &&
+    ['anyof', 'nanyof'].includes(filterPrevComparisonOp.value[getFilterKey(filter)]) &&
     ['eq', 'neq'].includes(filter.comparison_op!)
   ) {
     // anyof and nanyof can allow multiple selections,
@@ -401,7 +404,7 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     // didn't have this filter yet), clear defensively to avoid stale
     // record IDs being interpreted as count values.
     const recordOps = ['eq_id', 'neq_id', 'in_id', 'nin_id']
-    const prevOp = filterPrevComparisonOp.value[filter.id!]
+    const prevOp = filterPrevComparisonOp.value[getFilterKey(filter)]
     const currOp = filter.comparison_op!
     const currIsRecord = recordOps.includes(currOp)
     const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
@@ -420,7 +423,7 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     saveOrUpdate(filter, i)
   }
 
-  filterPrevComparisonOp.value[filter.id!] = filter.comparison_op!
+  filterPrevComparisonOp.value[getFilterKey(filter)] = filter.comparison_op!
   $e('a:filter:update', {
     logical: filter.logical_op,
     comparison: filter.comparison_op,

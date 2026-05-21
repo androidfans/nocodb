@@ -347,13 +347,17 @@ export class RowFilterValidator {
           ) {
             const rawLinkData = data[field];
 
-            // HM/MM Links may only have a count (number) in the client cache.
-            // Without related record ids, record-id filters cannot be proven true.
+            // HM/MM Links may only have a count (number) in the client cache,
+            // not actual record objects. For _id operators we can't match by PK,
+            // but zero links guarantees negated operators (neq_id, nin_id) pass.
             if (
               filter.comparison_op?.endsWith('_id') &&
               typeof rawLinkData === 'number'
             ) {
-              res = false;
+              const negated = ['neq_id', 'nin_id'].includes(
+                filter.comparison_op,
+              );
+              res = negated && rawLinkData === 0;
             } else {
               let linkData = rawLinkData;
 
