@@ -8,6 +8,7 @@ interface Props {
   modelValue?: string | null
   column?: ColumnType
   comparisonOp?: string
+  disabled?: boolean
 }
 
 const props = defineProps<Props>()
@@ -231,6 +232,21 @@ const handleSearch = (val: string) => {
   onSearch(val)
 }
 
+const handleSelectMouseDown = (event: MouseEvent) => {
+  if (props.disabled) return
+
+  const target = event.target as HTMLElement
+  if (target.closest('.ant-select-clear, .ant-select-selection-item-remove')) return
+
+  isOpen.value = true
+}
+
+const handleSelectFocus = () => {
+  if (!props.disabled) {
+    isOpen.value = true
+  }
+}
+
 const hasSelection = computed(() => {
   if (isMulti.value) return false
   return !!props.modelValue
@@ -249,13 +265,16 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
     class="w-full nc-filter-record-select"
     :class="{ 'has-selection': hasSelection, 'has-search': hasSearchText, 'has-value': hasValue }"
     :placeholder="$t('general.select')"
-    :open="isOpen"
+    :open="isOpen && !disabled"
     :loading="loading"
     :search-value="searchVal"
     show-search
     :show-arrow="showSuffixIcon"
     :filter-option="false"
     :allow-clear="true"
+    :disabled="disabled"
+    @mousedown="handleSelectMouseDown"
+    @focus="handleSelectFocus"
     @search="handleSearch"
     @dropdown-visible-change="(v: boolean) => (isOpen = v)"
   >
