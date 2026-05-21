@@ -157,6 +157,11 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               model: baseModel.model,
             });
             columnQuery = baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')');
+            if (!isSubGroup) {
+              selectors.push(
+                baseModel.dbDriver.raw(`?? as ??`, [columnQuery, alias]),
+              );
+            }
           } else {
             columnQuery = (
               await genRollupSelectv2({
@@ -167,11 +172,9 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
                 )) as RollupColumn,
               })
             ).builder;
-          }
-          if (!isSubGroup) {
-            selectors.push(
-              baseModel.dbDriver.raw(`?? as ??`, [columnQuery, alias]),
-            );
+            if (!isSubGroup) {
+              selectors.push(columnQuery.as(alias));
+            }
           }
           break;
         case UITypes.Rollup:

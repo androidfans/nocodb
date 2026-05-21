@@ -333,9 +333,9 @@ export class RowFilterValidator {
                 res = false; // Unsupported operation for User fields
             }
           } else if (
-            [UITypes.LinkToAnotherRecord, UITypes.Links].includes(
-              column.uidt as UITypes
-            )
+            column.uidt === UITypes.LinkToAnotherRecord ||
+            (column.uidt === UITypes.Links &&
+              filter.comparison_op?.endsWith('_id'))
           ) {
             let linkData = data[field];
 

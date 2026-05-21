@@ -1012,6 +1012,59 @@ describe('validateRowFilters', () => {
         ).toBe(expected);
       }
     );
+
+    it.each([
+      ['eq_id', 'crossRecA', true],
+      ['in_id', 'crossRecB,crossRecC', true],
+      ['in_id', 'crossRecC,crossRecD', false],
+    ])(
+      'should evaluate cross-base "%s" against related record ids',
+      (comparisonOp, value, expected) => {
+        expect(
+          validateRowFilters({
+            filters: [
+              {
+                fk_column_id: 'crossBaseLinks',
+                comparison_op: comparisonOp as any,
+                value,
+              },
+            ],
+            data: {
+              CrossBaseLinks: [
+                { Id: 'crossRecA', Primary: 'CrossRecordA' },
+                { Id: 'crossRecB', Primary: 'CrossRecordB' },
+              ],
+            },
+            columns: [
+              {
+                id: 'crossBaseLinks',
+                title: 'CrossBaseLinks',
+                uidt: UITypes.Links,
+                colOptions: {
+                  fk_related_model_id: 'crossBaseRelatedModel',
+                  fk_related_base_id: 'relatedBase',
+                } as LinkToAnotherRecordType,
+              },
+            ],
+            client: mockClient,
+            metas: {
+              'relatedBase:crossBaseRelatedModel': {
+                columns: [
+                  { id: 'r0', title: 'Id', pk: true, uidt: UITypes.ID },
+                  {
+                    id: 'r1',
+                    title: 'Primary',
+                    pv: true,
+                    uidt: UITypes.SingleLineText,
+                  },
+                ],
+              },
+            },
+            baseId: 'currentBase',
+          })
+        ).toBe(expected);
+      }
+    );
   });
 
   // Edge cases

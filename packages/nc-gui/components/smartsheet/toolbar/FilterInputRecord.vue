@@ -68,9 +68,17 @@ async function fetchRecords(search?: string) {
   if (!relatedTableId.value || !relatedBaseId.value) return
   loading.value = true
   try {
-    const where = search
-      ? `(${displayValueColumnTitle.value},like,%${search}%)`
-      : undefined
+    let where: string | undefined
+    if (search) {
+      const clauses: string[] = []
+      if (displayValueColumnTitle.value) {
+        clauses.push(`(${displayValueColumnTitle.value},like,%${search}%)`)
+      }
+      if (pkColumnTitle.value) {
+        clauses.push(`(${pkColumnTitle.value},eq,${search})`)
+      }
+      where = clauses.length ? clauses.join('~or') : undefined
+    }
 
     const res = await $api.dbDataTableRow.list(relatedTableId.value, {
       limit: 100,
