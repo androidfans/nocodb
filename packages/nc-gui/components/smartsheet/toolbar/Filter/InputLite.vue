@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClientType, SqlUiFactory, UITypes } from 'nocodb-sdk'
+import { ClientType, SqlUiFactory, isLinksOrLTAR } from 'nocodb-sdk'
 import type { ColumnType } from 'nocodb-sdk'
 import SingleSelect from '~/components/cell/SingleSelect/index.vue'
 import MultiSelect from '~/components/cell/MultiSelect/index.vue'
@@ -15,6 +15,7 @@ import Integer from '~/components/cell/Integer/index.vue'
 import Float from '~/components/cell/Float/index.vue'
 import Text from '~/components/cell/Text/index.vue'
 import User from '~/components/cell/User/index.vue'
+import FilterInputRecord from '~/components/smartsheet/toolbar/FilterInputRecord.vue'
 
 interface Props {
   // column could be possibly undefined when the filter is created
@@ -31,6 +32,8 @@ interface Emits {
 const props = defineProps<Props>()
 
 const emit = defineEmits<Emits>()
+
+const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
 const column = toRef(props, 'column')
 
@@ -60,7 +63,7 @@ const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: str
   isInt,
   isFloat,
   isTextArea,
-  isLinks: (col: ColumnType) => col.uidt === UITypes.Links,
+  isLinks: (col: ColumnType) => isLinksOrLTAR(col),
   isUser,
   isReadonlyUser,
 }
@@ -128,7 +131,7 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
-    isLinks: Integer,
+    isLinks: RECORD_OPS.has(props.filter.comparison_op!) ? FilterInputRecord : Integer,
     isUser: User,
     isReadonlyUser: User,
   }
@@ -147,7 +150,12 @@ const componentProps = computed(() => {
     case 'isPercent':
     case 'isDecimal':
     case 'isFloat':
-    case 'isLinks':
+    case 'isLinks': {
+      if (RECORD_OPS.has(props.filter.comparison_op!)) {
+        return { column: column.value, comparisonOp: props.filter.comparison_op }
+      }
+      return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
+    }
     case 'isInt': {
       return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
     }
@@ -183,7 +191,7 @@ const componentProps = computed(() => {
 const hasExtraPadding = computed(() => {
   return (
     column.value &&
-    (column.value?.uidt === UITypes.Links ||
+    (isLinksOrLTAR(column.value) ||
       isInt(column.value, abstractType) ||
       isDate(column.value, abstractType) ||
       isDateTime(column.value, abstractType) ||

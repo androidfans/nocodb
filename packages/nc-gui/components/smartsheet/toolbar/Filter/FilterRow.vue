@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { UITypes } from 'nocodb-sdk'
+import { UITypes, isLinksOrLTAR } from 'nocodb-sdk'
 import type { ClientType } from 'nocodb-sdk'
 import type { RowHandler } from './types'
 
@@ -52,6 +52,8 @@ interface Emits {
 const props = defineProps<Props>()
 const emits = defineEmits<Emits>()
 const vModel = useVModel(props, 'modelValue', emits)
+
+const RECORD_OPS = ['eq_id', 'neq_id', 'in_id', 'nin_id']
 
 const meta = inject(MetaInj, ref())
 
@@ -236,6 +238,20 @@ const onComparisonOpChange = (comparison_op: string) => {
         // hence remove the previous value
         filter.value = null
         filter.comparison_sub_op = null
+      } else if (isLinksOrLTAR(col)) {
+        const prevOp = filterPrevComparisonOp.value
+        const currOp = filter.comparison_op!
+        const currIsRecord = RECORD_OPS.includes(currOp)
+        const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
+        if (!prevOp) {
+          filter.value = null
+        } else {
+          const prevIsRecord = RECORD_OPS.includes(prevOp)
+          const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
+          if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
+            filter.value = null
+          }
+        }
       } else if (isDateType((col.filterUidt ?? col.uidt) as UITypes)) {
         // for date / datetime,
         // the input type could be decimal or datepicker / datetime picker

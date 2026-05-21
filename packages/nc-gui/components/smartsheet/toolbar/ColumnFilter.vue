@@ -6,6 +6,7 @@ import {
   isColumnInError,
   isCreatedOrLastModifiedTimeCol,
   isHiddenCol,
+  isLinksOrLTAR,
   isSystemColumn,
   isVirtualCol,
 } from 'nocodb-sdk'
@@ -395,7 +396,7 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     if (!filter.meta.timezone) {
       filter.meta.timezone = getTimezoneFromColumn(col)
     }
-  } else if (col.uidt === UITypes.Links) {
+  } else if (isLinksOrLTAR(col)) {
     // Clear filter value when switching between incompatible operator types:
     //   - record ops (eq_id, in_id) store comma-separated PKs
     //   - count ops (eq, gt) store a number

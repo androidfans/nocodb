@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { UITypes } from 'nocodb-sdk'
+import { isLinksOrLTAR } from 'nocodb-sdk'
 import type { ColumnType } from 'nocodb-sdk'
 import SingleSelect from '~/components/cell/SingleSelect/index.vue'
 import MultiSelect from '~/components/cell/MultiSelect/index.vue'
@@ -18,8 +18,6 @@ import User from '~/components/cell/User/index.vue'
 import ColourFilter from '~/components/cell/Colour/FilterInput.vue'
 import FilterInputRecord from '~/components/smartsheet/toolbar/FilterInputRecord.vue'
 
-const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
-
 interface Props {
   // column could be possibly undefined when the filter is created
   column?: ColumnType
@@ -34,6 +32,8 @@ interface Emits {
 const props = defineProps<Props>()
 
 const emit = defineEmits<Emits>()
+
+const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
 const column = toRef(props, 'column')
 
@@ -63,7 +63,7 @@ const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: str
   isInt,
   isFloat,
   isTextArea,
-  isLinks: (col: ColumnType) => col.uidt === UITypes.Links || col.uidt === UITypes.LinkToAnotherRecord,
+  isLinks: (col: ColumnType) => isLinksOrLTAR(col),
   isUser,
   isReadonlyUser,
   isColour,
@@ -194,7 +194,7 @@ const componentProps = computed(() => {
 const hasExtraPadding = computed(() => {
   return (
     column.value &&
-    (column.value?.uidt === UITypes.Links ||
+    (isLinksOrLTAR(column.value) ||
       isInt(column.value, abstractType) ||
       isDate(column.value, abstractType) ||
       isDateTime(column.value, abstractType) ||

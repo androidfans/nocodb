@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import Draggable from 'vuedraggable'
-import { type FilterType, UITypes, parseProp } from 'nocodb-sdk'
+import { type FilterType, UITypes, isLinksOrLTAR, parseProp } from 'nocodb-sdk'
 import { type GroupEmits, type GroupProps } from './types'
 import { SmartsheetToolbarFilterGroupRow } from '#components'
 
 const props = defineProps<GroupProps>()
 const emits = defineEmits<GroupEmits>()
 const vModel = useVModel(props, 'modelValue', emits)
+
+const RECORD_OPS = ['eq_id', 'neq_id', 'in_id', 'nin_id']
 
 const { $e } = useNuxtApp()
 
@@ -75,6 +77,20 @@ const handleFilterChange = async (filter) => {
     // hence remove the previous value
     filter.value = null
     filter.comparison_sub_op = null
+  } else if (isLinksOrLTAR(col)) {
+    const prevOp = filterPrevComparisonOp.value[filter.id!]
+    const currOp = filter.comparison_op!
+    const currIsRecord = RECORD_OPS.includes(currOp)
+    const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
+    if (!prevOp) {
+      filter.value = null
+    } else {
+      const prevIsRecord = RECORD_OPS.includes(prevOp)
+      const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
+      if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
+        filter.value = null
+      }
+    }
   } else if (isDateType((col.filterUidt ?? col.uidt) as UITypes)) {
     // for date / datetime,
     // the input type could be decimal or datepicker / datetime picker
