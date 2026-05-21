@@ -240,8 +240,12 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
-      // Both link types excluded: eq_id replaces eq for record filtering;
-      // count filtering uses gt/lt/gte/lte (or a Rollup field).
+      // Both link types excluded (by design):
+      // - Record filtering uses eq_id/neq_id/in_id/nin_id operators
+      //   with a record picker UI instead of text/number input.
+      // - Count-based "equals N" filtering is intentionally removed;
+      //   users who need exact count matching should create a Rollup
+      //   field. gt/lt/gte/lte remain available for range comparisons.
       // V2 columns use LinkToAnotherRecord (the current/active type);
       // Links is the deprecated V1 type — kept here for completeness.
       UITypes.Links,
@@ -287,6 +291,7 @@ export const comparisonOpList = (
       UITypes.LastModifiedTime,
       UITypes.Time,
       UITypes.Colour,
+      // Link types use record picker (eq_id) instead of text search
       UITypes.Links,
       UITypes.LinkToAnotherRecord,
       ...numericUITypes,
@@ -313,6 +318,7 @@ export const comparisonOpList = (
       UITypes.LastModifiedTime,
       UITypes.Time,
       UITypes.Colour,
+      // Link types use record picker (neq_id) instead of text search
       UITypes.Links,
       UITypes.LinkToAnotherRecord,
       ...numericUITypes,
