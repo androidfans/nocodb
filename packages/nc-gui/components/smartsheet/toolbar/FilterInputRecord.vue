@@ -8,7 +8,6 @@ interface Props {
   modelValue?: string | null
   column?: ColumnType
   comparisonOp?: string
-  disabled?: boolean
 }
 
 const props = defineProps<Props>()
@@ -24,10 +23,9 @@ const isMulti = computed(() => ['in_id', 'nin_id'].includes(props.comparisonOp |
 
 const aselect = ref<typeof AntSelect>()
 const isOpen = ref(false)
-const searchVal = ref('')
+const searchVal = ref<string | null>()
 const records = ref<{ pk: string; displayValue: string }[]>([])
 const loading = ref(false)
-let fetchRequestId = 0
 
 const colOptions = computed(() => column.value?.colOptions as LinkToAnotherRecordType | undefined)
 
@@ -46,11 +44,10 @@ const selectedValue = computed({
     if (isMulti.value) {
       const arr = Array.isArray(val) ? val : val ? [val] : []
       emit('update:modelValue', arr.length ? arr.join(',') : null)
-      searchVal.value = ''
     } else {
       const scalar = Array.isArray(val) ? val[0] : val
       emit('update:modelValue', scalar || null)
-      searchVal.value = ''
+      isOpen.value = false
     }
   },
 })
@@ -63,12 +60,6 @@ const relatedTableMeta = ref<any>(null)
 const metaLoaded = ref(false)
 
 async function loadRelatedTableMeta() {
-  relatedTableMeta.value = null
-  displayValueColumn.value = null
-  displayValueColumnTitle.value = ''
-  pkColumn.value = null
-  pkColumnTitle.value = ''
-
   if (!relatedTableId.value || !relatedBaseId.value) return
   const meta = await getMeta(relatedBaseId.value, relatedTableId.value)
   if (!meta) return
@@ -88,7 +79,6 @@ async function loadRelatedTableMeta() {
 
 async function fetchRecords(search?: string) {
   if (!relatedTableId.value || !relatedBaseId.value || !metaLoaded.value) return
-  const requestId = ++fetchRequestId
   loading.value = true
   try {
     let where: string | undefined
@@ -102,7 +92,6 @@ async function fetchRecords(search?: string) {
         } else {
           const dvClause = getValidSearchQueryForColumn(displayValueColumn.value, search, relatedTableMeta.value, {
             getWhereQueryAs: 'string',
-            serializeLinkRecordSearchQuery: true,
           }) as string
           if (dvClause) clauses.push(dvClause)
         }
@@ -110,7 +99,6 @@ async function fetchRecords(search?: string) {
       if (pkColumn.value) {
         const pkClause = getValidSearchQueryForColumn(pkColumn.value, search, relatedTableMeta.value, {
           getWhereQueryAs: 'string',
-          serializeLinkRecordSearchQuery: true,
         }) as string
         if (pkClause) clauses.push(pkClause)
       }
@@ -122,8 +110,6 @@ async function fetchRecords(search?: string) {
       where,
       ...(displayValueColumnTitle.value ? { fields: [pkColumnTitle.value, displayValueColumnTitle.value].filter(Boolean) } : {}),
     })
-
-    if (requestId !== fetchRequestId) return
 
     const rows = (res as any)?.list || []
     records.value = rows.map((row: Record<string, any>) => ({
@@ -150,9 +136,7 @@ async function fetchRecords(search?: string) {
   } catch (e) {
     console.error('Failed to fetch records for filter', e)
   } finally {
-    if (requestId === fetchRequestId) {
-      loading.value = false
-    }
+    loading.value = false
   }
 }
 
@@ -202,11 +186,9 @@ watch(
 )
 
 watch(
-  [relatedBaseId, relatedTableId],
+  relatedTableId,
   async () => {
     metaLoaded.value = false
-    records.value = []
-    pkToDisplayMap.value = new Map()
     await loadRelatedTableMeta()
     metaLoaded.value = true
     await resolveSelectedDisplayValues()
@@ -215,14 +197,12 @@ watch(
   { immediate: true },
 )
 
-const handleDropdownVisibleChange = (visible: boolean) => {
-  isOpen.value = visible
-
-  if (visible) {
+watch(isOpen, (n) => {
+  if (n) {
     searchVal.value = ''
     fetchRecords()
   }
-}
+})
 
 const onSearch = useDebounceFn((val: string) => {
   fetchRecords(val || undefined)
@@ -237,10 +217,6 @@ const hasSelection = computed(() => {
   if (isMulti.value) return false
   return !!props.modelValue
 })
-
-const hasValue = computed(() => !!props.modelValue)
-const hasSearchText = computed(() => !!searchVal.value)
-const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
 </script>
 
 <template>
@@ -249,17 +225,15 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
     v-model:value="selectedValue"
     :mode="isMulti ? 'multiple' : undefined"
     class="w-full nc-filter-record-select"
-    :class="{ 'has-selection': hasSelection, 'has-search': hasSearchText, 'has-value': hasValue }"
+    :class="{ 'has-selection': hasSelection }"
     :placeholder="$t('general.select')"
+    :open="isOpen"
     :loading="loading"
-    :search-value="searchVal"
     show-search
-    :show-arrow="showSuffixIcon"
     :filter-option="false"
     :allow-clear="true"
-    :disabled="disabled"
     @search="handleSearch"
-    @dropdown-visible-change="handleDropdownVisibleChange"
+    @dropdown-visible-change="(v: boolean) => (isOpen = v)"
   >
     <a-select-option v-for="record in records" :key="record.pk" :value="record.pk">
       <div class="flex items-center gap-1">
@@ -285,8 +259,6 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
 
 <style lang="scss" scoped>
 .nc-filter-record-select {
-  min-width: 14rem;
-
   :deep(.ant-select-selector) {
     @apply !min-h-8 flex items-center flex-wrap;
   }
@@ -295,21 +267,10 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
     @apply !flex items-center !border-none !bg-nc-bg-brand !text-xs !text-nc-content-brand !font-medium !rounded-lg !px-2 !py-[3px] !max-w-32;
   }
 
-  &.has-selection:not(.ant-select-open) {
+  &.has-selection {
     :deep(.ant-select-selection-search) {
       @apply !w-0 !overflow-hidden;
     }
-  }
-
-  &.has-value,
-  &.has-search {
-    :deep(.ant-select-arrow) {
-      @apply !hidden;
-    }
-  }
-
-  :deep(.ant-select-clear) {
-    @apply !right-2;
   }
 }
 </style>

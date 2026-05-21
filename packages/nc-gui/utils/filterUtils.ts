@@ -162,24 +162,10 @@ export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
   }
   // if column is a lookup column, then use the lookup type extracted from the column
   else if (col.btLookupColumn) {
-    return getFilterUidt(col.btLookupColumn as ColumnTypeForFilter)
+    return col.btLookupColumn.uidt as UITypes
   } else {
     return col.uidt as UITypes
   }
-}
-
-export const getFilterInputColumn = (column?: ColumnTypeForFilter | ColumnType): ColumnTypeForFilter | ColumnType | undefined => {
-  if (!column) return undefined
-
-  const filterColumn = (
-    (column as ColumnTypeForFilter).btLookupColumn ? { ...(column as ColumnTypeForFilter).btLookupColumn } : { ...column }
-  ) as ColumnTypeForFilter
-
-  const filterUidt = (column as ColumnTypeForFilter).filterUidt ?? getFilterUidt(filterColumn as ColumnTypeForFilter)
-  ;(filterColumn as any).uidt = filterUidt
-  ;(filterColumn as any).filterUidt = filterUidt
-
-  return filterColumn
 }
 
 export const composeColumnsForFilter = async ({

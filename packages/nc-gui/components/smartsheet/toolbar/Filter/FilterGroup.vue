@@ -3,7 +3,6 @@ import Draggable from 'vuedraggable'
 import { type FilterType, UITypes, isLinksOrLTAR, parseProp } from 'nocodb-sdk'
 import { type GroupEmits, type GroupProps } from './types'
 import { SmartsheetToolbarFilterGroupRow } from '#components'
-import { getFilterInputColumn } from '~/utils/filterUtils'
 
 const props = defineProps<GroupProps>()
 const emits = defineEmits<GroupEmits>()
@@ -75,12 +74,8 @@ const getColumn = (filter: FilterType) => {
   return props.columns?.find((col: ColumnTypeForFilter) => col.id === filter.fk_column_id)
 }
 
-const getFilterColumn = (filter: FilterType) => {
-  return getFilterInputColumn(getColumn(filter)) as ColumnTypeForFilter | undefined
-}
-
 const handleFilterChange = async (filter) => {
-  const col = getFilterColumn(filter)
+  const col = getColumn(filter)
   if (!col) return
   if (
     col.uidt === UITypes.SingleSelect &&
@@ -109,7 +104,7 @@ const handleFilterChange = async (filter) => {
         filter.value = null
       }
     }
-  } else if (isDateType(col.uidt as UITypes)) {
+  } else if (isDateType((col.filterUidt ?? col.uidt) as UITypes)) {
     // for date / datetime,
     // the input type could be decimal or datepicker / datetime picker
     // hence remove the previous value
