@@ -383,9 +383,14 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
       filter.meta.timezone = getTimezoneFromColumn(col)
     }
   } else if (col.uidt === UITypes.Links) {
-    const prevIsRecord = ['eq_id', 'neq_id', 'in_id', 'nin_id'].includes(filterPrevComparisonOp.value[filter.id!])
-    const currIsRecord = ['eq_id', 'neq_id', 'in_id', 'nin_id'].includes(filter.comparison_op!)
-    if (prevIsRecord !== currIsRecord) {
+    const recordOps = ['eq_id', 'neq_id', 'in_id', 'nin_id']
+    const prevOp = filterPrevComparisonOp.value[filter.id!]
+    const currOp = filter.comparison_op!
+    const prevIsRecord = recordOps.includes(prevOp)
+    const currIsRecord = recordOps.includes(currOp)
+    const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
+    const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
+    if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
       filter.value = null
     }
   }

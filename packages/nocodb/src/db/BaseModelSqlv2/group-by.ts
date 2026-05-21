@@ -153,7 +153,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             const selectQb = await generateLookupSelectQuery({
               baseModelSqlv2: baseModel,
               column,
-              alias,
+              alias: null,
               model: baseModel.model,
             });
             columnQuery = selectQb?.builder;
@@ -594,7 +594,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               const selectQb = await generateLookupSelectQuery({
                 baseModelSqlv2: baseModel,
                 column,
-                alias: getAs(column),
+                alias: null,
                 model: baseModel.model,
               });
               selectors.push(selectQb?.builder.as(getAs(column)));
@@ -936,7 +936,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
                   const selectQb = await generateLookupSelectQuery({
                     baseModelSqlv2: baseModel,
                     column,
-                    alias: getAs(column),
+                    alias: null,
                     model: baseModel.model,
                   });
                   colSelectors.push(selectQb?.builder.as(getAs(column)));
@@ -1314,7 +1314,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
                   const selectQb = await generateLookupSelectQuery({
                     baseModelSqlv2: baseModel,
                     column,
-                    alias: getAs(column),
+                    alias: null,
                     model: baseModel.model,
                   });
                   colSelectors.push(selectQb?.builder.as(getAs(column)));

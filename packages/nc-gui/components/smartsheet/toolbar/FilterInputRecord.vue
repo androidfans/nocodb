@@ -27,17 +27,23 @@ const loading = ref(false)
 const colOptions = computed(() => column.value?.colOptions as LinkToAnotherRecordType | undefined)
 
 const relatedTableId = computed(() => colOptions.value?.fk_related_model_id)
+const relatedBaseId = computed(() => (colOptions.value as any)?.fk_related_base_id || column.value?.base_id)
 
-const selectedPks = computed<string[]>({
+const selectedValue = computed({
   get: () => {
-    if (!props.modelValue) return []
-    return props.modelValue.split(',').filter(Boolean)
-  },
-  set: (val: string[]) => {
+    if (!props.modelValue) return isMulti.value ? [] : undefined
     if (isMulti.value) {
-      emit('update:modelValue', val.length ? val.join(',') : null)
+      return String(props.modelValue).split(',').filter(Boolean)
+    }
+    return String(props.modelValue)
+  },
+  set: (val: string | string[] | undefined) => {
+    if (isMulti.value) {
+      const arr = Array.isArray(val) ? val : val ? [val] : []
+      emit('update:modelValue', arr.length ? arr.join(',') : null)
     } else {
-      emit('update:modelValue', val.length ? val[val.length - 1] : null)
+      const scalar = Array.isArray(val) ? val[0] : val
+      emit('update:modelValue', scalar || null)
       isOpen.value = false
     }
   },
@@ -47,8 +53,8 @@ const displayValueColumnTitle = ref<string>('')
 const pkColumnTitle = ref<string>('')
 
 async function loadRelatedTableMeta() {
-  if (!relatedTableId.value || !column.value?.base_id) return
-  const meta = await getMeta(column.value.base_id, relatedTableId.value)
+  if (!relatedTableId.value || !relatedBaseId.value) return
+  const meta = await getMeta(relatedBaseId.value, relatedTableId.value)
   if (!meta) return
 
   const pvCol = (meta.columns || []).find((c: ColumnType) => c.pv)
@@ -59,14 +65,14 @@ async function loadRelatedTableMeta() {
 }
 
 async function fetchRecords(search?: string) {
-  if (!relatedTableId.value || !column.value?.base_id) return
+  if (!relatedTableId.value || !relatedBaseId.value) return
   loading.value = true
   try {
     const where = search
       ? `(${displayValueColumnTitle.value},like,%${search}%)`
       : undefined
 
-    const res = await $api.dbDataTableRow.list(column.value.base_id, relatedTableId.value, {
+    const res = await $api.dbDataTableRow.list(relatedBaseId.value!, relatedTableId.value, {
       limit: 100,
       where,
       ...(displayValueColumnTitle.value ? { fields: [pkColumnTitle.value, displayValueColumnTitle.value].filter(Boolean) } : {}),
@@ -102,13 +108,14 @@ async function fetchRecords(search?: string) {
 const pkToDisplayMap = ref<Map<string, string>>(new Map())
 
 async function resolveSelectedDisplayValues() {
-  if (!selectedPks.value.length || !relatedTableId.value || !column.value?.base_id) return
-  const unresolved = selectedPks.value.filter((pk) => !pkToDisplayMap.value.has(pk))
+  const pks = props.modelValue ? String(props.modelValue).split(',').filter(Boolean) : []
+  if (!pks.length || !relatedTableId.value || !relatedBaseId.value) return
+  const unresolved = pks.filter((pk) => !pkToDisplayMap.value.has(pk))
   if (!unresolved.length) return
 
   try {
     const where = `(${pkColumnTitle.value},in,${unresolved.join(',')})`
-    const res = await $api.dbDataTableRow.list(column.value.base_id, relatedTableId.value, {
+    const res = await $api.dbDataTableRow.list(relatedBaseId.value!, relatedTableId.value, {
       limit: unresolved.length,
       where,
       ...(displayValueColumnTitle.value ? { fields: [pkColumnTitle.value, displayValueColumnTitle.value].filter(Boolean) } : {}),
@@ -160,7 +167,7 @@ const search = () => {
 <template>
   <a-select
     ref="aselect"
-    v-model:value="selectedPks"
+    v-model:value="selectedValue"
     :mode="isMulti ? 'multiple' : undefined"
     class="w-full nc-filter-record-select"
     :placeholder="$t('general.select')"
