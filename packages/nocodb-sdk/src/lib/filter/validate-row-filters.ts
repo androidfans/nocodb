@@ -333,20 +333,24 @@ export class RowFilterValidator {
                 res = false; // Unsupported operation for User fields
             }
           } else if (
-            column.uidt === UITypes.Links &&
-            !isBtLikeV2Junction(column) &&
-            filter.comparison_op?.endsWith('_id')
-          ) {
-            // HM/MM Links with _id operators: client only has count, not
-            // record objects. Skip validation and let the server SQL decide.
-            res = true;
-          } else if (
             column.uidt === UITypes.LinkToAnotherRecord ||
-            (column.uidt === UITypes.Links && isBtLikeV2Junction(column))
+            (column.uidt === UITypes.Links &&
+              (isBtLikeV2Junction(column) ||
+                filter.comparison_op?.endsWith('_id')))
           ) {
-            let linkData = data[field];
+            const rawLinkData = data[field];
 
-            linkData = Array.isArray(linkData) ? linkData : [linkData];
+            // HM/MM Links may only have a count (number) in the client cache.
+            // If so, we can't validate _id operators — let the server decide.
+            if (
+              filter.comparison_op?.endsWith('_id') &&
+              typeof rawLinkData === 'number'
+            ) {
+              res = true;
+            } else {
+            let linkData = rawLinkData;
+
+            linkData = Array.isArray(linkData) ? linkData : linkData != null ? [linkData] : [];
 
             const colOptions = column.colOptions as LinkToAnotherRecordType;
 
@@ -365,10 +369,13 @@ export class RowFilterValidator {
             } else {
               const isIdOp = filter.comparison_op?.endsWith('_id');
               const pkColumn = relatedMeta.columns.find((col) => col.pk);
-              // Find the child column in the related table
-              const childColumn = isIdOp
-                ? pkColumn
+              const overrideId = (colOptions as any)
+                ?.fk_display_value_column_id;
+              const displayColumn = overrideId
+                ? relatedMeta.columns.find((col) => col.id === overrideId) ||
+                  relatedMeta.columns.find((col) => col.pv)
                 : relatedMeta.columns.find((col) => col.pv);
+              const childColumn = isIdOp ? pkColumn : displayColumn;
               if (!childColumn) {
                 res = false;
               } else {
@@ -471,6 +478,7 @@ export class RowFilterValidator {
                     res = false;
                 }
               }
+            }
             }
           } else if (
             [UITypes.JSON, UITypes.Time].includes(column.uidt as UITypes) &&

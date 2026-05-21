@@ -52,6 +52,7 @@ const selectedValue = computed({
 
 const displayValueColumnTitle = ref<string>('')
 const displayValueColumn = ref<ColumnType | null>(null)
+const pkColumn = ref<ColumnType | null>(null)
 const pkColumnTitle = ref<string>('')
 const relatedTableMeta = ref<any>(null)
 
@@ -65,8 +66,9 @@ async function loadRelatedTableMeta() {
   displayValueColumn.value = pvCol || (meta.columns || [])[0] || null
   displayValueColumnTitle.value = displayValueColumn.value?.title || ''
 
-  const pkCol = (meta.columns || []).find((c: ColumnType) => c.pk)
-  pkColumnTitle.value = pkCol?.title || 'Id'
+  const _pkCol = (meta.columns || []).find((c: ColumnType) => c.pk)
+  pkColumn.value = _pkCol || null
+  pkColumnTitle.value = _pkCol?.title || 'Id'
 }
 
 async function fetchRecords(search?: string) {
@@ -85,8 +87,14 @@ async function fetchRecords(search?: string) {
         ) as string
         if (dvClause) clauses.push(dvClause)
       }
-      if (pkColumnTitle.value) {
-        clauses.push(`(${pkColumnTitle.value},eq,${search})`)
+      if (pkColumn.value) {
+        const pkClause = getValidSearchQueryForColumn(
+          pkColumn.value,
+          search,
+          relatedTableMeta.value,
+          { getWhereQueryAs: 'string' },
+        ) as string
+        if (pkClause) clauses.push(pkClause)
       }
       where = clauses.length ? clauses.join('~or') : undefined
     }
