@@ -149,8 +149,7 @@ export const getDynamicColumns = (metaColumns: ColumnType[], column?: ColumnType
 }
 
 export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
-  // V2 MO/OO with deprecated Links uidt → normalize to LinkToAnotherRecord
-  // (the current/active type) so filter routing treats them uniformly.
+  // BT-like Links → normalize to LTAR for uniform filter routing
   if (col.uidt === UITypes.Links && isBtLikeV2Junction(col)) {
     return UITypes.LinkToAnotherRecord
   }
@@ -169,10 +168,18 @@ export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
   }
 }
 
-// Record-id filter operators for link columns. Used by FilterInput,
-// InputLite, FilterRow, and FilterGroup to detect when the filter
-// input should render a record picker instead of text/number input,
-// and when operator switching should clear the filter value.
+/**
+ * Record-id filter operators for link columns.
+ *
+ * Link column type context:
+ *   - V2 (current): uses UITypes.LinkToAnotherRecord — all new link fields
+ *   - V1 (deprecated): uses UITypes.Links — legacy, kept for backward compat
+ *   Both types are handled uniformly via isLinksOrLTAR() throughout the filter
+ *   system. When you see both types listed together, that's why.
+ *
+ * These operators filter by the related record's primary key (not display
+ * value or count). The UI renders a record picker dropdown for them.
+ */
 export const RECORD_FILTER_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
 // Resolve the "real" column that a filter input should render for.

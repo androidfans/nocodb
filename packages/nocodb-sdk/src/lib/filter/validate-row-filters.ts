@@ -333,17 +333,10 @@ export class RowFilterValidator {
                 res = false; // Unsupported operation for User fields
             }
           } else if (
-            // V2 link columns use UITypes.LinkToAnotherRecord (the current/
-            // active type for all new fields). UITypes.Links is the deprecated
-            // V1 type — kept here for backward compat.
-            //
-            // LinkToAnotherRecord always has record objects in the client cache.
-            // Links enters this branch in two cases:
-            //   1. BT-like V2 junctions (MO/OO) — single-record semantics,
-            //      client has the related record object(s).
-            //   2. _id operators (eq_id, in_id, etc.) — filter by primary key.
-            //      For HM/MM the client may only have a count; that case is
-            //      handled below with a typeof check.
+            // Both link types enter here for record-level matching.
+            // LTAR always has record objects; Links only enters for
+            // BT-like junctions or _id operators. HM/MM count-only
+            // data is handled by the typeof check below.
             column.uidt === UITypes.LinkToAnotherRecord ||
             (column.uidt === UITypes.Links &&
               (isBtLikeV2Junction(column) ||

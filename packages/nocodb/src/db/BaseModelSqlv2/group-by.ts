@@ -148,18 +148,11 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
             'Group by using Button column is not supported',
           );
           break;
-        // UITypes.Links is the deprecated V1 type. V2 columns use
-        // LinkToAnotherRecord and are handled by the existing LTAR case
-        // below. This branch only fires for legacy V1 Links columns.
-        //
-        // NOTE: This BT-like vs rollup pattern is duplicated at ~4
-        // locations in this file (one per group-by query variant).
-        // This mirrors the upstream structure where every UIType case
-        // is repeated across all variants. Extracting a shared helper
-        // would reduce duplication but diverge from upstream's pattern,
-        // making rebase harder. Keep in sync when modifying.
+        // Links (deprecated V1) — V2 uses LTAR case below.
+        // Pattern duplicated ~4x in this file (mirrors upstream structure;
+        // extracting would diverge from upstream and complicate rebase).
         case UITypes.Links:
-          // V2 MO/OO (BT-like): group by display value via lookup subquery.
+          // BT-like: group by display value; otherwise: group by count.
           // V2 OM/MM and V1: group by link count via rollup.
           // This mirrors the sort logic in sortV2.ts.
           // Note: the two branches push to selectors differently because

@@ -240,14 +240,9 @@ export const comparisonOpList = (
       UITypes.User,
       UITypes.CreatedBy,
       UITypes.LastModifiedBy,
-      // Both link types excluded (by design):
-      // - Record filtering uses eq_id/neq_id/in_id/nin_id operators
-      //   with a record picker UI instead of text/number input.
-      // - Count-based "equals N" filtering is intentionally removed;
-      //   users who need exact count matching should create a Rollup
-      //   field. gt/lt/gte/lte remain available for range comparisons.
-      // V2 columns use LinkToAnotherRecord (the current/active type);
-      // Links is the deprecated V1 type — kept here for completeness.
+      // Both link types excluded (by design): record filtering uses
+      // _id operators with a record picker; count eq/neq intentionally
+      // removed — use Rollup for exact count, gt/lt for ranges.
       UITypes.Links,
       UITypes.LinkToAnotherRecord,
     ],
@@ -549,16 +544,8 @@ export const comparisonOpList = (
     ],
     semanticType: 'date_range',
   },
-  // Record-id operators for link columns (both V2 LinkToAnotherRecord
-  // and deprecated V1 Links). These filter by the related record's
-  // primary key, not by display value or link count. The UI renders a
-  // record picker dropdown.
-  //
-  // V2 columns (the current default) use UITypes.LinkToAnotherRecord;
-  // UITypes.Links is the deprecated V1 type, included for backward compat.
-  //
-  // Labels reuse the standard "is"/"is not" text via getEqText/getNeqText
-  // so users see the same wording — only the input widget changes.
+  // Record-id operators for both link types. Filter by related record's
+  // PK; UI renders a record picker. Labels reuse "is"/"is not" text.
   {
     text: getEqText(fieldUiType),
     value: 'eq_id',

@@ -62,8 +62,7 @@ const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: str
   isInt,
   isFloat,
   isTextArea,
-  // Matches both V2 LinkToAnotherRecord (current/active type for all
-  // new link fields) and deprecated V1 Links. isLinksOrLTAR covers both.
+  // Covers both link types — @see RECORD_FILTER_OPS in filterUtils.ts
   isLinks: (col: ColumnType) => isLinksOrLTAR(col),
   isUser,
   isReadonlyUser,
@@ -134,15 +133,8 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
-    // Both V2 LinkToAnotherRecord (current) and deprecated V1 Links
-    // enter this slot. The input component depends on the operator and
-    // the concrete column type:
-    //   - _id operators (eq_id, in_id, …) → record picker dropdown
-    //   - Links (deprecated V1, count-based) non-_id → Integer
-    //   - LinkToAnotherRecord (V2) non-_id → Text (display value)
-    // In practice V2 columns will always use _id operators because
-    // eq/neq/like/nlike are excluded for both link types in filterUtils.
-    // The fallback branches exist for safety and rebase clarity.
+    // Link column input routing — @see RECORD_FILTER_OPS in filterUtils.ts
+    //   _id operators → record picker | Links non-_id → Integer | LTAR non-_id → Text
     isLinks: RECORD_FILTER_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
       : columnRef.value?.uidt === UITypes.Links
