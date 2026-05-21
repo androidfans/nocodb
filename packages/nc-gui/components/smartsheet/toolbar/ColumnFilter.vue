@@ -393,6 +393,13 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
       filter.meta.timezone = getTimezoneFromColumn(col)
     }
   } else if (col.uidt === UITypes.Links) {
+    // Clear filter value when switching between incompatible operator types:
+    //   - record ops (eq_id, in_id) store comma-separated PKs
+    //   - count ops (eq, gt) store a number
+    //   - multi ops (in_id, nin_id) vs single ops (eq_id, neq_id)
+    // If prevOp is unknown (page just loaded, syncFilterPrevComparisonOps
+    // didn't have this filter yet), clear defensively to avoid stale
+    // record IDs being interpreted as count values.
     const recordOps = ['eq_id', 'neq_id', 'in_id', 'nin_id']
     const prevOp = filterPrevComparisonOp.value[filter.id!]
     const currOp = filter.comparison_op!

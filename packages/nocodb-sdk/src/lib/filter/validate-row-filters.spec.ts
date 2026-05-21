@@ -1015,6 +1015,35 @@ describe('validateRowFilters', () => {
     );
 
     it.each([
+      ['eq_id', 'recA', 0],
+      ['eq_id', 'recA', 2],
+      ['neq_id', 'recA', 2],
+      ['in_id', 'recA,recB', 2],
+      ['nin_id', 'recA,recB', 2],
+    ])(
+      'should not pass "%s" when Links data is only a count',
+      (comparisonOp, value, count) => {
+        expect(
+          validateRowFilters({
+            filters: [
+              {
+                fk_column_id: '10',
+                comparison_op: comparisonOp as any,
+                value,
+              },
+            ],
+            data: {
+              RecordLinks: count,
+            },
+            columns: mockColumns,
+            client: mockClient,
+            metas: mockMetas,
+          })
+        ).toBe(false);
+      }
+    );
+
+    it.each([
       ['eq_id', 'crossRecA', true],
       ['in_id', 'crossRecB,crossRecC', true],
       ['in_id', 'crossRecC,crossRecD', false],

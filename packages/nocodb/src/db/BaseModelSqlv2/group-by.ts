@@ -149,6 +149,12 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
           );
           break;
         case UITypes.Links:
+          // V2 MO/OO (BT-like): group by display value via lookup subquery.
+          // V2 OM/MM and V1: group by link count via rollup.
+          // This mirrors the sort logic in sortV2.ts.
+          // Note: the two branches push to selectors differently because
+          // generateLookupSelectQuery returns a Raw (needs raw alias),
+          // while genRollupSelectv2 returns a QueryBuilder (has .as()).
           if (isBtLikeV2Junction(column)) {
             const selectQb = await generateLookupSelectQuery({
               baseModelSqlv2: baseModel,

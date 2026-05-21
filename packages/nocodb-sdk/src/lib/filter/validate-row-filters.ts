@@ -333,6 +333,13 @@ export class RowFilterValidator {
                 res = false; // Unsupported operation for User fields
             }
           } else if (
+            // LTAR always has record objects in the client cache.
+            // Links enters this branch in two cases:
+            //   1. BT-like V2 junctions (MO/OO) — single-record semantics,
+            //      client has the related record object(s).
+            //   2. _id operators (eq_id, in_id, etc.) — filter by primary key.
+            //      For HM/MM the client may only have a count; that case is
+            //      handled below with a typeof check.
             column.uidt === UITypes.LinkToAnotherRecord ||
             (column.uidt === UITypes.Links &&
               (isBtLikeV2Junction(column) ||
@@ -341,12 +348,12 @@ export class RowFilterValidator {
             const rawLinkData = data[field];
 
             // HM/MM Links may only have a count (number) in the client cache.
-            // If so, we can't validate _id operators — let the server decide.
+            // Without related record ids, record-id filters cannot be proven true.
             if (
               filter.comparison_op?.endsWith('_id') &&
               typeof rawLinkData === 'number'
             ) {
-              res = true;
+              res = false;
             } else {
               let linkData = rawLinkData;
 
@@ -373,12 +380,17 @@ export class RowFilterValidator {
               } else {
                 const isIdOp = filter.comparison_op?.endsWith('_id');
                 const pkColumn = relatedMeta.columns.find((col) => col.pk);
+                // Honor per-LTAR display column override. Server uses
+                // fk_display_value_column_id in getDisplayValueOfRefTable();
+                // client must match to avoid filter result divergence.
                 const overrideId = (colOptions as any)
                   ?.fk_display_value_column_id;
                 const displayColumn = overrideId
                   ? relatedMeta.columns.find((col) => col.id === overrideId) ||
                     relatedMeta.columns.find((col) => col.pv)
                   : relatedMeta.columns.find((col) => col.pv);
+                // _id operators match against primary key; display-value
+                // operators (eq, like, etc.) match against the display column.
                 const childColumn = isIdOp ? pkColumn : displayColumn;
                 if (!childColumn) {
                   res = false;
@@ -390,6 +402,9 @@ export class RowFilterValidator {
                     })
                     .filter((val) => val !== '');
 
+                  // Strip _id suffix so eq_id → eq, in_id → in, etc.
+                  // This mirrors the server-side LTAR handler which also
+                  // strips _id before delegating to the base operator logic.
                   const effectiveOp = isIdOp
                     ? filter.comparison_op.replace(/_id$/, '')
                     : filter.comparison_op;
