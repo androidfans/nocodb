@@ -36,13 +36,13 @@ const emit = defineEmits<Emits>()
 const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
 const rawColumn = toRef(props, 'column')
-const column = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
+const columnRef = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
 const editEnabled = ref(true)
 
 const readOnly = ref(props.filter.readOnly || props.disabled)
 
-provide(ColumnInj, column)
+provide(ColumnInj, columnRef)
 
 provide(EditModeInj, readonly(editEnabled))
 
@@ -74,18 +74,18 @@ type FilterType = keyof typeof checkTypeFunctions
 
 const baseStore = useBase()
 
-const sqlUi = computed(() => baseStore.getSqlUiBySourceId(column.value?.source_id))
+const sqlUi = computed(() => baseStore.getSqlUiBySourceId(columnRef.value?.source_id))
 
-const abstractType = computed(() => column.value && sqlUi.value?.getAbstractType(column.value))
+const abstractType = computed(() => columnRef.value && sqlUi.value?.getAbstractType(columnRef.value))
 
 const checkType = (filterType: FilterType) => {
   const checkTypeFunction = checkTypeFunctions[filterType]
 
-  if (!column.value || !checkTypeFunction) {
+  if (!columnRef.value || !checkTypeFunction) {
     return false
   }
 
-  return checkTypeFunction(column.value, abstractType.value)
+  return checkTypeFunction(columnRef.value, abstractType.value)
 }
 
 const filterInput = computed({
@@ -141,7 +141,7 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
     //   - LTAR (V1 BT) non-_id (eq, like, …) → Text (display value)
     isLinks: RECORD_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
-      : column.value?.uidt === UITypes.Links
+      : columnRef.value?.uidt === UITypes.Links
       ? Integer
       : Text,
     isUser: User,
@@ -166,10 +166,10 @@ const componentProps = computed(() => {
     case 'isLinks': {
       // Record picker needs column meta to resolve the related table
       if (RECORD_OPS.has(props.filter.comparison_op!)) {
-        return { column: column.value, comparisonOp: props.filter.comparison_op }
+        return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
       }
       // Links (V2 OM/MM) count input — fixed height like other numeric inputs
-      if (column.value?.uidt === UITypes.Links) {
+      if (columnRef.value?.uidt === UITypes.Links) {
         return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
       }
       // LTAR (V1 BT) text input — no fixed height needed
@@ -196,7 +196,7 @@ const componentProps = computed(() => {
     case 'isRating': {
       return {
         style: {
-          minWidth: `${(column.value?.meta?.max || 5) * 19}px`,
+          minWidth: `${(columnRef.value?.meta?.max || 5) * 19}px`,
         },
         showReadonlyField: props.filter?.readOnly || props?.disabled,
       }
@@ -209,13 +209,13 @@ const componentProps = computed(() => {
 
 const hasExtraPadding = computed(() => {
   return (
-    column.value &&
-    (isLinksOrLTAR(column.value) ||
-      isInt(column.value, abstractType) ||
-      isDate(column.value, abstractType) ||
-      isDateTime(column.value, abstractType) ||
-      isTime(column.value, abstractType) ||
-      isYear(column.value, abstractType))
+    columnRef.value &&
+    (isLinksOrLTAR(columnRef.value) ||
+      isInt(columnRef.value, abstractType) ||
+      isDate(columnRef.value, abstractType) ||
+      isDateTime(columnRef.value, abstractType) ||
+      isTime(columnRef.value, abstractType) ||
+      isYear(columnRef.value, abstractType))
   )
 })
 
@@ -232,7 +232,7 @@ const isSingleOrMultiSelect = computed(() => {
 
 <template>
   <a-select
-    v-if="column && isBoolean(column, abstractType)"
+    v-if="columnRef && isBoolean(columnRef, abstractType)"
     v-model:value="filterInput"
     :disabled="filter.readOnly || props.disabled"
     :options="booleanOptions"
@@ -248,7 +248,7 @@ const isSingleOrMultiSelect = computed(() => {
       v-model="filterInput"
       :disabled="filter.readOnly || props.disabled"
       placeholder="Enter a value"
-      :column="column"
+      :column="columnRef"
       class="flex !rounded-lg"
       :class="{
         'text-nc-content-gray-muted pointer-events-none': props.disabled,

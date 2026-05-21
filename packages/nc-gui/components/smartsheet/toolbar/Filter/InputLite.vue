@@ -36,13 +36,13 @@ const emit = defineEmits<Emits>()
 const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
 const rawColumn = toRef(props, 'column')
-const column = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
+const columnRef = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
 const editEnabled = computed(() => !props.disabled)
 
 const readOnly = ref(props.filter.readOnly || props.disabled)
 
-provide(ColumnInj, column)
+provide(ColumnInj, columnRef)
 
 provide(EditModeInj, readonly(editEnabled))
 
@@ -74,16 +74,16 @@ type FilterUIType = keyof typeof checkTypeFunctions
 const dbClientType = computed(() => props.dbClientType ?? ClientType.PG)
 
 const sqlUi = computed(() => dbClientType.value && SqlUiFactory.create({ client: dbClientType.value }))
-const abstractType = computed(() => column.value && sqlUi.value?.getAbstractType(column.value))
+const abstractType = computed(() => columnRef.value && sqlUi.value?.getAbstractType(columnRef.value))
 
 const checkType = (filterUIType: FilterUIType) => {
   const checkTypeFunction = checkTypeFunctions[filterUIType]
 
-  if (!column.value || !checkTypeFunction) {
+  if (!columnRef.value || !checkTypeFunction) {
     return false
   }
 
-  return checkTypeFunction(column.value, abstractType.value)
+  return checkTypeFunction(columnRef.value, abstractType.value)
 }
 
 const filterInput = computed({
@@ -135,7 +135,7 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     // Links & LTAR share this slot — see FilterInput.vue for full explanation
     isLinks: RECORD_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
-      : column.value?.uidt === UITypes.Links
+      : columnRef.value?.uidt === UITypes.Links
       ? Integer
       : Text,
     isUser: User,
@@ -158,9 +158,9 @@ const componentProps = computed(() => {
     case 'isFloat':
     case 'isLinks': {
       if (RECORD_OPS.has(props.filter.comparison_op!)) {
-        return { column: column.value, comparisonOp: props.filter.comparison_op }
+        return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
       }
-      if (column.value?.uidt === UITypes.Links) {
+      if (columnRef.value?.uidt === UITypes.Links) {
         return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
       }
       return { showReadonlyField: props.filter?.readOnly || props?.disabled }
@@ -186,7 +186,7 @@ const componentProps = computed(() => {
     case 'isRating': {
       return {
         style: {
-          minWidth: `${(column.value?.meta?.max || 5) * 19}px`,
+          minWidth: `${(columnRef.value?.meta?.max || 5) * 19}px`,
         },
         showReadonlyField: props.filter?.readOnly || props?.disabled,
       }
@@ -199,13 +199,13 @@ const componentProps = computed(() => {
 
 const hasExtraPadding = computed(() => {
   return (
-    column.value &&
-    (isLinksOrLTAR(column.value) ||
-      isInt(column.value, abstractType) ||
-      isDate(column.value, abstractType) ||
-      isDateTime(column.value, abstractType) ||
-      isTime(column.value, abstractType) ||
-      isYear(column.value, abstractType))
+    columnRef.value &&
+    (isLinksOrLTAR(columnRef.value) ||
+      isInt(columnRef.value, abstractType) ||
+      isDate(columnRef.value, abstractType) ||
+      isDateTime(columnRef.value, abstractType) ||
+      isTime(columnRef.value, abstractType) ||
+      isYear(columnRef.value, abstractType))
   )
 })
 
@@ -222,7 +222,7 @@ const isSingleOrMultiSelect = computed(() => {
 
 <template>
   <a-select
-    v-if="column && isBoolean(column, abstractType)"
+    v-if="columnRef && isBoolean(columnRef, abstractType)"
     v-model:value="filterInput"
     :disabled="filter.readOnly || disabled"
     :options="booleanOptions"
@@ -238,7 +238,7 @@ const isSingleOrMultiSelect = computed(() => {
       v-model="filterInput"
       :disabled="filter.readOnly || disabled"
       placeholder="Enter a value"
-      :column="column"
+      :column="columnRef"
       class="flex !rounded-lg"
       :class="{
         'text-nc-content-gray-muted pointer-events-none': disabled,
