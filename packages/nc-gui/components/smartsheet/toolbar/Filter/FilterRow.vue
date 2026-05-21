@@ -2,6 +2,7 @@
 import { UITypes, isLinksOrLTAR } from 'nocodb-sdk'
 import type { ClientType } from 'nocodb-sdk'
 import type { RowHandler } from './types'
+import { getFilterInputColumn } from '~/utils/filterUtils'
 
 interface Props {
   modelValue: ColumnFilterType
@@ -113,6 +114,8 @@ const column = computed(() => {
   return props.columns.find((col) => col.id === fk_column_id)
 })
 
+const filterInputColumn = computed(() => getFilterInputColumn(column.value) as ColumnTypeForFilter | undefined)
+
 const dynamicColumns = computed(() => {
   if (!vModel.value?.dynamic) {
     return []
@@ -121,11 +124,11 @@ const dynamicColumns = computed(() => {
 })
 
 const comparisonOps = computed(() => {
-  const evalColumn = column.value
+  const evalColumn = filterInputColumn.value
   if (!evalColumn) {
     return []
   }
-  const evalUidt = (evalColumn?.filterUidt ?? evalColumn?.uidt) as UITypes
+  const evalUidt = evalColumn?.uidt as UITypes
   const list = comparisonOpList(evalUidt, parseProp(evalColumn?.meta)?.date_format).filter((compOp) =>
     isComparisonOpAllowed(vModel.value, compOp, evalUidt, props.showNullAndEmptyInFilter),
   )
@@ -133,8 +136,8 @@ const comparisonOps = computed(() => {
 })
 
 const comparisonSubOps = computed(() => {
-  const evalColumn = column.value
-  const evalUidt = (evalColumn?.filterUidt ?? evalColumn?.uidt) as UITypes
+  const evalColumn = filterInputColumn.value
+  const evalUidt = evalColumn?.uidt as UITypes
   return comparisonSubOpList(vModel.value.comparison_op!, parseProp(evalColumn?.meta)?.date_format).filter((compSubOp) =>
     isComparisonSubOpAllowed(vModel.value, compSubOp, evalUidt),
   )
@@ -145,13 +148,13 @@ const showFilterInput = computed(() => {
   if (!filter.comparison_op) return false
 
   if (filter.comparison_sub_op) {
-    return !comparisonSubOpList(filter.comparison_op, parseProp(column.value?.meta)?.date_format).find(
+    return !comparisonSubOpList(filter.comparison_op, parseProp(filterInputColumn.value?.meta)?.date_format).find(
       (op) => op.value === filter.comparison_sub_op,
     )?.ignoreVal
   } else {
     return !comparisonOpList(
-      (column.value?.filterUidt ?? column.value?.uidt) as UITypes,
-      parseProp(column.value?.meta)?.date_format,
+      filterInputColumn.value?.uidt as UITypes,
+      parseProp(filterInputColumn.value?.meta)?.date_format,
     ).find((op) => op.value === filter.comparison_op)?.ignoreVal
   }
 })
@@ -224,7 +227,7 @@ const onComparisonOpChange = (comparison_op: string) => {
     vModel.value.comparison_op = comparison_op as any
     const filter = vModel.value
 
-    const col = column.value
+    const col = filterInputColumn.value
     if (col) {
       // adjust value and sub op
       if (
@@ -254,7 +257,7 @@ const onComparisonOpChange = (comparison_op: string) => {
             filter.value = null
           }
         }
-      } else if (isDateType((col.filterUidt ?? col.uidt) as UITypes)) {
+      } else if (isDateType(col.uidt as UITypes)) {
         // for date / datetime,
         // the input type could be decimal or datepicker / datetime picker
         // hence remove the previous value
@@ -622,7 +625,7 @@ const onChangeToDynamic = async () => {
               :class="{
                 '!w-full': webHook,
               }"
-              :column="column"
+              :column="filterInputColumn"
               :filter="vModel"
               :disabled="isDisabled"
               :db-client-type="dbClientType"
@@ -687,7 +690,7 @@ const onChangeToDynamic = async () => {
             </template>
           </template>
           <div v-else class="flex-grow"></div>
-          <SmartsheetToolbarFilterTimezoneAbbreviation :column="column" :filter="vModel" />
+          <SmartsheetToolbarFilterTimezoneAbbreviation :column="filterInputColumn" :filter="vModel" />
         </div>
       </template>
       <div v-if="!vModel.readOnly && !disabled" :class="{ 'cursor-wait': isLoadingFilter }">

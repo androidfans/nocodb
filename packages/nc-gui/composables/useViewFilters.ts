@@ -11,6 +11,7 @@ import {
 import type { ComputedRef, Ref } from 'vue'
 import type { SelectProps } from 'ant-design-vue'
 import { UITypes, isSystemColumn } from 'nocodb-sdk'
+import { getFilterUidt } from '~/utils/filterUtils'
 
 export type ColumnFilterType = FilterType & {
   status?: string
@@ -212,7 +213,7 @@ export function useViewFilters(
       }
       // if column is a lookup column, then use the lookup type extracted from the column
       else if (btLookupTypesMap.value[col.id]) {
-        obj[col.id] = btLookupTypesMap.value[col.id].uidt
+        obj[col.id] = getFilterUidt(btLookupTypesMap.value[col.id])
       } else {
         obj[col.id] = col.uidt
       }

@@ -16,6 +16,7 @@ import Float from '~/components/cell/Float/index.vue'
 import Text from '~/components/cell/Text/index.vue'
 import User from '~/components/cell/User/index.vue'
 import FilterInputRecord from '~/components/smartsheet/toolbar/FilterInputRecord.vue'
+import { getFilterInputColumn } from '~/utils/filterUtils'
 
 interface Props {
   // column could be possibly undefined when the filter is created
@@ -35,19 +36,20 @@ const emit = defineEmits<Emits>()
 
 const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
 
-const column = toRef(props, 'column')
+const rawColumn = toRef(props, 'column')
+const filterColumn = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
 const editEnabled = computed(() => !props.disabled)
 
 const readOnly = ref(props.filter.readOnly || props.disabled)
 
-provide(ColumnInj, column)
+provide(ColumnInj, filterColumn)
 
 provide(EditModeInj, readonly(editEnabled))
 
 provide(ReadonlyInj, readOnly)
 
-const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: string) => boolean> = {
+const checkTypeFunctions: Record<string, (_column: ColumnType, _abstractType?: string) => boolean> = {
   isSingleSelect,
   isMultiSelect,
   isDate,
@@ -73,16 +75,16 @@ type FilterUIType = keyof typeof checkTypeFunctions
 const dbClientType = computed(() => props.dbClientType ?? ClientType.PG)
 
 const sqlUi = computed(() => dbClientType.value && SqlUiFactory.create({ client: dbClientType.value }))
-const abstractType = computed(() => column.value && sqlUi.value?.getAbstractType(column.value))
+const abstractType = computed(() => filterColumn.value && sqlUi.value?.getAbstractType(filterColumn.value))
 
 const checkType = (filterUIType: FilterUIType) => {
   const checkTypeFunction = checkTypeFunctions[filterUIType]
 
-  if (!column.value || !checkTypeFunction) {
+  if (!filterColumn.value || !checkTypeFunction) {
     return false
   }
 
-  return checkTypeFunction(column.value, abstractType.value)
+  return checkTypeFunction(filterColumn.value, abstractType.value)
 }
 
 const filterInput = computed({
@@ -134,9 +136,9 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     // Links & LTAR share this slot — see FilterInput.vue for full explanation
     isLinks: RECORD_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
-      : column.value?.uidt === UITypes.Links
-        ? Integer
-        : Text,
+      : filterColumn.value?.uidt === UITypes.Links
+      ? Integer
+      : Text,
     isUser: User,
     isReadonlyUser: User,
   }
@@ -157,9 +159,9 @@ const componentProps = computed(() => {
     case 'isFloat':
     case 'isLinks': {
       if (RECORD_OPS.has(props.filter.comparison_op!)) {
-        return { column: column.value, comparisonOp: props.filter.comparison_op }
+        return { column: filterColumn.value, comparisonOp: props.filter.comparison_op }
       }
-      if (column.value?.uidt === UITypes.Links) {
+      if (filterColumn.value?.uidt === UITypes.Links) {
         return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
       }
       return { showReadonlyField: props.filter?.readOnly || props?.disabled }
@@ -185,7 +187,7 @@ const componentProps = computed(() => {
     case 'isRating': {
       return {
         style: {
-          minWidth: `${(column.value?.meta?.max || 5) * 19}px`,
+          minWidth: `${(filterColumn.value?.meta?.max || 5) * 19}px`,
         },
         showReadonlyField: props.filter?.readOnly || props?.disabled,
       }
@@ -198,13 +200,13 @@ const componentProps = computed(() => {
 
 const hasExtraPadding = computed(() => {
   return (
-    column.value &&
-    (isLinksOrLTAR(column.value) ||
-      isInt(column.value, abstractType) ||
-      isDate(column.value, abstractType) ||
-      isDateTime(column.value, abstractType) ||
-      isTime(column.value, abstractType) ||
-      isYear(column.value, abstractType))
+    filterColumn.value &&
+    (isLinksOrLTAR(filterColumn.value) ||
+      isInt(filterColumn.value, abstractType) ||
+      isDate(filterColumn.value, abstractType) ||
+      isDateTime(filterColumn.value, abstractType) ||
+      isTime(filterColumn.value, abstractType) ||
+      isYear(filterColumn.value, abstractType))
   )
 })
 
@@ -221,7 +223,7 @@ const isSingleOrMultiSelect = computed(() => {
 
 <template>
   <a-select
-    v-if="column && isBoolean(column, abstractType)"
+    v-if="filterColumn && isBoolean(filterColumn, abstractType)"
     v-model:value="filterInput"
     :disabled="filter.readOnly || disabled"
     :options="booleanOptions"
@@ -237,7 +239,7 @@ const isSingleOrMultiSelect = computed(() => {
       v-model="filterInput"
       :disabled="filter.readOnly || disabled"
       placeholder="Enter a value"
-      :column="column"
+      :column="filterColumn"
       class="flex !rounded-lg"
       :class="{
         'text-nc-content-gray-muted pointer-events-none': disabled,
