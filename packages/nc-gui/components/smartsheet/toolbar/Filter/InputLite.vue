@@ -33,8 +33,6 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<Emits>()
 
-const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
-
 const rawColumn = toRef(props, 'column')
 const columnRef = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
@@ -135,7 +133,7 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     isFloat: Float,
     // Both V2 LinkToAnotherRecord and deprecated V1 Links share this slot.
     // See FilterInput.vue for the full routing explanation.
-    isLinks: RECORD_OPS.has(props.filter.comparison_op!)
+    isLinks: RECORD_FILTER_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
       : columnRef.value?.uidt === UITypes.Links
       ? Integer
@@ -159,7 +157,7 @@ const componentProps = computed(() => {
     case 'isDecimal':
     case 'isFloat':
     case 'isLinks': {
-      if (RECORD_OPS.has(props.filter.comparison_op!)) {
+      if (RECORD_FILTER_OPS.has(props.filter.comparison_op!)) {
         return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
       }
       if (columnRef.value?.uidt === UITypes.Links) {

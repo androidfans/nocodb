@@ -33,8 +33,6 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<Emits>()
 
-const RECORD_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
-
 const rawColumn = toRef(props, 'column')
 const columnRef = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
@@ -145,7 +143,7 @@ const componentMap: Partial<Record<FilterType, any>> = computed(() => {
     // In practice V2 columns will always use _id operators because
     // eq/neq/like/nlike are excluded for both link types in filterUtils.
     // The fallback branches exist for safety and rebase clarity.
-    isLinks: RECORD_OPS.has(props.filter.comparison_op!)
+    isLinks: RECORD_FILTER_OPS.has(props.filter.comparison_op!)
       ? FilterInputRecord
       : columnRef.value?.uidt === UITypes.Links
       ? Integer
@@ -171,7 +169,7 @@ const componentProps = computed(() => {
     case 'isFloat':
     case 'isLinks': {
       // Record picker needs column meta to resolve the related table
-      if (RECORD_OPS.has(props.filter.comparison_op!)) {
+      if (RECORD_FILTER_OPS.has(props.filter.comparison_op!)) {
         return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
       }
       // Links (V2 OM/MM) count input — fixed height like other numeric inputs

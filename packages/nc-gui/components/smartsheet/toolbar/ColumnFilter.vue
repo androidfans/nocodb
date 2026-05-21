@@ -404,15 +404,14 @@ const filterUpdateCondition = (filter: FilterType, i: number) => {
     // If prevOp is unknown (page just loaded, syncFilterPrevComparisonOps
     // didn't have this filter yet), clear defensively to avoid stale
     // record IDs being interpreted as count values.
-    const recordOps = ['eq_id', 'neq_id', 'in_id', 'nin_id']
     const prevOp = filterPrevComparisonOp.value[getFilterKey(filter)]
     const currOp = filter.comparison_op!
-    const currIsRecord = recordOps.includes(currOp)
+    const currIsRecord = RECORD_FILTER_OPS.has(currOp)
     const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
     if (!prevOp) {
       filter.value = null
     } else {
-      const prevIsRecord = recordOps.includes(prevOp)
+      const prevIsRecord = RECORD_FILTER_OPS.has(prevOp)
       const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
       if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
         filter.value = null

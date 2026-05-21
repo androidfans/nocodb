@@ -151,6 +151,13 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
         // UITypes.Links is the deprecated V1 type. V2 columns use
         // LinkToAnotherRecord and are handled by the existing LTAR case
         // below. This branch only fires for legacy V1 Links columns.
+        //
+        // NOTE: This BT-like vs rollup pattern is duplicated at ~4
+        // locations in this file (one per group-by query variant).
+        // This mirrors the upstream structure where every UIType case
+        // is repeated across all variants. Extracting a shared helper
+        // would reduce duplication but diverge from upstream's pattern,
+        // making rebase harder. Keep in sync when modifying.
         case UITypes.Links:
           // V2 MO/OO (BT-like): group by display value via lookup subquery.
           // V2 OM/MM and V1: group by link count via rollup.

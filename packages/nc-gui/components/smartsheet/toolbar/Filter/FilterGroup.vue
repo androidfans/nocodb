@@ -8,8 +8,6 @@ const props = defineProps<GroupProps>()
 const emits = defineEmits<GroupEmits>()
 const vModel = useVModel(props, 'modelValue', emits)
 
-const RECORD_OPS = ['eq_id', 'neq_id', 'in_id', 'nin_id']
-
 const { $e } = useNuxtApp()
 
 const { appInfo } = useGlobal()
@@ -93,12 +91,12 @@ const handleFilterChange = async (filter) => {
   } else if (isLinksOrLTAR(col)) {
     const prevOp = filterPrevComparisonOp.value[filter.id! || (filter as any).tmp_id]
     const currOp = filter.comparison_op!
-    const currIsRecord = RECORD_OPS.includes(currOp)
+    const currIsRecord = RECORD_FILTER_OPS.has(currOp)
     const currIsMulti = ['in_id', 'nin_id'].includes(currOp)
     if (!prevOp) {
       filter.value = null
     } else {
-      const prevIsRecord = RECORD_OPS.includes(prevOp)
+      const prevIsRecord = RECORD_FILTER_OPS.has(prevOp)
       const prevIsMulti = ['in_id', 'nin_id'].includes(prevOp)
       if (prevIsRecord !== currIsRecord || prevIsMulti !== currIsMulti) {
         filter.value = null

@@ -169,6 +169,12 @@ export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
   }
 }
 
+// Record-id filter operators for link columns. Used by FilterInput,
+// InputLite, FilterRow, and FilterGroup to detect when the filter
+// input should render a record picker instead of text/number input,
+// and when operator switching should clear the filter value.
+export const RECORD_FILTER_OPS = new Set(['eq_id', 'neq_id', 'in_id', 'nin_id'])
+
 // Resolve the "real" column that a filter input should render for.
 // For lookup columns, follows the chain to the terminal column so the
 // filter input component matches the actual data type (e.g. a lookup
