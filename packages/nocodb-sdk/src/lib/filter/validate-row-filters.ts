@@ -350,8 +350,12 @@ export class RowFilterValidator {
             if (!relatedMeta?.columns) {
               res = false;
             } else {
+              const isIdOp = filter.comparison_op?.endsWith('_id');
+              const pkColumn = relatedMeta.columns.find((col) => col.pk);
               // Find the child column in the related table
-              const childColumn = relatedMeta.columns.find((col) => col.pv);
+              const childColumn = isIdOp
+                ? pkColumn
+                : relatedMeta.columns.find((col) => col.pv);
               if (!childColumn) {
                 res = false;
               } else {
@@ -362,13 +366,35 @@ export class RowFilterValidator {
                   })
                   .filter((val) => val !== '');
 
-                switch (filter.comparison_op as any) {
+                const effectiveOp = isIdOp
+                  ? filter.comparison_op.replace(/_id$/, '')
+                  : filter.comparison_op;
+
+                switch (effectiveOp as any) {
                   case 'eq':
                     res = childValues.includes(ncToString(filter.value));
                     break;
                   case 'neq':
                     res = !childValues.includes(ncToString(filter.value));
                     break;
+                  case 'in': {
+                    const inValues =
+                      ncToString(filter.value)
+                        .split(',')
+                        .map((v) => v.trim())
+                        .filter(Boolean);
+                    res = childValues.some((val) => inValues.includes(val));
+                    break;
+                  }
+                  case 'nin': {
+                    const ninValues =
+                      ncToString(filter.value)
+                        .split(',')
+                        .map((v) => v.trim())
+                        .filter(Boolean);
+                    res = !childValues.some((val) => ninValues.includes(val));
+                    break;
+                  }
                   case 'like':
                     res = childValues.some((val) =>
                       val

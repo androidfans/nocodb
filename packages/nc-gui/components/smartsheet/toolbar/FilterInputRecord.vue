@@ -72,7 +72,7 @@ async function fetchRecords(search?: string) {
       ? `(${displayValueColumnTitle.value},like,%${search}%)`
       : undefined
 
-    const res = await $api.dbDataTableRow.list(relatedBaseId.value!, relatedTableId.value, {
+    const res = await $api.dbDataTableRow.list(relatedTableId.value, {
       limit: 100,
       where,
       ...(displayValueColumnTitle.value ? { fields: [pkColumnTitle.value, displayValueColumnTitle.value].filter(Boolean) } : {}),
@@ -115,7 +115,7 @@ async function resolveSelectedDisplayValues() {
 
   try {
     const where = `(${pkColumnTitle.value},in,${unresolved.join(',')})`
-    const res = await $api.dbDataTableRow.list(relatedBaseId.value!, relatedTableId.value, {
+    const res = await $api.dbDataTableRow.list(relatedTableId.value, {
       limit: unresolved.length,
       where,
       ...(displayValueColumnTitle.value ? { fields: [pkColumnTitle.value, displayValueColumnTitle.value].filter(Boolean) } : {}),

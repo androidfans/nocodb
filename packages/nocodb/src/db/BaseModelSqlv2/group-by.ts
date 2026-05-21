@@ -156,7 +156,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               alias: null,
               model: baseModel.model,
             });
-            columnQuery = selectQb?.builder;
+            columnQuery = baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')');
           } else {
             columnQuery = (
               await genRollupSelectv2({
@@ -597,7 +597,12 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
                 alias: null,
                 model: baseModel.model,
               });
-              selectors.push(selectQb?.builder.as(getAs(column)));
+              selectors.push(
+                baseModel.dbDriver.raw(`?? as ??`, [
+                  baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')'),
+                  getAs(column),
+                ]),
+              );
             } else {
               const rollupColOptions = (await column.getColOptions(
                 baseModel.context,
@@ -939,7 +944,12 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
                     alias: null,
                     model: baseModel.model,
                   });
-                  colSelectors.push(selectQb?.builder.as(getAs(column)));
+                  colSelectors.push(
+                    baseModel.dbDriver.raw(`?? as ??`, [
+                      baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')'),
+                      getAs(column),
+                    ]),
+                  );
                 } else {
                   const rollupColOptions = (await column.getColOptions(
                     baseModel.context,
@@ -1317,7 +1327,12 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
                     alias: null,
                     model: baseModel.model,
                   });
-                  colSelectors.push(selectQb?.builder.as(getAs(column)));
+                  colSelectors.push(
+                    baseModel.dbDriver.raw(`?? as ??`, [
+                      baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')'),
+                      getAs(column),
+                    ]),
+                  );
                 } else {
                   const rollupColOptions = (await column.getColOptions(
                     baseModel.context,
