@@ -77,7 +77,7 @@ async function loadRelatedTableMeta() {
 }
 
 async function fetchRecords(search?: string) {
-  if (!relatedTableId.value || !relatedBaseId.value) return
+  if (!relatedTableId.value || !relatedBaseId.value || !metaLoaded.value) return
   loading.value = true
   try {
     let where: string | undefined
@@ -154,7 +154,7 @@ function mergeSelectedIntoOptions() {
 
 async function resolveSelectedDisplayValues() {
   const pks = props.modelValue ? String(props.modelValue).split(',').filter(Boolean) : []
-  if (!pks.length || !relatedTableId.value || !relatedBaseId.value) return
+  if (!pks.length || !relatedTableId.value || !relatedBaseId.value || !metaLoaded.value) return
   const unresolved = pks.filter((pk) => !pkToDisplayMap.value.has(pk))
   if (!unresolved.length) return
 
@@ -181,16 +181,24 @@ function getDisplayLabel(pk: string) {
   return pkToDisplayMap.value.get(pk) || `#${pk}`
 }
 
+const metaLoaded = ref(false)
+
 watch(
   () => props.modelValue,
   () => resolveSelectedDisplayValues(),
 )
 
-onMounted(async () => {
-  await loadRelatedTableMeta()
-  await resolveSelectedDisplayValues()
-  await fetchRecords()
-})
+watch(
+  relatedTableId,
+  async () => {
+    metaLoaded.value = false
+    await loadRelatedTableMeta()
+    metaLoaded.value = true
+    await resolveSelectedDisplayValues()
+    await fetchRecords()
+  },
+  { immediate: true },
+)
 
 watch(isOpen, (n) => {
   if (n) {
