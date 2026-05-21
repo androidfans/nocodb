@@ -165,7 +165,9 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               alias: null,
               model: baseModel.model,
             });
-            columnQuery = baseModel.dbDriver.raw(selectQb.builder).wrap('(', ')');
+            columnQuery = baseModel.dbDriver
+              .raw(selectQb.builder)
+              .wrap('(', ')');
             if (!isSubGroup) {
               selectors.push(
                 baseModel.dbDriver.raw(`?? as ??`, [columnQuery, alias]),
@@ -951,7 +953,10 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               }
               case UITypes.Links:
               case UITypes.Rollup: {
-                if (column.uidt === UITypes.Links && isBtLikeV2Junction(column)) {
+                if (
+                  column.uidt === UITypes.Links &&
+                  isBtLikeV2Junction(column)
+                ) {
                   const selectQb = await generateLookupSelectQuery({
                     baseModelSqlv2: baseModel,
                     column,
@@ -1334,7 +1339,10 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
               }
               case UITypes.Links:
               case UITypes.Rollup: {
-                if (column.uidt === UITypes.Links && isBtLikeV2Junction(column)) {
+                if (
+                  column.uidt === UITypes.Links &&
+                  isBtLikeV2Junction(column)
+                ) {
                   const selectQb = await generateLookupSelectQuery({
                     baseModelSqlv2: baseModel,
                     column,

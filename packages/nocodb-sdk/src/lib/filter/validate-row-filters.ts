@@ -359,7 +359,7 @@ export class RowFilterValidator {
               typeof rawLinkData === 'number'
             ) {
               const negated = ['neq_id', 'nin_id'].includes(
-                filter.comparison_op,
+                filter.comparison_op
               );
               res = negated && rawLinkData === 0;
             } else {
