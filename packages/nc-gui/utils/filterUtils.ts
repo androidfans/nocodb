@@ -175,10 +175,11 @@ export const getFilterUidt = (col: ColumnTypeForFilter): UITypes => {
 export const getFilterInputColumn = (column?: ColumnTypeForFilter | ColumnType): ColumnTypeForFilter | ColumnType | undefined => {
   if (!column) return undefined
 
-  const filterColumn = (
-    (column as ColumnTypeForFilter).btLookupColumn ? { ...(column as ColumnTypeForFilter).btLookupColumn } : { ...column }
-  ) as ColumnTypeForFilter
+  // Non-lookup columns: return as-is, no uidt override needed.
+  // Only lookup columns need resolution to their terminal column type.
+  if (!(column as ColumnTypeForFilter).btLookupColumn) return column
 
+  const filterColumn = { ...(column as ColumnTypeForFilter).btLookupColumn } as ColumnTypeForFilter
   const filterUidt = (column as ColumnTypeForFilter).filterUidt ?? getFilterUidt(filterColumn as ColumnTypeForFilter)
   ;(filterColumn as any).uidt = filterUidt
   ;(filterColumn as any).filterUidt = filterUidt
