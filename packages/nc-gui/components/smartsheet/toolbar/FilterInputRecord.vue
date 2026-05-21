@@ -249,9 +249,9 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
 
     <template #tagRender="{ value: val, closable, onClose }">
       <span
-        class="nc-filter-record-chip inline-flex items-center gap-1 bg-nc-bg-brand rounded-lg px-2 py-[3px] mr-0.5 my-0.25 text-xs text-nc-content-brand font-medium max-w-32"
+        class="nc-filter-record-chip inline-flex items-center gap-0.5 bg-nc-bg-brand rounded-lg px-1.5 py-[2px] mr-0.5 my-0.25 text-xs text-nc-content-brand font-medium"
       >
-        <span class="truncate">{{ getDisplayLabel(val) }}</span>
+        <span class="truncate max-w-20">{{ getDisplayLabel(val) }}</span>
         <component
           :is="iconMap.closeThick"
           v-if="closable"
@@ -268,16 +268,26 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
   min-width: 14rem;
 
   :deep(.ant-select-selector) {
-    @apply !min-h-8 flex items-center flex-wrap;
+    @apply !min-h-8 flex items-center flex-wrap gap-0.5 !py-0.5;
+  }
+
+  // Multi-select: chips flow horizontally with wrapping
+  :deep(.ant-select-selection-overflow) {
+    @apply flex flex-wrap gap-0.5;
+  }
+
+  :deep(.ant-select-selection-overflow-item) {
+    @apply !flex-none;
   }
 
   :deep(.ant-select-selection-item) {
-    @apply !flex items-center !border-none !bg-nc-bg-brand !text-xs !text-nc-content-brand !font-medium !rounded-lg !px-2 !py-[3px] !max-w-32;
+    @apply !flex items-center !border-none !bg-nc-bg-brand !text-xs !text-nc-content-brand !font-medium !rounded-lg !px-1.5 !py-[2px] !max-w-24 !h-auto !mr-0;
   }
 
-  &.has-selection:not(.ant-select-open) {
+  // Single-select: hide search input when value is selected
+  &.has-selection {
     :deep(.ant-select-selection-search) {
-      @apply !w-0 !overflow-hidden;
+      @apply !w-0 !overflow-hidden !absolute;
     }
   }
 
@@ -290,6 +300,11 @@ const showSuffixIcon = computed(() => !hasSearchText.value && !hasValue.value)
 
   :deep(.ant-select-clear) {
     @apply !right-2;
+  }
+
+  // Multi-select search input should shrink to fit alongside chips
+  :deep(.ant-select-selection-search) {
+    @apply !m-0;
   }
 }
 </style>
