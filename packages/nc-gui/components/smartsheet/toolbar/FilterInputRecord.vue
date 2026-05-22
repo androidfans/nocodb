@@ -317,7 +317,7 @@ const handleSearchInput = (e: Event) => {
 .nc-record-chip {
   @apply inline-flex items-center gap-0.5 flex-shrink-0
     bg-nc-bg-brand rounded-lg px-1.5 py-0.5 text-xs
-    text-nc-content-brand font-medium max-w-28;
+    text-nc-content-brand font-medium max-w-36;
 }
 
 .chip-close {
