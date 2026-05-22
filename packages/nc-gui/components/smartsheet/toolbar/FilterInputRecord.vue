@@ -293,10 +293,10 @@ const handleSearchInput = (e: Event) => {
 .nc-filter-record-trigger {
   @apply flex items-center justify-between gap-1 min-h-8 w-56 px-2 py-0.5
     rounded-lg cursor-pointer border-1 border-nc-border-gray-medium
-    bg-nc-bg-default hover:border-nc-border-brand transition-colors overflow-hidden;
+    bg-nc-bg-default hover:bg-nc-bg-gray-extralight transition-colors overflow-hidden;
 
   &.is-open {
-    @apply border-nc-border-brand;
+    @apply bg-nc-bg-gray-extralight border-nc-border-gray-medium;
   }
 }
 
@@ -334,7 +334,7 @@ const handleSearchInput = (e: Event) => {
 .nc-filter-record-panel {
   @apply bg-nc-bg-default rounded-lg shadow-lg
     border-1 border-nc-border-gray-medium
-    w-64 max-h-72 flex flex-col;
+    w-80 max-h-72 flex flex-col;
 }
 
 .panel-search {
