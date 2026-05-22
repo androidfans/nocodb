@@ -263,18 +263,31 @@ export async function nestedConditionJoin({
         ? 'mm'
         : relationColOptions.type;
       // Resolve display column once — honors per-LTAR fk_display_value_column_id override
+      const isIdOp = filter.comparison_op?.endsWith('_id') ?? false;
       const displayCol = await getDisplayValueOfRefTable(
         context,
         relationColumn,
       );
+      // _id operators filter by PK instead of display value;
+      // strip the _id suffix so the downstream generic handler sees eq/neq/in/nin.
+      const targetCol = isIdOp
+        ? (relationType === RelationTypes.BELONGS_TO ? parentModel : childModel)
+            .primaryKey
+        : displayCol;
+      const effectiveFilter = isIdOp
+        ? {
+            ...filter,
+            comparison_op: filter.comparison_op!.replace(/_id$/, ''),
+          }
+        : filter;
       switch (relationType) {
         case RelationTypes.HAS_MANY: {
           const filterOperationResult = await parseConditionV2(
             childBaseModel,
             new Filter({
-              ...filter,
+              ...effectiveFilter,
               fk_model_id: childModel.id,
-              fk_column_id: displayCol?.id,
+              fk_column_id: targetCol?.id,
             }),
             aliasCount,
             relAlias,
@@ -289,9 +302,9 @@ export async function nestedConditionJoin({
           const filterOperationResult = await parseConditionV2(
             parentBaseModel,
             new Filter({
-              ...filter,
+              ...effectiveFilter,
               fk_model_id: parentModel.id,
-              fk_column_id: displayCol?.id,
+              fk_column_id: targetCol?.id,
             }),
             aliasCount,
             relAlias,
@@ -306,9 +319,9 @@ export async function nestedConditionJoin({
           const filterOperationResult = await parseConditionV2(
             parentBaseModel,
             new Filter({
-              ...filter,
+              ...effectiveFilter,
               fk_model_id: parentModel.id,
-              fk_column_id: displayCol?.id,
+              fk_column_id: targetCol?.id,
             }),
             aliasCount,
             relAlias,

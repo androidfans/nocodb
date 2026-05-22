@@ -162,7 +162,11 @@ const componentProps = computed(() => {
     case 'isLinks': {
       // Record picker needs column meta to resolve the related table
       if (RECORD_FILTER_OPS.has(props.filter.comparison_op!)) {
-        return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
+        return {
+          column: columnRef.value,
+          comparisonOp: props.filter.comparison_op,
+          disabled: props.filter?.readOnly || props?.disabled,
+        }
       }
       // Links (V2 OM/MM) count input — fixed height like other numeric inputs
       if (columnRef.value?.uidt === UITypes.Links) {

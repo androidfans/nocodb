@@ -7,6 +7,7 @@ interface Props {
   modelValue?: string | null
   column?: ColumnType
   comparisonOp?: string
+  disabled?: boolean
 }
 
 const props = defineProps<Props>()
@@ -233,20 +234,25 @@ const handleSearchInput = (e: Event) => {
 </script>
 
 <template>
-  <NcDropdown v-model:visible="isOpen" placement="bottomLeft">
+  <NcDropdown v-model:visible="isOpen" :disabled="props.disabled" placement="bottomLeft">
     <!-- Trigger: fixed-width button with chips, overflow hidden -->
-    <div class="nc-filter-record-trigger group" :class="{ 'is-open': isOpen }" @click.stop>
+    <div class="nc-filter-record-trigger group" :class="{ 'is-open': isOpen, 'is-disabled': props.disabled }" @click.stop>
       <div class="trigger-chips">
         <template v-if="selectedPks.length">
           <span v-for="pk in selectedPks" :key="pk" class="nc-record-chip">
             <span class="truncate">{{ getDisplayLabel(pk) }}</span>
-            <component :is="iconMap.closeThick" class="chip-close" @click.stop="removeRecord(pk)" />
+            <component :is="iconMap.closeThick" v-if="!props.disabled" class="chip-close" @click.stop="removeRecord(pk)" />
           </span>
         </template>
         <span v-else class="trigger-placeholder">Select record</span>
       </div>
       <div class="trigger-actions">
-        <component :is="iconMap.close" v-if="selectedPks.length" class="action-icon clear-icon" @click.stop="clearAll" />
+        <component
+          :is="iconMap.close"
+          v-if="selectedPks.length && !props.disabled"
+          class="action-icon clear-icon"
+          @click.stop="clearAll"
+        />
         <component :is="iconMap.chevronDown" class="action-icon chevron-icon" :class="{ 'rotate-180': isOpen }" />
       </div>
     </div>
@@ -297,6 +303,10 @@ const handleSearchInput = (e: Event) => {
 
   &.is-open {
     @apply bg-nc-bg-gray-extralight border-nc-border-gray-medium;
+  }
+
+  &.is-disabled {
+    @apply opacity-60 cursor-not-allowed;
   }
 }
 

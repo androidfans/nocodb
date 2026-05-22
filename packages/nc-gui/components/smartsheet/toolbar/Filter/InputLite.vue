@@ -157,7 +157,11 @@ const componentProps = computed(() => {
     case 'isFloat':
     case 'isLinks': {
       if (RECORD_FILTER_OPS.has(props.filter.comparison_op!)) {
-        return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
+        return {
+          column: columnRef.value,
+          comparisonOp: props.filter.comparison_op,
+          disabled: props.filter?.readOnly || props?.disabled,
+        }
       }
       if (columnRef.value?.uidt === UITypes.Links) {
         return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
