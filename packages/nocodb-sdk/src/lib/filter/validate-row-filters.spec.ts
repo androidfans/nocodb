@@ -4,6 +4,7 @@ import {
 } from '~/lib/filter/validate-row-filters';
 import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import UITypes from '~/lib/UITypes';
+import { LinksVersion, RelationTypes } from '~/lib/globals';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
@@ -41,11 +42,20 @@ const mockColumns: ColumnType[] = [
   { id: '7', title: 'JsonData', uidt: UITypes.JSON },
   { id: '8', title: 'TimeData', uidt: UITypes.Time },
   { id: '9', title: 'DateData', uidt: UITypes.Date },
+  {
+    id: '10',
+    title: 'RecordLinks',
+    uidt: UITypes.Links,
+    colOptions: {
+      fk_related_model_id: 'relatedModel',
+    } as LinkToAnotherRecordType,
+  },
 ];
 
 const mockMetas = {
   relatedModel: {
     columns: [
+      { id: 'r0', title: 'Id', pk: true, uidt: UITypes.ID },
       { id: 'r1', title: 'Primary', pv: true, uidt: UITypes.SingleLineText },
     ],
   },
@@ -963,6 +973,178 @@ describe('validateRowFilters', () => {
           metas: mockMetas,
         })
       ).toBe(false);
+    });
+  });
+
+  describe('Links record-id filters', () => {
+    const data = {
+      RecordLinks: [
+        { Id: 'recA', Primary: 'RecordA' },
+        { Id: 'recB', Primary: 'RecordB' },
+      ],
+    };
+
+    it.each([
+      ['eq_id', 'recA', true],
+      ['eq_id', 'recC', false],
+      ['neq_id', 'recC', true],
+      ['neq_id', 'recA', false],
+      ['in_id', 'recC,recB', true],
+      ['in_id', 'recC,recD', false],
+      ['nin_id', 'recC,recD', true],
+      ['nin_id', 'recA,recD', false],
+    ])(
+      'should evaluate "%s" against related record ids',
+      (comparisonOp, value, expected) => {
+        expect(
+          validateRowFilters({
+            filters: [
+              {
+                fk_column_id: '10',
+                comparison_op: comparisonOp as any,
+                value,
+              },
+            ],
+            data,
+            columns: mockColumns,
+            client: mockClient,
+            metas: mockMetas,
+          })
+        ).toBe(expected);
+      }
+    );
+
+    it.each([
+      ['eq_id', 'recA', 0],
+      ['eq_id', 'recA', 2],
+      ['neq_id', 'recA', 2],
+      ['in_id', 'recA,recB', 2],
+      ['nin_id', 'recA,recB', 2],
+    ])(
+      'should not pass "%s" when Links data is only a count',
+      (comparisonOp, value, count) => {
+        expect(
+          validateRowFilters({
+            filters: [
+              {
+                fk_column_id: '10',
+                comparison_op: comparisonOp as any,
+                value,
+              },
+            ],
+            data: {
+              RecordLinks: count,
+            },
+            columns: mockColumns,
+            client: mockClient,
+            metas: mockMetas,
+          })
+        ).toBe(false);
+      }
+    );
+
+    it.each([
+      ['eq_id', 'crossRecA', true],
+      ['in_id', 'crossRecB,crossRecC', true],
+      ['in_id', 'crossRecC,crossRecD', false],
+    ])(
+      'should evaluate cross-base "%s" against related record ids',
+      (comparisonOp, value, expected) => {
+        expect(
+          validateRowFilters({
+            filters: [
+              {
+                fk_column_id: 'crossBaseLinks',
+                comparison_op: comparisonOp as any,
+                value,
+              },
+            ],
+            data: {
+              CrossBaseLinks: [
+                { Id: 'crossRecA', Primary: 'CrossRecordA' },
+                { Id: 'crossRecB', Primary: 'CrossRecordB' },
+              ],
+            },
+            columns: [
+              {
+                id: 'crossBaseLinks',
+                title: 'CrossBaseLinks',
+                uidt: UITypes.Links,
+                colOptions: {
+                  fk_related_model_id: 'crossBaseRelatedModel',
+                  fk_related_base_id: 'relatedBase',
+                } as LinkToAnotherRecordType,
+              },
+            ],
+            client: mockClient,
+            metas: {
+              'relatedBase:crossBaseRelatedModel': {
+                columns: [
+                  { id: 'r0', title: 'Id', pk: true, uidt: UITypes.ID },
+                  {
+                    id: 'r1',
+                    title: 'Primary',
+                    pv: true,
+                    uidt: UITypes.SingleLineText,
+                  },
+                ],
+              },
+            },
+            baseId: 'currentBase',
+          })
+        ).toBe(expected);
+      }
+    );
+
+    it('should keep non-BT Links count filters on the numeric path', () => {
+      expect(
+        validateRowFilters({
+          filters: [
+            {
+              fk_column_id: '10',
+              comparison_op: 'gt',
+              value: 0,
+            },
+          ],
+          data: {
+            RecordLinks: 2,
+          },
+          columns: mockColumns,
+          client: mockClient,
+          metas: mockMetas,
+        })
+      ).toBe(true);
+    });
+
+    it('should evaluate BT-like Links filters against related display values', () => {
+      expect(
+        validateRowFilters({
+          filters: [
+            {
+              fk_column_id: 'btLikeLinks',
+              comparison_op: 'eq',
+              value: 'RecordA',
+            },
+          ],
+          data: {
+            BtLikeLinks: { Id: 'recA', Primary: 'RecordA' },
+          },
+          columns: [
+            {
+              id: 'btLikeLinks',
+              title: 'BtLikeLinks',
+              uidt: UITypes.Links,
+              colOptions: {
+                fk_related_model_id: 'relatedModel',
+                version: LinksVersion.V2,
+                type: RelationTypes.MANY_TO_ONE,
+              } as LinkToAnotherRecordType,
+            },
+          ],
+          client: mockClient,
+          metas: mockMetas,
+        })
+      ).toBe(true);
     });
   });
 

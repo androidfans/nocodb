@@ -10,7 +10,7 @@ import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import { isDateMonthFormat } from '~/lib/dateTimeHelper';
 import { buildFilterTree } from '~/lib/filterHelpers';
 import { parseProp } from '~/lib/helperFunctions';
-import UITypes from '~/lib/UITypes';
+import UITypes, { isBtLikeV2Junction } from '~/lib/UITypes';
 import { getLookupColumnType } from '~/lib/columnHelper/utils/get-lookup-column-type';
 import { getNodejsTimezone } from '~/lib/timezoneUtils';
 import { ColumnHelper } from '~/lib/columnHelper/column-helper';
@@ -332,106 +332,173 @@ export class RowFilterValidator {
               default:
                 res = false; // Unsupported operation for User fields
             }
-          } else if (column.uidt === UITypes.LinkToAnotherRecord) {
-            let linkData = data[field];
+          } else if (
+            // Both link types enter here for record-level matching.
+            // LTAR always has record objects; Links only enters for
+            // BT-like junctions or _id operators. HM/MM count-only
+            // data is handled by the typeof check below.
+            column.uidt === UITypes.LinkToAnotherRecord ||
+            (column.uidt === UITypes.Links &&
+              (isBtLikeV2Junction(column) ||
+                filter.comparison_op?.endsWith('_id')))
+          ) {
+            const rawLinkData = data[field];
 
-            linkData = Array.isArray(linkData) ? linkData : [linkData];
-
-            const colOptions = column.colOptions as LinkToAnotherRecordType;
-
-            const relatedModelId = colOptions?.fk_related_model_id;
-
-            const relatedMeta = getMetaWithCompositeKey(
-              metas,
-              baseId,
-              relatedModelId
-            );
-
-            if (!relatedMeta?.columns) {
-              res = false;
+            // HM/MM Links may only have a count (number) in the client cache,
+            // not actual record objects. For _id operators we can't match by PK,
+            // but zero links guarantees negated operators (neq_id, nin_id) pass.
+            if (
+              filter.comparison_op?.endsWith('_id') &&
+              typeof rawLinkData === 'number'
+            ) {
+              const negated = ['neq_id', 'nin_id'].includes(
+                filter.comparison_op
+              );
+              res = negated && rawLinkData === 0;
             } else {
-              // Find the child column in the related table
-              const childColumn = relatedMeta.columns.find((col) => col.pv);
-              if (!childColumn) {
+              let linkData = rawLinkData;
+
+              linkData = Array.isArray(linkData)
+                ? linkData
+                : linkData != null
+                ? [linkData]
+                : [];
+
+              const colOptions = column.colOptions as LinkToAnotherRecordType;
+
+              const relatedModelId = colOptions?.fk_related_model_id;
+              const relatedBaseId =
+                (colOptions as any)?.fk_related_base_id || baseId;
+
+              const relatedMeta = getMetaWithCompositeKey(
+                metas,
+                relatedBaseId,
+                relatedModelId
+              );
+
+              if (!relatedMeta?.columns) {
                 res = false;
               } else {
-                const childFieldName = childColumn.title;
-                const childValues = linkData
-                  .map((item) => {
-                    return ncToString(item?.[childFieldName]);
-                  })
-                  .filter((val) => val !== '');
+                const isIdOp = filter.comparison_op?.endsWith('_id');
+                const pkColumn = relatedMeta.columns.find((col) => col.pk);
+                // Honor per-LTAR display column override. Server uses
+                // fk_display_value_column_id in getDisplayValueOfRefTable();
+                // client must match to avoid filter result divergence.
+                const overrideId = (colOptions as any)
+                  ?.fk_display_value_column_id;
+                const displayColumn = overrideId
+                  ? relatedMeta.columns.find((col) => col.id === overrideId) ||
+                    relatedMeta.columns.find((col) => col.pv)
+                  : relatedMeta.columns.find((col) => col.pv);
+                // _id operators match against primary key; display-value
+                // operators (eq, like, etc.) match against the display column.
+                const childColumn = isIdOp ? pkColumn : displayColumn;
+                if (!childColumn) {
+                  res = false;
+                } else {
+                  const childFieldName = childColumn.title;
+                  const childValues = linkData
+                    .map((item) => {
+                      return ncToString(item?.[childFieldName]);
+                    })
+                    .filter((val) => val !== '');
 
-                switch (filter.comparison_op as any) {
-                  case 'eq':
-                    res = childValues.includes(ncToString(filter.value));
-                    break;
-                  case 'neq':
-                    res = !childValues.includes(ncToString(filter.value));
-                    break;
-                  case 'like':
-                    res = childValues.some((val) =>
-                      val
-                        .toLowerCase()
-                        .includes(ncToString(filter.value).toLowerCase())
-                    );
-                    break;
-                  case 'nlike':
-                    res = !childValues.some((val) =>
-                      val
-                        .toLowerCase()
-                        .includes(ncToString(filter.value).toLowerCase())
-                    );
-                    break;
-                  case 'anyof': {
-                    const filterValues =
-                      ncToString(filter.value)
+                  // Strip _id suffix so eq_id → eq, in_id → in, etc.
+                  // This mirrors the server-side LTAR handler which also
+                  // strips _id before delegating to the base operator logic.
+                  const effectiveOp = isIdOp
+                    ? filter.comparison_op.replace(/_id$/, '')
+                    : filter.comparison_op;
+
+                  switch (effectiveOp as any) {
+                    case 'eq':
+                      res = childValues.includes(ncToString(filter.value));
+                      break;
+                    case 'neq':
+                      res = !childValues.includes(ncToString(filter.value));
+                      break;
+                    case 'in': {
+                      const inValues = ncToString(filter.value)
                         .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = childValues.some((val) => filterValues.includes(val));
-                    break;
-                  }
-                  case 'nanyof': {
-                    const filterValues2 =
-                      ncToString(filter.value)
+                        .map((v) => v.trim())
+                        .filter(Boolean);
+                      res = childValues.some((val) => inValues.includes(val));
+                      break;
+                    }
+                    case 'nin': {
+                      const ninValues = ncToString(filter.value)
                         .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = !childValues.some((val) =>
-                      filterValues2.includes(val)
-                    );
-                    break;
+                        .map((v) => v.trim())
+                        .filter(Boolean);
+                      res = !childValues.some((val) => ninValues.includes(val));
+                      break;
+                    }
+                    case 'like':
+                      res = childValues.some((val) =>
+                        val
+                          .toLowerCase()
+                          .includes(ncToString(filter.value).toLowerCase())
+                      );
+                      break;
+                    case 'nlike':
+                      res = !childValues.some((val) =>
+                        val
+                          .toLowerCase()
+                          .includes(ncToString(filter.value).toLowerCase())
+                      );
+                      break;
+                    case 'anyof': {
+                      const filterValues =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = childValues.some((val) =>
+                        filterValues.includes(val)
+                      );
+                      break;
+                    }
+                    case 'nanyof': {
+                      const filterValues2 =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = !childValues.some((val) =>
+                        filterValues2.includes(val)
+                      );
+                      break;
+                    }
+                    case 'allof': {
+                      const filterValues3 =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = filterValues3.every((filterVal) =>
+                        childValues.includes(filterVal)
+                      );
+                      break;
+                    }
+                    case 'nallof': {
+                      const filterValues4 =
+                        ncToString(filter.value)
+                          .split(',')
+                          .map((v) => v.trim()) || [];
+                      res = !filterValues4.every((filterVal) =>
+                        childValues.includes(filterVal)
+                      );
+                      break;
+                    }
+                    case 'gb_null':
+                    case 'empty':
+                    case 'blank':
+                      res = linkData.length === 0;
+                      break;
+                    case 'notempty':
+                    case 'notblank':
+                      res = linkData.length > 0;
+                      break;
+                    default:
+                      res = false;
                   }
-                  case 'allof': {
-                    const filterValues3 =
-                      ncToString(filter.value)
-                        .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = filterValues3.every((filterVal) =>
-                      childValues.includes(filterVal)
-                    );
-                    break;
-                  }
-                  case 'nallof': {
-                    const filterValues4 =
-                      ncToString(filter.value)
-                        .split(',')
-                        .map((v) => v.trim()) || [];
-                    res = !filterValues4.every((filterVal) =>
-                      childValues.includes(filterVal)
-                    );
-                    break;
-                  }
-                  case 'gb_null':
-                  case 'empty':
-                  case 'blank':
-                    res = linkData.length === 0;
-                    break;
-                  case 'notempty':
-                  case 'notblank':
-                    res = linkData.length > 0;
-                    break;
-                  default:
-                    res = false;
                 }
               }
             }

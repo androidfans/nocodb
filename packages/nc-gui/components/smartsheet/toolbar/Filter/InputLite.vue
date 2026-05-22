@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ClientType, SqlUiFactory, UITypes } from 'nocodb-sdk'
+import { ClientType, SqlUiFactory, UITypes, isLinksOrLTAR } from 'nocodb-sdk'
 import type { ColumnType } from 'nocodb-sdk'
 import SingleSelect from '~/components/cell/SingleSelect/index.vue'
 import MultiSelect from '~/components/cell/MultiSelect/index.vue'
@@ -15,6 +15,7 @@ import Integer from '~/components/cell/Integer/index.vue'
 import Float from '~/components/cell/Float/index.vue'
 import Text from '~/components/cell/Text/index.vue'
 import User from '~/components/cell/User/index.vue'
+import FilterInputRecord from '~/components/smartsheet/toolbar/FilterInputRecord.vue'
 
 interface Props {
   // column could be possibly undefined when the filter is created
@@ -32,13 +33,14 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<Emits>()
 
-const column = toRef(props, 'column')
+const rawColumn = toRef(props, 'column')
+const columnRef = computed(() => getFilterInputColumn(rawColumn.value) as ColumnType | undefined)
 
 const editEnabled = computed(() => !props.disabled)
 
 const readOnly = ref(props.filter.readOnly || props.disabled)
 
-provide(ColumnInj, column)
+provide(ColumnInj, columnRef)
 
 provide(EditModeInj, readonly(editEnabled))
 
@@ -60,7 +62,8 @@ const checkTypeFunctions: Record<string, (column: ColumnType, abstractType?: str
   isInt,
   isFloat,
   isTextArea,
-  isLinks: (col: ColumnType) => col.uidt === UITypes.Links,
+  // Covers both link types — @see RECORD_FILTER_OPS in filterUtils.ts
+  isLinks: (col: ColumnType) => isLinksOrLTAR(col),
   isUser,
   isReadonlyUser,
 }
@@ -70,16 +73,16 @@ type FilterUIType = keyof typeof checkTypeFunctions
 const dbClientType = computed(() => props.dbClientType ?? ClientType.PG)
 
 const sqlUi = computed(() => dbClientType.value && SqlUiFactory.create({ client: dbClientType.value }))
-const abstractType = computed(() => column.value && sqlUi.value?.getAbstractType(column.value))
+const abstractType = computed(() => columnRef.value && sqlUi.value?.getAbstractType(columnRef.value))
 
 const checkType = (filterUIType: FilterUIType) => {
   const checkTypeFunction = checkTypeFunctions[filterUIType]
 
-  if (!column.value || !checkTypeFunction) {
+  if (!columnRef.value || !checkTypeFunction) {
     return false
   }
 
-  return checkTypeFunction(column.value, abstractType.value)
+  return checkTypeFunction(columnRef.value, abstractType.value)
 }
 
 const filterInput = computed({
@@ -128,7 +131,12 @@ const componentMap: Partial<Record<FilterUIType, any>> = computed(() => {
     isDecimal: Decimal,
     isInt: Integer,
     isFloat: Float,
-    isLinks: Integer,
+    // Link column input routing — @see RECORD_FILTER_OPS in filterUtils.ts
+    isLinks: RECORD_FILTER_OPS.has(props.filter.comparison_op!)
+      ? FilterInputRecord
+      : columnRef.value?.uidt === UITypes.Links
+      ? Integer
+      : Text,
     isUser: User,
     isReadonlyUser: User,
   }
@@ -147,7 +155,15 @@ const componentProps = computed(() => {
     case 'isPercent':
     case 'isDecimal':
     case 'isFloat':
-    case 'isLinks':
+    case 'isLinks': {
+      if (RECORD_FILTER_OPS.has(props.filter.comparison_op!)) {
+        return { column: columnRef.value, comparisonOp: props.filter.comparison_op }
+      }
+      if (columnRef.value?.uidt === UITypes.Links) {
+        return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
+      }
+      return { showReadonlyField: props.filter?.readOnly || props?.disabled }
+    }
     case 'isInt': {
       return { class: 'h-32px', showReadonlyField: props.filter?.readOnly || props?.disabled }
     }
@@ -169,7 +185,7 @@ const componentProps = computed(() => {
     case 'isRating': {
       return {
         style: {
-          minWidth: `${(column.value?.meta?.max || 5) * 19}px`,
+          minWidth: `${(columnRef.value?.meta?.max || 5) * 19}px`,
         },
         showReadonlyField: props.filter?.readOnly || props?.disabled,
       }
@@ -182,13 +198,13 @@ const componentProps = computed(() => {
 
 const hasExtraPadding = computed(() => {
   return (
-    column.value &&
-    (column.value?.uidt === UITypes.Links ||
-      isInt(column.value, abstractType) ||
-      isDate(column.value, abstractType) ||
-      isDateTime(column.value, abstractType) ||
-      isTime(column.value, abstractType) ||
-      isYear(column.value, abstractType))
+    columnRef.value &&
+    (isLinksOrLTAR(columnRef.value) ||
+      isInt(columnRef.value, abstractType) ||
+      isDate(columnRef.value, abstractType) ||
+      isDateTime(columnRef.value, abstractType) ||
+      isTime(columnRef.value, abstractType) ||
+      isYear(columnRef.value, abstractType))
   )
 })
 
@@ -205,7 +221,7 @@ const isSingleOrMultiSelect = computed(() => {
 
 <template>
   <a-select
-    v-if="column && isBoolean(column, abstractType)"
+    v-if="columnRef && isBoolean(columnRef, abstractType)"
     v-model:value="filterInput"
     :disabled="filter.readOnly || disabled"
     :options="booleanOptions"
@@ -221,7 +237,7 @@ const isSingleOrMultiSelect = computed(() => {
       v-model="filterInput"
       :disabled="filter.readOnly || disabled"
       placeholder="Enter a value"
-      :column="column"
+      :column="columnRef"
       class="flex !rounded-lg"
       :class="{
         'text-nc-content-gray-muted pointer-events-none': disabled,
