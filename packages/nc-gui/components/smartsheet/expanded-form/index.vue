@@ -138,6 +138,8 @@ const isSaving = ref(false)
 
 const isRecordReloading = ref(false)
 
+const closingDeletedRowId = ref<string | undefined>()
+
 // Template mode: editable template name in the header
 const editableTemplateName = ref(props.templateName || '')
 
@@ -346,6 +348,13 @@ watch(
 const displayField = computed(() => meta.value?.columns?.find((c) => c.pv && fields.value?.includes(c)) ?? null)
 
 const reloadViewDataListener = withLoading(async (params) => {
+  // Custom link-record refreshes can be replayed while a route-backed form is
+  // closing. After delete succeeds, do not let those stale refreshes read the
+  // deleted row again and surface a false "Record not found" error.
+  if (closingDeletedRowId.value && `${primaryKey.value}` === `${closingDeletedRowId.value}`) {
+    return
+  }
+
   // Skip loading deleted record again
   if (params?.skipLoadingRowId && params?.skipLoadingRowId === primaryKey.value) {
     return
@@ -905,10 +914,15 @@ const onDeleteRowClick = () => {
 }
 
 const onConfirmDeleteRowClick = async () => {
+  const deletedRowId = primaryKey.value || undefined
+
   // Double guard for delayed clicks or an already-open confirm modal.
   if (isLoading.value) return
 
-  await deleteRowById(primaryKey.value || undefined)
+  const deleted = await deleteRowById(deletedRowId)
+  if (!deleted) return
+
+  closingDeletedRowId.value = deletedRowId
 
   emits('deletedRecord')
   showDeleteRowModal.value = false
@@ -916,11 +930,15 @@ const onConfirmDeleteRowClick = async () => {
 
   await reloadViewDataTrigger.trigger({
     shouldShowLoading: false,
-    skipLoadingRowId: primaryKey.value || undefined,
+    skipLoadingRowId: deletedRowId,
   })
 }
 
 watch(rowId, async (nRow) => {
+  if (closingDeletedRowId.value && `${primaryKey.value}` === `${closingDeletedRowId.value}`) {
+    return
+  }
+
   mobileDiscussionMode.value = false
   await triggerRowLoad(nRow)
 })

@@ -604,6 +604,7 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
     const deleteRowById = async (rowId?: string) => {
       try {
         const recordId = rowId ?? extractPkFromRow(row.value.row, meta.value.columns as ColumnType[])
+        if (!recordId) return false
 
         const res: { message?: string[] } | number = await $api.dbTableRow.delete(
           NOCO,
@@ -620,8 +621,11 @@ const [useProvideExpandedFormStore, useExpandedFormStore] = useInjectionState(
           )
           return false
         }
+
+        return true
       } catch (e: any) {
         message.error(`${t('msg.error.deleteFailed')}: ${await extractSdkResponseErrorMsg(e)}`)
+        return false
       }
     }
 
