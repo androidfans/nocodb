@@ -40,11 +40,8 @@ import { filterBuilder } from '~/utils/api-v3-data-transformation.builder';
 
 const webhookLogLevel =
   process.env.NC_WEBHOOK_LOG_LEVEL || process.env.NC_AUTOMATION_LOG_LEVEL;
-// Temporary troubleshooting switch.
+// Temporary troubleshooting instrumentation (always on).
 // Remove all nc-webhook-trace instrumentation after root-cause is fixed.
-const webhookTraceEnabled = ['1', 'true', 'yes', 'on'].includes(
-  (process.env.NC_WEBHOOK_TRACE || '').toLowerCase(),
-);
 
 interface WebhookResponseLog {
   status: number;
@@ -61,8 +58,6 @@ export class WebhookInvoker {
   protected logger = new Logger(WebhookInvoker.name);
 
   private trace(event: string, meta: Record<string, unknown>) {
-    if (!webhookTraceEnabled) return;
-
     this.logger.warn(`[nc-webhook-trace][invoker] ${event} ${JSON.stringify(meta)}`);
   }
 

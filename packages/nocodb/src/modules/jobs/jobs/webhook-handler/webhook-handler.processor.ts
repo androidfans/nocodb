@@ -5,18 +5,13 @@ import { Hook, Model, View } from '~/models';
 import { type HandleWebhookJobData } from '~/interface/Jobs';
 import { IJobsService } from '~/modules/jobs/jobs-service.interface';
 
-// Temporary troubleshooting switch.
+// Temporary troubleshooting instrumentation (always on).
 // Remove all nc-webhook-trace instrumentation after root-cause is fixed.
-const webhookTraceEnabled = ['1', 'true', 'yes', 'on'].includes(
-  (process.env.NC_WEBHOOK_TRACE || '').toLowerCase(),
-);
 
 export class WebhookHandlerProcessor {
   protected logger = new Logger(WebhookHandlerProcessor.name);
 
   private trace(event: string, meta: Record<string, unknown>) {
-    if (!webhookTraceEnabled) return;
-
     this.logger.warn(`[nc-webhook-trace][job] ${event} ${JSON.stringify(meta)}`);
   }
 
