@@ -20,11 +20,24 @@ import { IJobsService } from '~/modules/jobs/jobs-service.interface';
 import { MailService } from '~/services/mail/mail.service';
 
 export const HANDLE_WEBHOOK = '__nc_handleHooks';
+// Temporary troubleshooting switch.
+// Remove all nc-webhook-trace instrumentation after root-cause is fixed.
+const webhookTraceEnabled = ['1', 'true', 'yes', 'on'].includes(
+  (process.env.NC_WEBHOOK_TRACE || '').toLowerCase(),
+);
 
 @Injectable()
 export class HookHandlerService implements OnModuleInit, OnModuleDestroy {
   protected logger = new Logger(HookHandlerService.name);
   protected unsubscribe: () => void;
+
+  private trace(event: string, meta: Record<string, unknown>) {
+    if (!webhookTraceEnabled) return;
+
+    this.logger.warn(
+      `[nc-webhook-trace][dispatcher] ${event} ${JSON.stringify(meta)}`,
+    );
+  }
 
   constructor(
     @Inject('IEventEmitter') protected readonly eventEmitter: IEventEmitter,
@@ -142,16 +155,29 @@ export class HookHandlerService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
+    const affectedColumns = await getAffectedColumns(context, {
+      hookName,
+      newData,
+      prevData,
+      model,
+    });
+
     const hooks = await Hook.list(context, {
       fk_model_id: modelId,
       event: event as HookType['event'],
       operation: operation as HookType['operation'][0],
-      affectedColumns: await getAffectedColumns(context, {
-        hookName,
-        newData,
-        prevData,
-        model,
-      }),
+      affectedColumns,
+    });
+    this.trace('hooks:selected', {
+      hookName,
+      modelId,
+      viewId: viewId ?? null,
+      event,
+      operation,
+      affectedColumnsCount: affectedColumns?.length ?? 0,
+      affectedColumns,
+      totalHooks: hooks.length,
+      activeHooks: hooks.filter((h) => h.active).length,
     });
     for (const hook of hooks) {
       if (hook.active) {
@@ -167,6 +193,12 @@ export class HookHandlerService implements OnModuleInit, OnModuleDestroy {
             hookName,
             ncSiteUrl: context.nc_site_url,
           });
+          this.trace('hooks:enqueued', {
+            hookName,
+            hookId: hook.id,
+            modelId,
+            viewId: viewId ?? null,
+          });
         } catch (e) {
           this.logger.error({
             error: e,
@@ -174,6 +206,13 @@ export class HookHandlerService implements OnModuleInit, OnModuleDestroy {
             hook: hook.id,
           });
         }
+      } else {
+        this.trace('hooks:skip-inactive', {
+          hookName,
+          hookId: hook.id,
+          modelId,
+          viewId: viewId ?? null,
+        });
       }
     }
   }

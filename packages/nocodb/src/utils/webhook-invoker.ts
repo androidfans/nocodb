@@ -40,6 +40,11 @@ import { filterBuilder } from '~/utils/api-v3-data-transformation.builder';
 
 const webhookLogLevel =
   process.env.NC_WEBHOOK_LOG_LEVEL || process.env.NC_AUTOMATION_LOG_LEVEL;
+// Temporary troubleshooting switch.
+// Remove all nc-webhook-trace instrumentation after root-cause is fixed.
+const webhookTraceEnabled = ['1', 'true', 'yes', 'on'].includes(
+  (process.env.NC_WEBHOOK_TRACE || '').toLowerCase(),
+);
 
 interface WebhookResponseLog {
   status: number;
@@ -54,6 +59,12 @@ export type HookPayloadType = Omit<HookType, 'operation'> & {
 
 export class WebhookInvoker {
   protected logger = new Logger(WebhookInvoker.name);
+
+  private trace(event: string, meta: Record<string, unknown>) {
+    if (!webhookTraceEnabled) return;
+
+    this.logger.warn(`[nc-webhook-trace][invoker] ${event} ${JSON.stringify(meta)}`);
+  }
 
   populateAxiosReq({
     apiMeta: _apiMeta,
@@ -360,6 +371,18 @@ export class WebhookInvoker {
       ...hook,
       operation: hook.operation as any as string,
     };
+    const traceMetaBase = {
+      hookId: hook?.id,
+      hookTitle: hook?.title,
+      hookVersion: hook?.version,
+      hookName,
+      modelId: model?.id,
+      viewId: view?.id ?? null,
+      isTestHook: testHook,
+      hasCondition: !!hook?.condition,
+      triggerField: hook?.trigger_field,
+      operation: hookPayload.operation,
+    };
 
     let hookLog: HookLogType;
     const startTime = process.hrtime();
@@ -371,10 +394,21 @@ export class WebhookInvoker {
     let notification, filters;
     let reqPayload;
     try {
+      this.trace('invoke:start', {
+        ...traceMetaBase,
+        isBulkOperation: Array.isArray(newData),
+        inputRowCount: Array.isArray(newData) ? newData.length : newData ? 1 : 0,
+      });
+
       notification =
         typeof hook.notification === 'string'
           ? JSON.parse(hook.notification)
           : hook.notification;
+      this.trace('invoke:notification-loaded', {
+        ...traceMetaBase,
+        notificationType: notification?.type ?? null,
+        triggerFormId: notification?.trigger_form_id ?? null,
+      });
 
       const isBulkOperation = Array.isArray(newData);
 
@@ -384,14 +418,29 @@ export class WebhookInvoker {
         notification?.type !== 'Script'
       ) {
         // only URL & Script hooks are supported for bulk operations
+        this.trace('invoke:skip-unsupported-bulk-type', {
+          ...traceMetaBase,
+          notificationType: notification?.type ?? null,
+        });
         return;
+      }
+
+      if (hook.condition && testHook) {
+        this.trace('condition:skip-test-hook', traceMetaBase);
       }
 
       if (hook.condition && !testHook) {
         filters = testFilters || (await hook.getFilters(context));
+        this.trace('condition:filters-loaded', {
+          ...traceMetaBase,
+          filterCount: filters?.length ?? 0,
+          fromTestFilters: !!testFilters,
+        });
 
         if (isBulkOperation) {
           const filteredData = [];
+          let prevMatchedCount = 0;
+          let newMatchedCount = 0;
           for (let i = 0; i < newData.length; i++) {
             const data = newData[i];
 
@@ -406,25 +455,36 @@ export class WebhookInvoker {
                 client: source?.type,
               }))
             ) {
+              prevMatchedCount++;
               continue;
             }
 
             if (
               await validateCondition(
                 context,
-                testFilters || (await hook.getFilters(context)),
+                filters,
                 data,
                 { client: source?.type },
               )
             ) {
+              newMatchedCount++;
               filteredData.push(data);
             }
           }
+          this.trace('condition:bulk-evaluated', {
+            ...traceMetaBase,
+            totalRows: newData.length,
+            prevMatchedCount,
+            newMatchedCount,
+            passedRows: filteredData.length,
+          });
           if (!filteredData.length) {
+            this.trace('condition:skip-no-rows-passed', traceMetaBase);
             return;
           }
           newData = filteredData;
         } else {
+          let prevMatched = false;
           // if condition is satisfied for prevData then return
           // if filters are not defined then skip the check
           if (
@@ -434,16 +494,22 @@ export class WebhookInvoker {
               client: source?.type,
             }))
           ) {
+            prevMatched = true;
+            this.trace('condition:skip-prev-matched', traceMetaBase);
             return;
           }
+          const newMatched = await validateCondition(context, filters, newData, {
+            client: source?.type,
+          });
+          this.trace('condition:single-evaluated', {
+            ...traceMetaBase,
+            prevMatched,
+            newMatched,
+          });
           if (
-            !(await validateCondition(
-              context,
-              testFilters || (await hook.getFilters(context)),
-              newData,
-              { client: source?.type },
-            ))
+            !newMatched
           ) {
+            this.trace('condition:skip-new-not-matched', traceMetaBase);
             return;
           }
         }
@@ -457,6 +523,11 @@ export class WebhookInvoker {
       ) {
         const formId = notification.trigger_form_id;
         if (view && formId !== view.id) {
+          this.trace('invoke:skip-form-filter-mismatch', {
+            ...traceMetaBase,
+            expectedFormId: formId,
+            currentViewId: view?.id ?? null,
+          });
           return;
         }
       }
@@ -496,6 +567,7 @@ export class WebhookInvoker {
                 conditions: JSON.stringify(filters),
               };
             }
+            this.trace('invoke:email-sent', traceMetaBase);
           }
           break;
         case 'URL':
@@ -529,6 +601,10 @@ export class WebhookInvoker {
                 conditions: JSON.stringify(filters),
               };
             }
+            this.trace('invoke:url-sent', {
+              ...traceMetaBase,
+              status: responsePayload?.status,
+            });
           }
           break;
         case 'Script':
@@ -609,6 +685,11 @@ export class WebhookInvoker {
                 ncSiteUrl,
               },
             });
+            this.trace('invoke:script-job-enqueued', {
+              ...traceMetaBase,
+              scriptId: notification?.payload?.scriptId ?? null,
+              recordsCount: datas.length,
+            });
           }
           break;
         default:
@@ -658,10 +739,20 @@ export class WebhookInvoker {
                 conditions: JSON.stringify(filters),
               };
             }
+            this.trace('invoke:adapter-sent', {
+              ...traceMetaBase,
+              notificationType: notification?.type ?? null,
+            });
           }
           break;
       }
     } catch (e) {
+      this.trace('invoke:error', {
+        ...traceMetaBase,
+        notificationType: notification?.type ?? null,
+        errorCode: e?.error_code ?? e?.code ?? null,
+        errorMessage: e?.message ?? null,
+      });
       if (e.response) {
         this.logger.debug({
           data: e.response.data,
@@ -891,6 +982,10 @@ export class WebhookInvoker {
         throw new Error(errorMessage);
       }
     } finally {
+      this.trace('invoke:finish', {
+        ...traceMetaBase,
+        hasHookLog: !!hookLog,
+      });
       if (hookLog) {
         hookLog.execution_time = this.parseHrtimeToMilliSeconds(
           process.hrtime(startTime),

@@ -1051,7 +1051,7 @@ export default class Filter implements FilterType {
     const cachedList = await NocoCache.getList(
       context,
       CacheScope.FILTER_EXP,
-      [FilterCacheScope.VIEW, hookId],
+      [FilterCacheScope.HOOK, hookId],
       { key: 'order' },
     );
     let { list: filterObjs } = cachedList;
