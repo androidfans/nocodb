@@ -28,6 +28,10 @@ import { getRedisURL } from '~/helpers/redisHelpers';
 import { RedisIoAdapter } from '~/gateways/RedisIoAdapter';
 import { DEFAULT_APP_SETTINGS } from '~/interface/AppSettings';
 import { NC_APP_SETTINGS } from '~/constants';
+import {
+  installRuntimeSnapshotTrace,
+  installSlowRequestTrace,
+} from '~/helpers/slowRequestTrace';
 
 dotenv.config();
 declare const module: any;
@@ -186,6 +190,9 @@ export default class Noco {
 
     this._httpServer = nestApp.getHttpAdapter().getInstance();
     this._server = server;
+
+    installSlowRequestTrace(nestApp);
+    installRuntimeSnapshotTrace();
 
     nestApp.use(requestIp.mw());
     nestApp.use(cookieParser());

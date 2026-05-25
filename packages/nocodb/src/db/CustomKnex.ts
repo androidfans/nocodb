@@ -7,6 +7,7 @@ import type { BaseModelSqlv2 } from '~/db/BaseModelSqlv2';
 import Filter from '~/models/Filter';
 import { NcError } from '~/helpers/catchError';
 import { isMuxEnabled } from '~/utils/envs';
+import { installDbAcquireTrace } from '~/helpers/dbAcquireTrace';
 
 // refer : https://github.com/brianc/node-pg-types/blob/master/lib/builtins.js
 const pgTypes = {
@@ -1081,6 +1082,7 @@ function CustomKnex(
   }
 
   const kn: CustomKnex = knex(arg);
+  installDbAcquireTrace(kn, arg, extDb);
 
   const knexRaw = kn.raw.bind(kn);
   const knexTransaction = kn.transaction.bind(kn);

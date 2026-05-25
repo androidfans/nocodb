@@ -6,6 +6,10 @@ import { JobsEventService } from '~/modules/jobs/jobs-event.service';
 import { JobStatus } from '~/interface/Jobs';
 import { JobsMap } from '~/modules/jobs/jobs-map.service';
 
+const FALLBACK_QUEUE_SNAPSHOT_KEY = Symbol.for(
+  'nocodb.trace.fallbackQueueSnapshot',
+);
+
 export interface Job {
   id: string;
   name: string;
@@ -22,6 +26,25 @@ export class QueueService {
   static processed = 0;
   static queueMemory: Job[] = [];
   static _emitter: Emittery = new Emittery();
+
+  static {
+    (globalThis as any)[FALLBACK_QUEUE_SNAPSHOT_KEY] = () => {
+      const jobsByStatus = QueueService.queueMemory.reduce<
+        Record<string, number>
+      >((acc, job) => {
+        acc[job.status] = (acc[job.status] ?? 0) + 1;
+        return acc;
+      }, {});
+
+      return {
+        size: QueueService.queue.size,
+        pending: QueueService.queue.pending,
+        processed: QueueService.processed,
+        memorySize: QueueService.queueMemory.length,
+        jobsByStatus,
+      };
+    };
+  }
 
   constructor(
     protected readonly jobsEventService: JobsEventService,
@@ -82,8 +105,10 @@ export class QueueService {
 
       const { this: processor, fn = 'job' } = this.jobsMap.jobs[job.name];
       const result = await processor[fn](job);
+      QueueService.processed += 1;
       this.emitter.emit(JobStatus.COMPLETED, { job, result });
     } catch (error) {
+      QueueService.processed += 1;
       this.emitter.emit(JobStatus.FAILED, { job, error });
     }
   }
