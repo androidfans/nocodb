@@ -83,9 +83,9 @@ const timeCellMaxWidth = computed(() => {
     :title="localState?.format(dateTimeFormat)"
     class="nc-date-picker w-full flex items-center nc-cell-field relative gap-2 nc-cell-picker-datetime tracking-tight"
   >
-    <div class="flex-1 flex items-center gap-2 truncate">
+    <div class="nc-readonly-datetime-value flex-1 flex items-center gap-2 truncate">
       <div
-        class="px-1 nc-truncate"
+        class="nc-readonly-datetime-date px-1 nc-truncate"
         :class="{
           'w-[fit-content]': isUnderLookup,
           'w-[60%] !max-w-[110px]': !isUnderLookup,
@@ -103,3 +103,15 @@ const timeCellMaxWidth = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped lang="scss">
+:global(.nc-expanded-form-row) .nc-readonly-datetime-value {
+  @apply flex-none;
+}
+
+:global(.nc-expanded-form-row) .nc-readonly-datetime-date {
+  width: 12ch !important;
+  min-width: 12ch !important;
+  max-width: none !important;
+}
+</style>
