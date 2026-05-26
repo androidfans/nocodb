@@ -660,4 +660,10 @@ const minimizeMaxWidth = computed(() => {
     }
   }
 }
+
+:global(.nc-expanded-form-row .nc-cell-picker-datetime),
+:global(.nc-expanded-form-row .nc-cell-picker-datetime .nc-date-picker) {
+  width: fit-content !important;
+  max-width: none !important;
+}
 </style>
