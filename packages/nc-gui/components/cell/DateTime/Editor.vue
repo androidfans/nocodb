@@ -514,20 +514,23 @@ const minimizeMaxWidth = computed(() => {
       :auto-close="false"
       :trigger="['click']"
       class="nc-cell-picker-datetime"
-      :class="[`nc-${randomClass}`, { 'nc-null': modelValue === null && showNull }]"
+      :class="[`nc-${randomClass}`, { 'nc-null': modelValue === null && showNull, '!w-fit !max-w-none': minimizeMaxWidth }]"
       :overlay-class-name="`${randomClass} nc-picker-datetime ${open ? 'active' : ''} !min-w-[0] overflow-hidden`"
     >
       <!-- 减小 Date 与 Time 的视觉间距，并让容器占满可用宽度，避免编辑态在窄列里提前挤压 -->
       <div
         :title="localState?.format(dateTimeFormat)"
-        class="nc-date-picker ant-picker-input flex items-center relative gap-1 !truncate !w-full"
+        class="nc-date-picker ant-picker-input flex items-center relative gap-1 !truncate"
         :class="{
-          'max-w-[calc(100%_-_70px)]': minimizeMaxWidth,
+          '!w-fit !max-w-none': minimizeMaxWidth,
+          '!w-full': !minimizeMaxWidth,
         }"
       >
         <div
-          class="flex min-w-0 w-fit rounded-md box-border max-w-[110px]"
+          class="flex w-fit rounded-md box-border"
           :class="{
+            'shrink-0 max-w-none': minimizeMaxWidth,
+            'min-w-0 max-w-[110px]': !minimizeMaxWidth,
             'py-0': isForm,
             'py-0.5': !isForm && !isColDisabled,
             'px-1': !isColDisabled,
@@ -539,7 +542,11 @@ const minimizeMaxWidth = computed(() => {
             :value="dateCellValue"
             :size="dateInputSize"
             :placeholder="typeof placeholder === 'string' ? placeholder : placeholder?.date"
-            class="nc-date-input w-auto max-w-full min-w-0 !truncate border-transparent outline-none !text-current !bg-transparent !focus:(border-none ring-transparent)"
+            class="nc-date-input w-auto !truncate border-transparent outline-none !text-current !bg-transparent !focus:(border-none ring-transparent)"
+            :class="{
+              '!w-[12ch] !min-w-[12ch] !max-w-none': minimizeMaxWidth,
+              'max-w-full min-w-0': !minimizeMaxWidth,
+            }"
             :readonly="isColDisabled || !!isMobileMode"
             @focus="onFocus(true)"
             @blur="onBlur($event, true)"
