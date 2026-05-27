@@ -513,7 +513,7 @@ const minimizeMaxWidth = computed(() => {
       :placement="isDatePicker ? 'bottomLeft' : 'bottomRight'"
       :auto-close="false"
       :trigger="['click']"
-      class="nc-cell-picker-datetime"
+      class="nc-cell-picker-datetime nc-editable-datetime-picker"
       :class="[`nc-${randomClass}`, { 'nc-null': modelValue === null && showNull, '!w-fit !max-w-none': minimizeMaxWidth }]"
       :overlay-class-name="`${randomClass} nc-picker-datetime ${open ? 'active' : ''} !min-w-[0] overflow-hidden`"
     >
@@ -661,8 +661,8 @@ const minimizeMaxWidth = computed(() => {
   }
 }
 
-:global(.nc-expanded-form-row .nc-cell-picker-datetime),
-:global(.nc-expanded-form-row .nc-cell-picker-datetime .nc-date-picker) {
+:global(.nc-expanded-form-row .nc-editable-datetime-picker),
+:global(.nc-expanded-form-row .nc-editable-datetime-picker .nc-date-picker) {
   width: fit-content !important;
   max-width: none !important;
 }
