@@ -8,60 +8,56 @@ const withColumnAliases = (
 
 describe('nocoExecute', () => {
   it('normalizes nested lookup aliases that resolve to a multiselect column', async () => {
-    const sourceVideo = {
-      video_category: 'Short,Live',
+    const referencedRecord = {
+      category: 'Option A,Option B',
     };
-    const sourceVariationScript = withColumnAliases(
+    const intermediateRecord = withColumnAliases(
       {
-        source_video: sourceVideo,
+        reference: referencedRecord,
       },
       {
-        script_category: {
-          path: ['source_video', 'video_category'],
+        nested_lookup: {
+          path: ['reference', 'category'],
           targetUidt: UITypes.MultiSelect,
         },
       },
     );
     const row = withColumnAliases(
       {
-        source_variation_script: sourceVariationScript,
+        relation: intermediateRecord,
       },
       {
-        source_video_category: {
-          path: ['source_variation_script', 'script_category'],
+        lookup_category: {
+          path: ['relation', 'nested_lookup'],
           targetUidt: UITypes.MultiSelect,
         },
       },
     );
 
-    await expect(
-      nocoExecute({ source_video_category: 1 }, row),
-    ).resolves.toEqual({
-      source_video_category: ['Short', 'Live'],
+    await expect(nocoExecute({ lookup_category: 1 }, row)).resolves.toEqual({
+      lookup_category: ['Option A', 'Option B'],
     });
   });
 
   it('flattens JSON aggregated multiselect lookup values', async () => {
     const row = withColumnAliases(
       {
-        source_videos: [
+        references: [
           {
-            video_category: '["Short,Live","Ad"]',
+            category: '["Option A,Option B","Option C"]',
           },
         ],
       },
       {
-        source_video_category: {
-          path: ['source_videos', 'video_category'],
+        lookup_category: {
+          path: ['references', 'category'],
           targetUidt: UITypes.MultiSelect,
         },
       },
     );
 
-    await expect(
-      nocoExecute({ source_video_category: 1 }, row),
-    ).resolves.toEqual({
-      source_video_category: ['Short', 'Live', 'Ad'],
+    await expect(nocoExecute({ lookup_category: 1 }, row)).resolves.toEqual({
+      lookup_category: ['Option A', 'Option B', 'Option C'],
     });
   });
 });
