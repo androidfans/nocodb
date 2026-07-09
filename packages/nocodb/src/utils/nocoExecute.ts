@@ -1,4 +1,5 @@
 /** AST node: keys map to nested AST nodes (object) or leaf markers (1 / true) */
+import { UITypes } from 'nocodb-sdk';
 import type {
   DataReadTrace,
   DataReadTraceResolverContext,
@@ -20,9 +21,52 @@ const deepFlatten = (value) => {
     : value;
 };
 
+type ColumnAlias = {
+  path: string[];
+  targetUidt?: UITypes | string;
+};
+
+const parseMultiSelectLookupValue = (value: any): any => {
+  if (value === null || value === undefined || value === '') {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => {
+      const parsed = parseMultiSelectLookupValue(item);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    });
+  }
+
+  if (typeof value !== 'string') {
+    return value;
+  }
+
+  const trimmed = value.trim();
+  if (trimmed.startsWith('[')) {
+    try {
+      return parseMultiSelectLookupValue(JSON.parse(trimmed));
+    } catch {
+      // Fall through to comma splitting.
+    }
+  }
+
+  return value.split(',');
+};
+
+const applyColumnAliasTransform = (columnAlias: ColumnAlias, value: any) => {
+  const flattened = Array.isArray(value) ? deepFlatten(value) : value;
+
+  if (columnAlias?.targetUidt === UITypes.MultiSelect) {
+    return parseMultiSelectLookupValue(flattened);
+  }
+
+  return flattened;
+};
+
 export type ResolverObj =
   | {
-      __proto__?: { __columnAliases?: { [key: string]: any } };
+      __proto__?: { __columnAliases?: { [key: string]: ColumnAlias } };
     } & {
       [key: string]: null | ((args: any) => any) | any;
     };
@@ -106,13 +150,14 @@ const nocoExecute = async (
         cacheNode[key] = Promise.resolve(sourceObj[key]);
       } else if (cacheNode?.__proto__?.__columnAliases?.[key]) {
         // Redirect through column alias (e.g. Lookup → relation path)
+        const columnAlias = cacheNode.__proto__.__columnAliases[key];
         cacheNode[key] = resolvePath(
-          cacheNode.__proto__.__columnAliases[key].path,
+          columnAlias.path,
           cacheNode,
           {},
           args,
           traceContext,
-        );
+        ).then((resolved) => applyColumnAliasTransform(columnAlias, resolved));
       } else if (typeof cacheNode === 'object') {
         cacheNode[key] = Promise.resolve(sourceObj[key]);
       }
@@ -168,15 +213,14 @@ const nocoExecute = async (
     } else {
       // Column alias (e.g. Lookup): walk the alias path through cache so
       // previously resolved relations (e.g. BT 'Country') are reused
+      const columnAlias = columnAliases[key];
       fieldPromises[key] = resolvePath(
-        columnAliases[key].path,
+        columnAlias.path,
         cache,
         record,
         args?.nested?.[key],
         traceContext,
-      ).then((resolved) =>
-        Array.isArray(resolved) ? deepFlatten(resolved) : resolved,
-      );
+      ).then((resolved) => applyColumnAliasTransform(columnAlias, resolved));
     }
   }
 
