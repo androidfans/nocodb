@@ -2184,13 +2184,15 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
                 relCol.uidt === UITypes.Links && !linksAsLtar
                   ? `_nc_lk_${relCol.title}`
                   : relCol.title;
-              const lookupColumn = await Column.get(this.context, {
-                colId: colOptions.fk_lookup_column_id,
-              });
-              const nestedLookupColumn = await this.getNestedColumn(column);
               proto.__columnAliases[column.title] = {
-                path: [relColTitle, lookupColumn?.title],
-                targetUidt: nestedLookupColumn?.uidt,
+                path: [
+                  relColTitle,
+                  (
+                    await Column.get(this.context, {
+                      colId: colOptions.fk_lookup_column_id,
+                    })
+                  )?.title,
+                ],
               };
             }
             break;
