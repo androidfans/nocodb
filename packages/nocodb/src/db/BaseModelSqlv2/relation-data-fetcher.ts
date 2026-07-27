@@ -447,13 +447,10 @@ export const relationDataFetcher = (param: {
       const proto = await refBaseModel.getProto();
       child.__proto__ = proto;
 
-      const result = await postProcessData(refContext, {
-        data: [child],
-        model: refTable,
-        query: args,
-      });
-
-      return result?.[0] ?? null;
+      // Keep the resolver prototype intact so the parent nocoExecute call can
+      // resolve nested lookups. Eagerly processing the row here makes lookup
+      // results depend on whether DataLoader fetched one or multiple parents.
+      return child;
     },
 
     async multipleHmListCount({ colId, ids }) {
