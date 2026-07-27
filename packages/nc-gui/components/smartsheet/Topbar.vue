@@ -1,4 +1,8 @@
 <script lang="ts" setup>
+const emits = defineEmits<{
+  wrapChange: [wrapped: boolean]
+}>()
+
 const route = useRoute()
 const TAB_SPLIT_PERCENT_DEFAULT = 40
 const TAB_SPLIT_PERCENT_MIN = 20
@@ -41,7 +45,18 @@ const showTabSections = computed(
 const tabSplitPercent = ref(TAB_SPLIT_PERCENT_DEFAULT)
 const isDraggingSplit = ref(false)
 const tabSplitAreaRef = ref<HTMLElement>()
+const tableTabSectionRef = ref<HTMLElement>()
+const viewTabSectionRef = ref<HTMLElement>()
 const isTabSplitInitialized = ref(false)
+const areTableTabsWrapped = ref(false)
+const areViewTabsWrapped = ref(false)
+const isTabReordering = ref(false)
+
+const isTabSectionsWrapped = computed(() => areTableTabsWrapped.value || areViewTabsWrapped.value)
+
+let tabResizeObserver: ResizeObserver | undefined
+let tabMutationObserver: MutationObserver | undefined
+let wrapCheckFrame: number | undefined
 
 const normalizeTabSplitPercent = (value: unknown) => {
   const num = Number(value)
@@ -60,6 +75,80 @@ const tabSectionStyle = computed(() => {
   if (!showTabSections.value) return undefined
   return { width: `${tabSplitPercent.value}%` }
 })
+
+const getListContentWidth = (list: HTMLElement) => {
+  const style = getComputedStyle(list)
+  const gap = Number.parseFloat(style.columnGap || style.gap) || 0
+  const children = Array.from(list.children) as HTMLElement[]
+
+  return children.reduce((width, child, index) => {
+    return width + child.getBoundingClientRect().width + (index > 0 ? gap : 0)
+  }, 0)
+}
+
+const getFlexContentWidth = (section: HTMLElement | undefined, listSelector: string) => {
+  const list = section?.querySelector<HTMLElement>(listSelector)
+  const contentRoot = list?.parentElement
+  if (!list || !contentRoot) return 0
+
+  const rootStyle = getComputedStyle(contentRoot)
+  const gap = Number.parseFloat(rootStyle.columnGap || rootStyle.gap) || 0
+  const children = Array.from(contentRoot.children) as HTMLElement[]
+
+  return children.reduce((width, child, index) => {
+    const childWidth = child === list ? getListContentWidth(list) : child.getBoundingClientRect().width
+    return width + childWidth + (index > 0 ? gap : 0)
+  }, 0)
+}
+
+const updateTabSectionsWrap = () => {
+  if (isDraggingSplit.value || isTabReordering.value) return
+
+  if (!showTabSections.value || !tabSplitAreaRef.value) {
+    areTableTabsWrapped.value = false
+    areViewTabsWrapped.value = false
+    return
+  }
+
+  const areaWidth = tabSplitAreaRef.value.clientWidth
+  const dividerWidth = 16
+  const tableAvailableWidth = (areaWidth * tabSplitPercent.value) / 100
+  const viewAvailableWidth = Math.max(0, areaWidth - tableAvailableWidth - dividerWidth)
+  const tableRequiredWidth = getFlexContentWidth(tableTabSectionRef.value, '.nc-table-tab-list')
+  const viewRequiredWidth = getFlexContentWidth(viewTabSectionRef.value, '.nc-view-tab-list')
+  const overflowTolerance = 2
+
+  areTableTabsWrapped.value = tableRequiredWidth > tableAvailableWidth + overflowTolerance
+  areViewTabsWrapped.value = viewRequiredWidth > viewAvailableWidth + overflowTolerance
+}
+
+const scheduleTabSectionsWrapCheck = () => {
+  if (wrapCheckFrame !== undefined) cancelAnimationFrame(wrapCheckFrame)
+  wrapCheckFrame = requestAnimationFrame(() => {
+    wrapCheckFrame = undefined
+    updateTabSectionsWrap()
+  })
+}
+
+const onTabReorderChange = (reordering: boolean) => {
+  isTabReordering.value = reordering
+  if (!reordering) scheduleTabSectionsWrapCheck()
+}
+
+const observeTabSplitArea = () => {
+  tabResizeObserver?.disconnect()
+  tabMutationObserver?.disconnect()
+
+  if (!tabSplitAreaRef.value) return
+
+  tabResizeObserver?.observe(tabSplitAreaRef.value)
+  tabMutationObserver?.observe(tabSplitAreaRef.value, {
+    childList: true,
+    subtree: true,
+    characterData: true,
+  })
+  scheduleTabSectionsWrapCheck()
+}
 
 const getTabSplitStorage = () => {
   if (typeof window === 'undefined') return {}
@@ -114,6 +203,7 @@ const onSplitDragStart = (e: MouseEvent) => {
   const onUp = () => {
     isDraggingSplit.value = false
     persistTabSplitPercent()
+    scheduleTabSectionsWrapCheck()
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
   }
@@ -122,12 +212,34 @@ const onSplitDragStart = (e: MouseEvent) => {
   document.addEventListener('mouseup', onUp)
   onMove(e)
 }
+
+watch(isTabSectionsWrapped, (wrapped) => emits('wrapChange', wrapped), { immediate: true })
+
+watch([tabSplitPercent, showTabSections], scheduleTabSectionsWrapCheck, { flush: 'post' })
+
+watch(tabSplitAreaRef, observeTabSplitArea, { flush: 'post' })
+
+onMounted(async () => {
+  await nextTick()
+
+  tabResizeObserver = new ResizeObserver(scheduleTabSectionsWrapCheck)
+  tabMutationObserver = new MutationObserver(scheduleTabSectionsWrapCheck)
+  observeTabSplitArea()
+})
+
+onBeforeUnmount(() => {
+  tabResizeObserver?.disconnect()
+  tabMutationObserver?.disconnect()
+  if (wrapCheckFrame !== undefined) cancelAnimationFrame(wrapCheckFrame)
+  emits('wrapChange', false)
+})
 </script>
 
 <template>
   <div
     :class="{
       'bg-nc-bg-brand': isEditingDashboard || activeWorkflowHasDraftChanges,
+      'nc-table-topbar-wrapped': isTabSectionsWrapped,
     }"
     class="nc-table-topbar py-2 border-b-1 border-nc-border-gray-medium flex gap-3 items-center justify-between overflow-hidden relative h-[var(--topbar-height)] max-h-[var(--topbar-height)] min-h-[var(--topbar-height)] md:(px-2) xs:(px-1)"
     style="z-index: 7"
@@ -140,8 +252,17 @@ const onSplitDragStart = (e: MouseEvent) => {
         <GeneralOpenLeftSidebarBtn />
         <div ref="tabSplitAreaRef" class="flex items-center min-w-0 flex-1">
           <!-- Table tabs section -->
-          <div class="flex items-center gap-1 min-w-0 overflow-hidden flex-shrink-0" :style="tabSectionStyle">
-            <LazySmartsheetToolbarViewInfo v-if="!isPublic && !activeScriptId && !activeDashboardId && !activeWorkflowId" />
+          <div
+            ref="tableTabSectionRef"
+            class="flex items-center gap-1 min-w-0 overflow-hidden flex-shrink-0"
+            :class="{ 'h-full': areTableTabsWrapped }"
+            :style="tabSectionStyle"
+          >
+            <LazySmartsheetToolbarViewInfo
+              v-if="!isPublic && !activeScriptId && !activeDashboardId && !activeWorkflowId"
+              :wrap-tabs="areTableTabsWrapped"
+              @reorder-change="onTabReorderChange"
+            />
             <LazySmartsheetTopbarScriptInfo v-if="!isPublic && activeScriptId" />
             <LazySmartsheetTopbarDashboardInfo v-if="!isPublic && activeDashboardId" />
             <LazySmartsheetTopbarWorkflowInfo v-if="!isPublic && activeWorkflowId" />
@@ -156,7 +277,18 @@ const onSplitDragStart = (e: MouseEvent) => {
             <div class="nc-tab-split-line" />
           </div>
           <!-- View tabs section -->
-          <SmartsheetTopbarViewTabList v-if="showTabSections" class="flex-1 min-w-0" />
+          <div
+            v-if="showTabSections"
+            ref="viewTabSectionRef"
+            class="flex flex-1 min-w-0 overflow-hidden items-center"
+            :class="{ 'h-full': areViewTabsWrapped }"
+          >
+            <SmartsheetTopbarViewTabList
+              class="flex-1 min-w-0"
+              :wrap-tabs="areViewTabsWrapped"
+              @reorder-change="onTabReorderChange"
+            />
+          </div>
         </div>
       </div>
       <div v-if="activeDashboardId || activeWorkflowId">

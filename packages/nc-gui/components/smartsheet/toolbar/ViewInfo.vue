@@ -3,6 +3,16 @@ import type { TableType } from 'nocodb-sdk'
 import type { SortableEvent } from 'sortablejs'
 import Sortable from 'sortablejs'
 
+const props = defineProps<{
+  wrapTabs?: boolean
+}>()
+
+const emits = defineEmits<{
+  reorderChange: [reordering: boolean]
+}>()
+
+const finishReorder = () => requestAnimationFrame(() => emits('reorderChange', false))
+
 const { isUIAllowed } = useRoles()
 
 const { $api } = useNuxtApp()
@@ -55,9 +65,13 @@ const initSortable = (el: HTMLElement) => {
   sortable = Sortable.create(el, {
     direction: 'horizontal',
     ghostClass: 'nc-table-tab-ghost',
-    animation: 150,
+    animation: props.wrapTabs ? 0 : 150,
     revertOnSpill: true,
+    onChoose: () => emits('reorderChange', true),
+    onUnchoose: finishReorder,
     onEnd: async (evt) => {
+      finishReorder()
+
       const { newIndex = 0, oldIndex = 0 } = evt
       if (newIndex === oldIndex) return
 
@@ -170,7 +184,7 @@ onBeforeUnmount(() => {
 
       <GeneralIcon icon="ncSlash1" class="nc-breadcrumb-divider" />
 
-      <div ref="tableListRef" class="nc-table-tab-list">
+      <div ref="tableListRef" class="nc-table-tab-list" :class="{ 'nc-table-tab-list-wrapped': wrapTabs }">
         <div
           v-for="table in filteredTables"
           :key="table.id"
@@ -207,6 +221,13 @@ onBeforeUnmount(() => {
   &::-webkit-scrollbar {
     display: none;
   }
+}
+
+.nc-table-tab-list-wrapped {
+  @apply flex-wrap content-center overflow-x-hidden py-0;
+  height: 3.5rem;
+  row-gap: 0;
+  overflow-y: clip;
 }
 
 .nc-table-tab-item {

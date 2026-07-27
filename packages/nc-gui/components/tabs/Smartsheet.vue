@@ -189,6 +189,7 @@ const onDrop = async (event: DragEvent) => {
 }
 
 const { leftSidebarWidth, windowSize, isFullScreen } = storeToRefs(useSidebarStore())
+const isTopbarWrapped = ref(false)
 
 const { isPanelExpanded, extensionPanelSize } = useExtensions()
 
@@ -293,10 +294,11 @@ watch(isViewsLoading, async () => {
   <div
     class="nc-container relative flex flex-col h-full"
     :class="{ 'children:pointer-events-none': isEeUI && showBaseAccessRequestOverlay }"
+    :style="!isFullScreen && isTopbarWrapped ? { '--topbar-height': '5rem' } : undefined"
     @drop="onDrop"
     @dragover.prevent
   >
-    <SmartsheetTopbar v-if="!isFullScreen" />
+    <SmartsheetTopbar v-if="!isFullScreen" @wrap-change="isTopbarWrapped = $event" />
     <div style="height: calc(100% - var(--topbar-height))">
       <NcFullScreen v-if="openedViewsTab === 'view'" v-model="isFullScreen" class="h-full" :page-only="true">
         <!-- Splitpanes is conditionally rendered only after mount to avoid race conditions with its internal async resize logic. -->
