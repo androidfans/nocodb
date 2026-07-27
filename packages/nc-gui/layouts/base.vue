@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 const { signOut, signedIn, isLoading, user, currentVersion, appInfo } = useGlobal()
-const { isPaginationLoading } = storeToRefs(useViewsStore())
 
 useSidebar('nc-left-sidebar', { hasSidebar: false })
 
@@ -57,7 +56,7 @@ hooks.hook('page:finish', () => {
         </div>
 
         <div class="!text-nc-content-inverted-primary flex justify-center">
-          <div v-show="isLoading && !isPaginationLoading" class="flex items-center gap-2 ml-3" data-testid="nc-loading">
+          <div v-show="isLoading" class="flex items-center gap-2 ml-3" data-testid="nc-loading">
             {{ $t('general.loading') }}
 
             <component :is="iconMap.reload" :class="{ 'animate-infinite animate-spin': isLoading }" />
