@@ -164,8 +164,6 @@ const onSplitDragStart = (e: MouseEvent) => {
       </div>
 
       <div class="flex items-center justify-end gap-2">
-        <GeneralApiLoader v-if="!isMobileMode && !activeScriptId && !activeDashboardId" />
-
         <!-- Variable Setup Warning -->
         <SmartsheetTopbarVariableSetupWarning v-if="!isSharedBase && !isMobileMode" />
 
