@@ -46,7 +46,6 @@ const {
 } = inject(TreeViewInj)!
 
 const { loadViews: _loadViews } = useViewsStore()
-const { activeView } = storeToRefs(useViewsStore())
 const { isLeftSidebarOpen } = storeToRefs(useSidebarStore())
 
 const { showEEFeatures, showRecordPlanLimitExceededModal } = useEeConfig()
@@ -214,23 +213,8 @@ const onOpenTable = async () => {
     message.error(await extractSdkResponseErrorMsg(e))
   } finally {
     isLoading.value = false
-    isExpanded.value = true
   }
 }
-
-watch(
-  () => activeView.value?.id,
-  () => {
-    if (!activeView.value) return
-
-    if (activeView.value?.fk_model_id === table.value?.id) {
-      isExpanded.value = true
-    }
-  },
-  {
-    immediate: true,
-  },
-)
 
 const duplicateTable = (table: SidebarTableNode) => {
   isOptionsOpen.value = false
