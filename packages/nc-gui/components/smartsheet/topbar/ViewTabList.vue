@@ -4,16 +4,6 @@ import { ViewLockType, ViewTypes, getFirstNonPersonalView } from 'nocodb-sdk'
 import type { SortableEvent } from 'sortablejs'
 import Sortable from 'sortablejs'
 
-const props = defineProps<{
-  wrapTabs?: boolean
-}>()
-
-const emits = defineEmits<{
-  reorderChange: [reordering: boolean]
-}>()
-
-const finishReorder = () => requestAnimationFrame(() => emits('reorderChange', false))
-
 const { $e } = useNuxtApp()
 
 const { t } = useI18n()
@@ -115,13 +105,9 @@ const initSortable = (el: HTMLElement) => {
   sortable = Sortable.create(el, {
     direction: 'horizontal',
     ghostClass: 'nc-view-tab-ghost',
-    animation: props.wrapTabs ? 0 : 150,
+    animation: 150,
     revertOnSpill: true,
-    onChoose: () => emits('reorderChange', true),
-    onUnchoose: finishReorder,
     onEnd: async (evt) => {
-      finishReorder()
-
       const { newIndex = 0, oldIndex = 0 } = evt
       if (newIndex === oldIndex) return
 
@@ -175,7 +161,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div ref="scrollContainerRef" class="nc-view-tab-scroll-container">
-    <div ref="viewListRef" class="nc-view-tab-list" :class="{ 'nc-view-tab-list-wrapped': wrapTabs }">
+    <div ref="viewListRef" class="nc-view-tab-list">
       <div
         v-for="view in views"
         :key="view.id"
@@ -240,14 +226,6 @@ onBeforeUnmount(() => {
   &::-webkit-scrollbar {
     display: none;
   }
-}
-
-.nc-view-tab-list-wrapped {
-  @apply flex-1 flex-wrap content-center overflow-x-hidden py-0;
-  width: auto;
-  height: 3.5rem;
-  row-gap: 0;
-  overflow-y: clip;
 }
 
 .nc-view-tab-item {
