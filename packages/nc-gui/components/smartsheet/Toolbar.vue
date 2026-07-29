@@ -152,7 +152,7 @@ const isMobileSearchActive = computed(() => isMobileMode.value && isSearchExpand
       <template v-if="!isCalendar">
         <SmartsheetToolbarExport v-if="!isViewOperationsAllowed" is-in-toolbar />
         <SmartsheetToolbarOpenedViewAction v-if="!isMobileSearchActive" :show-only-copy-id="!isViewOperationsAllowed" />
-        <LazySmartsheetToolbarReload v-if="!isMobileSearchActive" />
+        <LazySmartsheetToolbarReload v-if="!isMobileMode" />
       </template>
 
       <SmartsheetToolbarPinnedFilters
