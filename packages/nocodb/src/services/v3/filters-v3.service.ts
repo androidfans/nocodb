@@ -280,6 +280,13 @@ export class FiltersV3Service {
       const hasParentInGroup =
         'parent_id' in groupOrFilter && groupOrFilter.parent_id;
       if (!hasParentInGroup) {
+        // The outer V3 group only carries the root logical operator; unlike
+        // nested groups, it has no persisted Filter row to store `enabled`.
+        if ('enabled' in groupOrFilter) {
+          NcError.get(context).badRequest(
+            'The virtual root filter group cannot be enabled or disabled.',
+          );
+        }
         // Root group handling when parent_id is not provided in groupOrFilter
         const existingRootFilters = await Filter.rootFilterList(
           context,

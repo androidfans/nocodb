@@ -2086,8 +2086,6 @@ export interface FilterGroupV3Type {
 export interface FilterGroupLevel1V3Type {
   /** Logical operator for the group. */
   group_operator: 'AND' | 'OR';
-  /** Whether this filter group is enabled. Defaults to true. */
-  enabled?: boolean;
   /** List of filters or nested filter groups at level 2. */
   filters: (FilterV3Type | FilterGroupLevel2V3Type)[];
 }

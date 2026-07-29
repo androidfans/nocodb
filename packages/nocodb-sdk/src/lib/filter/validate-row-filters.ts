@@ -65,6 +65,9 @@ export class RowFilterValidator {
     const filters: (FilterType & { meta?: any })[] = buildFilterTree(
       filterOutDisabledFilters(_filters)
     );
+    if (!filters.length) {
+      return true;
+    }
 
     let isValid: boolean | null = null;
     for (const filter of filters) {

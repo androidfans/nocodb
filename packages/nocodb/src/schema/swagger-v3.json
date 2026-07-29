@@ -12474,10 +12474,6 @@
             ],
             "description": "Logical operator for the group."
           },
-          "enabled": {
-            "type": "boolean",
-            "description": "Whether this filter group is enabled. Defaults to true."
-          },
           "filters": {
             "type": "array",
             "items": {

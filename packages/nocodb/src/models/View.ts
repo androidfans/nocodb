@@ -163,6 +163,15 @@ export default class View implements ViewType {
     return !Array.isArray(disabledIds) || !disabledIds.includes(conditionId);
   }
 
+  static withoutConditionToggles(meta: any) {
+    const parsedMeta = parseMetaProp({ meta });
+    if (!parsedMeta || typeof parsedMeta !== 'object') return parsedMeta;
+
+    const sanitizedMeta = { ...parsedMeta };
+    delete sanitizedMeta[CONDITION_TOGGLES_META_KEY];
+    return sanitizedMeta;
+  }
+
   static async setConditionEnabled(
     context: NcContext,
     viewId: string,

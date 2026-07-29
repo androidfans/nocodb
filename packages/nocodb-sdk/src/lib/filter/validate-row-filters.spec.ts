@@ -132,6 +132,26 @@ describe('validateRowFilters', () => {
     expect(result).toBe(true);
   });
 
+  it('should treat an entirely disabled filter list as no filters', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'disabled-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+          enabled: false,
+        },
+      ],
+      data: { Name: 'Bob' },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(true);
+  });
+
   it('should not seed new rows from disabled filters or their descendants', () => {
     const filters: FilterType[] = [
       {

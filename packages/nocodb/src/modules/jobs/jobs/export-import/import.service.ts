@@ -1770,7 +1770,10 @@ export class ImportService {
           const viewData = withoutId({
             ...view,
             meta: RowColorViewHelpers.withContext(targetContext).mapMetaColumn({
-              meta: view.meta,
+              // Archives may contain source-only toggle IDs in view meta.
+              // Conditions are recreated with new IDs below; new archives
+              // rebuild the state from explicit per-sort/per-column values.
+              meta: View.withoutConditionToggles(view.meta),
               idMap: {
                 get: getIdOrExternalId,
               } as any,
