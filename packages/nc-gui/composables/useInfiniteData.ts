@@ -92,10 +92,10 @@ export function useInfiniteData(args: {
   disableSmartsheet?: boolean
   isPublic?: Ref<boolean>
   groupByColumns?: ComputedRef<{ column: ColumnType; sort: string; order?: number }[]>
-  canvasMode?: ComputedRef<boolean>
+  respectDisabledSorts?: boolean | ComputedRef<boolean>
 }) {
   const NOCO = 'noco'
-  const { meta, viewMeta, callbacks, where, disableSmartsheet, isPublic, groupByColumns = ref(null), canvasMode } = args
+  const { meta, viewMeta, callbacks, where, disableSmartsheet, isPublic, groupByColumns = ref(null), respectDisabledSorts } = args
 
   const { $api, $ncSocket } = useNuxtApp()
 
@@ -150,10 +150,12 @@ export function useInfiniteData(args: {
       }
     : useSmartsheetStoreOrThrow()
 
-  // DOM tables retain their existing behavior. Canvas treats a disabled sort
-  // as absent for client-side cache placement and row-order decisions.
+  // Opt-in keeps legacy DOM tables unchanged while Canvas and Gallery treat a
+  // disabled sort as absent for client-side cache placement.
   const localOperationSorts = computed(() =>
-    canvasMode?.value ? sorts.value.filter((sort) => sort.enabled !== false && sort.enabled !== 0) : sorts.value,
+    (typeof respectDisabledSorts === 'boolean' ? respectDisabledSorts : respectDisabledSorts?.value)
+      ? sorts.value.filter((sort) => sort.enabled !== false && sort.enabled !== 0)
+      : sorts.value,
   )
 
   const { isGroupBy, groupBy } = disableSmartsheet

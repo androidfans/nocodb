@@ -38,6 +38,7 @@ export function useGalleryViewData(
     },
     where,
     isPublic,
+    respectDisabledSorts: true,
   })
 
   return {

@@ -13,6 +13,7 @@ import {
 import type {
   ButtonType,
   ColumnType,
+  FilterType,
   FormulaType,
   GridType,
   LinkToAnotherRecordType,
@@ -321,7 +322,23 @@ export function useCanvasTable({
 
   const activeSorts = computed(() => sorts.value.filter((sort) => sort.enabled !== false && sort.enabled !== 0))
 
-  const isInsertBelowDisabled = computed(() => !!allFilters.value?.length || !!activeSorts.value.length || isPublicView.value)
+  const hasActiveFilters = computed(() => {
+    const filtersById = new Map(allFilters.value.filter((filter) => filter.id).map((filter) => [filter.id, filter]))
+
+    return allFilters.value.some((filter) => {
+      if (filter.is_group) return false
+
+      let current: FilterType | undefined = filter
+      while (current) {
+        if (current.enabled === false || current.enabled === 0) return false
+        current = current.fk_parent_id ? filtersById.get(current.fk_parent_id) : undefined
+      }
+
+      return true
+    })
+  })
+
+  const isInsertBelowDisabled = computed(() => hasActiveFilters.value || !!activeSorts.value.length || isPublicView.value)
 
   const isRowReorderDisabled = computed(() => activeSorts.value.length || isPublicView.value || !isPrimaryKeyAvailable.value)
 

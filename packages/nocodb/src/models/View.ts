@@ -155,9 +155,8 @@ export default class View implements ViewType {
   ) {
     if (!conditionId) return true;
 
-    const toggles = view?.meta?.[
-      CONDITION_TOGGLES_META_KEY
-    ] as ConditionTogglesMeta;
+    const meta = parseMetaProp(view) ?? {};
+    const toggles = meta[CONDITION_TOGGLES_META_KEY] as ConditionTogglesMeta;
     const disabledIds =
       kind === 'sort' ? toggles?.disabledSorts : toggles?.disabledGroupBys;
 
@@ -175,7 +174,7 @@ export default class View implements ViewType {
     const view = await this.get(context, viewId, false, ncMeta);
     if (!view) NcError.viewNotFound(viewId);
 
-    const meta = { ...(view.meta ?? {}) };
+    const meta = { ...(parseMetaProp(view) ?? {}) };
     const toggles: ConditionTogglesMeta = {
       ...(meta[CONDITION_TOGGLES_META_KEY] ?? {}),
     };
@@ -196,6 +195,8 @@ export default class View implements ViewType {
       delete meta[CONDITION_TOGGLES_META_KEY];
     }
 
+    // Product decision: this single-user deployment accepts last-writer-wins
+    // for rare concurrent toggles instead of adding database-specific locks.
     await ncMeta.metaUpdate(
       context.workspace_id,
       context.base_id,
@@ -1835,12 +1836,16 @@ export default class View implements ViewType {
 
     const oldView = await this.get(context, viewId, false, ncMeta);
 
-    // Condition toggles are server-managed view state. Preserve them when a
-    // client sends an older full meta snapshot for an unrelated view update.
-    if ('meta' in updateObj && oldView?.meta?.[CONDITION_TOGGLES_META_KEY]) {
+    const currentMeta = parseMetaProp(oldView) ?? {};
+
+    // Preserve authoritative server state when an unrelated view update sends
+    // a full meta snapshot. Product decision: snapshots that remain open after
+    // the final toggle is re-enabled are not reconciled; clients are closed or
+    // refreshed between configuration sessions in this deployment.
+    if ('meta' in updateObj && currentMeta[CONDITION_TOGGLES_META_KEY]) {
       updateObj.meta = {
         ...(parseMetaProp({ meta: updateObj.meta }) ?? {}),
-        [CONDITION_TOGGLES_META_KEY]: oldView.meta[CONDITION_TOGGLES_META_KEY],
+        [CONDITION_TOGGLES_META_KEY]: currentMeta[CONDITION_TOGGLES_META_KEY],
       };
     }
 
