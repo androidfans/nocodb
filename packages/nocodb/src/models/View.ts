@@ -204,12 +204,19 @@ export default class View implements ViewType {
       { meta: JSON.stringify(meta) },
       viewId,
     );
-    await NocoCache.update(context, `${CacheScope.VIEW}:${viewId}`, { meta });
-    await NocoCache.del(
-      { workspace_id: RootScopes.BYPASS, base_id: RootScopes.BYPASS },
-      `${CacheScope.VIEW}:${viewId}`,
-    );
-    await View.clearSingleQueryCache(context, view.fk_model_id, [view], ncMeta);
+    ncMeta.knex.attachToTransaction(async () => {
+      await NocoCache.update(context, `${CacheScope.VIEW}:${viewId}`, { meta });
+      await NocoCache.del(
+        { workspace_id: RootScopes.BYPASS, base_id: RootScopes.BYPASS },
+        `${CacheScope.VIEW}:${viewId}`,
+      );
+      await View.clearSingleQueryCache(
+        context,
+        view.fk_model_id,
+        [view],
+        ncMeta,
+      );
+    });
   }
 
   public static async get(
