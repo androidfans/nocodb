@@ -460,7 +460,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
     }
 
     // Apply order by on the outer query, referencing g.<alias>
-    for (const sort of sorts || []) {
+    for (const sort of (sorts || []).filter(Sort.isEnabled)) {
       if (!groupByColumns[sort.fk_column_id]) {
         continue;
       }
@@ -1575,7 +1575,7 @@ export const groupBy = (baseModel: IBaseModelSqlV2, logger: Logger) => {
           }
         }
 
-        for (const sort of groupSort || []) {
+        for (const sort of (groupSort || []).filter(Sort.isEnabled)) {
           if (!groupByColumns[sort.fk_column_id]) {
             continue;
           }

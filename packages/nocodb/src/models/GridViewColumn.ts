@@ -73,7 +73,18 @@ export default class GridViewColumn implements GridColumnType {
         (a.order != null ? a.order : Infinity) -
         (b.order != null ? b.order : Infinity),
     );
-    return views?.map((v) => new GridViewColumn(v));
+    const view = await View.get(context, viewId, false, ncMeta);
+    return views?.map(
+      (v) =>
+        new GridViewColumn({
+          ...v,
+          group_by_enabled: View.isConditionEnabled(
+            view,
+            'groupBy',
+            v.fk_column_id,
+          ),
+        } as GridViewColumn),
+    );
   }
 
   public static async get(
@@ -103,7 +114,17 @@ export default class GridViewColumn implements GridColumnType {
         );
       }
     }
-    return viewColumn && new GridViewColumn(viewColumn);
+    if (!viewColumn) return null;
+
+    const view = await View.get(context, viewColumn.fk_view_id, false, ncMeta);
+    return new GridViewColumn({
+      ...viewColumn,
+      group_by_enabled: View.isConditionEnabled(
+        view,
+        'groupBy',
+        viewColumn.fk_column_id,
+      ),
+    } as GridViewColumn);
   }
 
   static async insert(
@@ -121,7 +142,6 @@ export default class GridViewColumn implements GridColumnType {
       'label',
       'width',
       'group_by',
-      'group_by_enabled',
       'group_by_order',
       'group_by_sort',
     ]);
@@ -150,6 +170,17 @@ export default class GridViewColumn implements GridColumnType {
       MetaTable.GRID_VIEW_COLUMNS,
       insertObj,
     );
+
+    if (column.group_by_enabled === false || column.group_by_enabled === 0) {
+      await View.setConditionEnabled(
+        context,
+        column.fk_view_id,
+        'groupBy',
+        column.fk_column_id,
+        false,
+        ncMeta,
+      );
+    }
 
     if (!(ncMeta as Upgrader).upgrader_mode) {
       // TODO: optimize this function & try to avoid if possible
@@ -186,38 +217,57 @@ export default class GridViewColumn implements GridColumnType {
     body: Partial<GridViewColumn>,
     ncMeta = Noco.ncMeta,
   ) {
+    const viewColumn = await this.get(context, columnId, ncMeta);
     const updateObj = extractProps(body, [
       'order',
       'show',
       'label',
       'width',
       'group_by',
-      'group_by_enabled',
       'group_by_order',
       'group_by_sort',
       'aggregation',
     ]);
 
     // set meta
-    const res = await ncMeta.metaUpdate(
-      context.workspace_id,
-      context.base_id,
-      MetaTable.GRID_VIEW_COLUMNS,
-      updateObj,
-      columnId,
-    );
+    const res = Object.keys(updateObj).length
+      ? await ncMeta.metaUpdate(
+          context.workspace_id,
+          context.base_id,
+          MetaTable.GRID_VIEW_COLUMNS,
+          updateObj,
+          columnId,
+        )
+      : true;
 
-    await NocoCache.update(
-      context,
-      `${CacheScope.GRID_VIEW_COLUMN}:${columnId}`,
-      updateObj,
-    );
+    if (Object.keys(updateObj).length) {
+      await NocoCache.update(
+        context,
+        `${CacheScope.GRID_VIEW_COLUMN}:${columnId}`,
+        updateObj,
+      );
+    }
+
+    if ('group_by_enabled' in body) {
+      await View.setConditionEnabled(
+        context,
+        viewColumn.fk_view_id,
+        'groupBy',
+        viewColumn.fk_column_id,
+        body.group_by_enabled !== false && body.group_by_enabled !== 0,
+        ncMeta,
+      );
+    }
 
     // on view column update, delete any optimised single query cache
     {
-      const gridCol = await this.get(context, columnId, ncMeta);
-      if (gridCol?.fk_view_id) {
-        const view = await View.get(context, gridCol.fk_view_id, false, ncMeta);
+      if (viewColumn?.fk_view_id) {
+        const view = await View.get(
+          context,
+          viewColumn.fk_view_id,
+          false,
+          ncMeta,
+        );
         if (view) {
           await View.clearSingleQueryCache(
             context,

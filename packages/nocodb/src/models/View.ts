@@ -75,6 +75,15 @@ const { v4: uuidv4 } = require('uuid');
 
 const logger = new Logger('View');
 
+const CONDITION_TOGGLES_META_KEY = 'customConditionToggles';
+
+type ConditionToggleKind = 'sort' | 'groupBy';
+
+interface ConditionTogglesMeta {
+  disabledSorts?: string[];
+  disabledGroupBys?: string[];
+}
+
 /*
 type ViewColumn =
   | GridViewColumn
@@ -137,6 +146,69 @@ export default class View implements ViewType {
 
   constructor(data: View) {
     Object.assign(this, data);
+  }
+
+  static isConditionEnabled(
+    view: Pick<View, 'meta'> | null | undefined,
+    kind: ConditionToggleKind,
+    conditionId: string | null | undefined,
+  ) {
+    if (!conditionId) return true;
+
+    const toggles = view?.meta?.[
+      CONDITION_TOGGLES_META_KEY
+    ] as ConditionTogglesMeta;
+    const disabledIds =
+      kind === 'sort' ? toggles?.disabledSorts : toggles?.disabledGroupBys;
+
+    return !Array.isArray(disabledIds) || !disabledIds.includes(conditionId);
+  }
+
+  static async setConditionEnabled(
+    context: NcContext,
+    viewId: string,
+    kind: ConditionToggleKind,
+    conditionId: string,
+    enabled: boolean,
+    ncMeta = Noco.ncMeta,
+  ) {
+    const view = await this.get(context, viewId, false, ncMeta);
+    if (!view) NcError.viewNotFound(viewId);
+
+    const meta = { ...(view.meta ?? {}) };
+    const toggles: ConditionTogglesMeta = {
+      ...(meta[CONDITION_TOGGLES_META_KEY] ?? {}),
+    };
+    const key = kind === 'sort' ? 'disabledSorts' : 'disabledGroupBys';
+    const disabledIds = new Set(
+      Array.isArray(toggles[key]) ? toggles[key] : [],
+    );
+
+    if (enabled) disabledIds.delete(conditionId);
+    else disabledIds.add(conditionId);
+
+    if (disabledIds.size) toggles[key] = [...disabledIds];
+    else delete toggles[key];
+
+    if (toggles.disabledSorts?.length || toggles.disabledGroupBys?.length) {
+      meta[CONDITION_TOGGLES_META_KEY] = toggles;
+    } else {
+      delete meta[CONDITION_TOGGLES_META_KEY];
+    }
+
+    await ncMeta.metaUpdate(
+      context.workspace_id,
+      context.base_id,
+      MetaTable.VIEWS,
+      { meta: JSON.stringify(meta) },
+      viewId,
+    );
+    await NocoCache.update(context, `${CacheScope.VIEW}:${viewId}`, { meta });
+    await NocoCache.del(
+      { workspace_id: RootScopes.BYPASS, base_id: RootScopes.BYPASS },
+      `${CacheScope.VIEW}:${viewId}`,
+    );
+    await View.clearSingleQueryCache(context, view.fk_model_id, [view], ncMeta);
   }
 
   public static async get(
@@ -2513,7 +2585,6 @@ export default class View implements ViewType {
             : [
                 'width',
                 'group_by',
-                'group_by_enabled',
                 'group_by_order',
                 'group_by_sort',
                 'aggregation',
@@ -3024,14 +3095,15 @@ export default class View implements ViewType {
         const viewColumns = await copyFromView.getColumns(context, ncMeta);
 
         const sortInsertObjs = [];
+        const disabledSortIds: string[] = [];
         const filterInsertObjs = [];
 
         for (const sort of sorts) {
+          const generatedId = await ncMeta.genNanoid(MetaTable.SORT);
           const sortProps = extractProps(sort, [
             'fk_column_id',
             'fk_level_id',
             'direction',
-            'enabled',
             'base_id',
             'source_id',
           ]);
@@ -3042,13 +3114,16 @@ export default class View implements ViewType {
           sortInsertObjs.push({
             ...sortProps,
             fk_view_id: view_id,
-            id: undefined,
+            id: generatedId,
           });
+          if (sort.enabled === false || sort.enabled === 0) {
+            disabledSortIds.push(generatedId);
+          }
 
           Noco.appHooksService.emit(AppEvents.SORT_CREATE, {
             sort: {
               ...sort,
-              id: undefined,
+              id: generatedId,
             },
             view: view as ViewType,
             column: await Column.get(context, {
@@ -3143,6 +3218,35 @@ export default class View implements ViewType {
           { viewColumns, copyFromView },
           insertedView,
         );
+
+        for (const sortId of disabledSortIds) {
+          await View.setConditionEnabled(
+            context,
+            view_id,
+            'sort',
+            sortId,
+            false,
+            ncMeta,
+          );
+        }
+        for (const viewColumn of viewColumns) {
+          if (
+            'group_by' in viewColumn &&
+            'group_by_enabled' in viewColumn &&
+            viewColumn.group_by &&
+            (viewColumn.group_by_enabled === false ||
+              viewColumn.group_by_enabled === 0)
+          ) {
+            await View.setConditionEnabled(
+              context,
+              view_id,
+              'groupBy',
+              viewColumn.fk_column_id,
+              false,
+              ncMeta,
+            );
+          }
+        }
       } else {
         // populate view columns
         await View.bulkColumnInsertToViews(

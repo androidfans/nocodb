@@ -29,6 +29,10 @@ export default class Sort {
     Object.assign(this, data);
   }
 
+  static isEnabled(sort: Pick<Sort, 'enabled'>) {
+    return sort.enabled !== false && sort.enabled !== 0;
+  }
+
   // skip viewWebhookManager for this, Sort.deleteAll is not a standalone operation, it's invoked by view service
   public static async deleteAll(
     context: NcContext,
@@ -72,7 +76,6 @@ export default class Sort {
       'fk_column_id',
       'fk_level_id',
       'direction',
-      'enabled',
       'base_id',
       'source_id',
     ]);
@@ -146,6 +149,17 @@ export default class Sort {
       );
     }
 
+    if (sortObj.enabled === false || sortObj.enabled === 0) {
+      await View.setConditionEnabled(
+        context,
+        row.fk_view_id,
+        'sort',
+        row.id,
+        false,
+        ncMeta,
+      );
+    }
+
     return this.get(context, row.id, ncMeta).then(async (sort) => {
       if (!sortObj.push_to_top) {
         await NocoCache.appendToList(
@@ -206,7 +220,14 @@ export default class Sort {
         (a.order != null ? a.order : Infinity) -
         (b.order != null ? b.order : Infinity),
     );
-    return sortList.map((s) => new Sort(s));
+    const view = await View.get(context, viewId, false, ncMeta);
+    return sortList.map(
+      (s) =>
+        new Sort({
+          ...s,
+          enabled: View.isConditionEnabled(view, 'sort', s.id),
+        }),
+    );
   }
 
   public static async update(
@@ -215,26 +236,41 @@ export default class Sort {
     body,
     ncMeta = Noco.ncMeta,
   ) {
-    const updateObj = extractProps(body, [
-      'fk_column_id',
-      'direction',
-      'enabled',
-    ]);
+    const sort = await this.get(context, sortId, ncMeta);
+    const updateObj = extractProps(body, ['fk_column_id', 'direction']);
 
     // set meta
-    const res = await ncMeta.metaUpdate(
-      context.workspace_id,
-      context.base_id,
-      MetaTable.SORT,
-      updateObj,
-      sortId,
-    );
+    const res = Object.keys(updateObj).length
+      ? await ncMeta.metaUpdate(
+          context.workspace_id,
+          context.base_id,
+          MetaTable.SORT,
+          updateObj,
+          sortId,
+        )
+      : true;
 
-    await NocoCache.update(context, `${CacheScope.SORT}:${sortId}`, updateObj);
+    if (Object.keys(updateObj).length) {
+      await NocoCache.update(
+        context,
+        `${CacheScope.SORT}:${sortId}`,
+        updateObj,
+      );
+    }
+
+    if ('enabled' in body) {
+      await View.setConditionEnabled(
+        context,
+        sort.fk_view_id,
+        'sort',
+        sortId,
+        body.enabled !== false && body.enabled !== 0,
+        ncMeta,
+      );
+    }
 
     // on update, delete any optimised single query cache
     {
-      const sort = await this.get(context, sortId, ncMeta);
       const view = await View.get(context, sort.fk_view_id, false, ncMeta);
       await View.clearSingleQueryCache(
         context,
@@ -267,6 +303,15 @@ export default class Sort {
       CacheDelDirection.CHILD_TO_PARENT,
     );
 
+    await View.setConditionEnabled(
+      context,
+      sort.fk_view_id,
+      'sort',
+      sortId,
+      true,
+      ncMeta,
+    );
+
     // on delete, delete any optimised single query cache
     if (sort?.fk_view_id) {
       const view = await View.get(context, sort.fk_view_id, false, ncMeta);
@@ -296,7 +341,12 @@ export default class Sort {
       );
       await NocoCache.set(context, `${CacheScope.SORT}:${id}`, sortData);
     }
-    return sortData && new Sort(sortData);
+    if (!sortData) return null;
+
+    const sort = new Sort(sortData);
+    const view = await View.get(context, sort.fk_view_id, false, ncMeta);
+    sort.enabled = View.isConditionEnabled(view, 'sort', sort.id);
+    return sort;
   }
 
   public async getModel(
