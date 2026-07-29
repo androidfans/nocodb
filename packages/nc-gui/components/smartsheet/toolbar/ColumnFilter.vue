@@ -782,6 +782,8 @@ const visibleFilters = computed(() =>
 // useViewFilters operations use indices into the full filters array.
 const getFilterIndex = (filter: ColumnFilterType) => filters.value.findIndex((f) => f === filter)
 
+const isFilterEnabled = (filter: ColumnFilterType) => filter.enabled !== false && filter.enabled !== 0
+
 const isLogicalOpChangeAllowed = computed(() => {
   return new Set(visibleFilters.value.slice(1).map((filter) => filter.logical_op)).size > 1
 })
@@ -800,7 +802,7 @@ const onLogicalOpUpdate = async (filter: Filter, index: number) => {
 }
 
 const onEnabledChange = async (filter: ColumnFilterType, index: number) => {
-  const newEnabled = filter.enabled === false
+  const newEnabled = !isFilterEnabled(filter)
   $e('a:filter:toggle-enabled', { enabled: newEnabled, isGroup: !!filter.is_group })
   filter.enabled = newEnabled
   await saveOrUpdate(filter, index)
@@ -1217,7 +1219,7 @@ defineExpose({
           <template v-if="filter.is_group">
             <div
               class="flex flex-col min-w-full w-min max-w-full gap-y-2"
-              :class="{ 'nc-filter-disabled-group': filter.enabled === false }"
+              :class="{ 'nc-filter-disabled-group': !isFilterEnabled(filter) }"
             >
               <div
                 class="flex rounded-lg p-2 min-w-full w-min max-w-full border-1"
@@ -1255,7 +1257,7 @@ defineExpose({
                   <template #start>
                     <NcCheckbox
                       v-if="!hideCheckbox"
-                      :checked="filter.enabled !== false"
+                      :checked="isFilterEnabled(filter)"
                       size="default"
                       :disabled="isLockedView || readOnly"
                       class="nc-filter-enabled-checkbox"
@@ -1348,7 +1350,7 @@ defineExpose({
           <div v-else class="flex xs:(items-start) items-center gap-2 w-full">
             <NcCheckbox
               v-if="!hideCheckbox"
-              :checked="filter.enabled !== false"
+              :checked="isFilterEnabled(filter)"
               size="default"
               :disabled="isLockedView || readOnly"
               class="nc-filter-enabled-checkbox xs:(flex min-h-8)"
@@ -1358,7 +1360,7 @@ defineExpose({
               class="flex flex-col gap-y-2 sm:gap-y-0 sm:flex-row gap-x-0 flex-1"
               :class="[
                 `nc-filter-wrapper-${filter.fk_column_id}`,
-                { 'nc-filter-disabled-row': filter.enabled === false, 'nc-filter-wrapper': !isMobileMode },
+                { 'nc-filter-disabled-row': !isFilterEnabled(filter), 'nc-filter-wrapper': !isMobileMode },
               ]"
             >
               <NcWrap :wrap="!!isMobileMode" class="grid grid-cols-12 gap-x-0 flex-1 nc-filter-wrapper">

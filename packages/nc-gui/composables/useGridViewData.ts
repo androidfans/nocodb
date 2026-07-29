@@ -19,6 +19,7 @@ export function useGridViewData(
   viewMeta: Ref<ViewType | undefined> | ComputedRef<(ViewType & { id: string }) | undefined>,
   where?: ComputedRef<string | undefined>,
   reloadVisibleDataHook?: EventHook<void>,
+  canvasMode?: ComputedRef<boolean>,
 ) {
   const tablesStore = useTablesStore()
   const { activeTable } = storeToRefs(tablesStore)
@@ -113,6 +114,7 @@ export function useGridViewData(
     groupByColumns,
     where,
     isPublic,
+    canvasMode,
   })
 
   function triggerAggregateReload(params: {

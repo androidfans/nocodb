@@ -224,10 +224,16 @@ const removeFieldFromGroupBy = async (group: Group) => {
 
 watch(open, () => {
   if (open.value) {
-    // Always show the persisted (synced) state. Restricted editors can't
-    // modify the view, so they see the saved state as-is. Full editors work
-    // directly on the synced state via saveGroupBy → updateGridViewColumn.
-    _groupBy.value = [...syncedGroupByEntries.value]
+    if (!isRestrictedEditor.value && localGroupBy.value !== null) {
+      _groupBy.value = localGroupBy.value.map((group, index) => ({
+        fk_column_id: group.column.id,
+        sort: group.sort || 'asc',
+        order: group.order || index + 1,
+        enabled: group.enabled,
+      }))
+    } else {
+      _groupBy.value = [...syncedGroupByEntries.value]
+    }
   } else {
     showCreateGroupBy.value = false
   }

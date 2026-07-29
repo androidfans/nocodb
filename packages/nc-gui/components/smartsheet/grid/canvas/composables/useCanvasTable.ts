@@ -319,9 +319,11 @@ export function useCanvasTable({
 
   const isOrderColumnExists = computed(() => (meta.value?.columns ?? []).some((col) => isOrderCol(col)))
 
-  const isInsertBelowDisabled = computed(() => !!allFilters.value?.length || !!sorts.value?.length || isPublicView.value)
+  const activeSorts = computed(() => sorts.value.filter((sort) => sort.enabled !== false && sort.enabled !== 0))
 
-  const isRowReorderDisabled = computed(() => sorts.value?.length || isPublicView.value || !isPrimaryKeyAvailable.value)
+  const isInsertBelowDisabled = computed(() => !!allFilters.value?.length || !!activeSorts.value.length || isPublicView.value)
+
+  const isRowReorderDisabled = computed(() => activeSorts.value.length || isPublicView.value || !isPrimaryKeyAvailable.value)
 
   const isDataEditAllowed = computed(() => isUIAllowed('dataEdit') && !isSqlView.value && !isPublicView.value)
 

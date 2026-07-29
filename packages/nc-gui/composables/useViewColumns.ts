@@ -636,7 +636,7 @@ const [useProvideViewColumns, useViewColumns] = useInjectionState(
     const updateGridViewColumn = async (id: string, props: Partial<GridColumnReqType>, undo = false) => {
       if (!undo) {
         const oldProps = Object.keys(props).reduce<Partial<GridColumnReqType>>((o: any, k) => {
-          if (gridViewCols.value[id][k as keyof GridColumnType]) {
+          if (gridViewCols.value[id][k as keyof GridColumnType] !== undefined) {
             if (k === 'width') o[k] = `${resizingColOldWith.value}px`
             else o[k] = gridViewCols.value[id][k as keyof GridColumnType]
           }

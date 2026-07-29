@@ -1835,6 +1835,15 @@ export default class View implements ViewType {
 
     const oldView = await this.get(context, viewId, false, ncMeta);
 
+    // Condition toggles are server-managed view state. Preserve them when a
+    // client sends an older full meta snapshot for an unrelated view update.
+    if ('meta' in updateObj && oldView?.meta?.[CONDITION_TOGGLES_META_KEY]) {
+      updateObj.meta = {
+        ...(parseMetaProp({ meta: updateObj.meta }) ?? {}),
+        [CONDITION_TOGGLES_META_KEY]: oldView.meta[CONDITION_TOGGLES_META_KEY],
+      };
+    }
+
     // set meta
     await ncMeta.metaUpdate(
       context.workspace_id,

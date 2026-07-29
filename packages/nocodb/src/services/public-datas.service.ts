@@ -98,7 +98,12 @@ export class PublicDatasService {
         visibleColumnIds.add(vc.fk_column_id);
       }
 
-      if (view.type === ViewTypes.GRID && (vc as GridViewColumn).group_by) {
+      if (
+        view.type === ViewTypes.GRID &&
+        (vc as GridViewColumn).group_by &&
+        (vc as GridViewColumn).group_by_enabled !== false &&
+        (vc as GridViewColumn).group_by_enabled !== 0
+      ) {
         groupByColumnIds.add(vc.fk_column_id);
       }
     }

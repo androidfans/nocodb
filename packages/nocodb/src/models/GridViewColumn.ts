@@ -248,13 +248,20 @@ export default class GridViewColumn implements GridColumnType {
       );
     }
 
-    if ('group_by_enabled' in body) {
+    if (
+      'group_by_enabled' in body ||
+      body.group_by === false ||
+      body.group_by === 0 ||
+      body.group_by === null
+    ) {
       await View.setConditionEnabled(
         context,
         viewColumn.fk_view_id,
         'groupBy',
         viewColumn.fk_column_id,
-        body.group_by_enabled !== false && body.group_by_enabled !== 0,
+        'group_by_enabled' in body
+          ? body.group_by_enabled !== false && body.group_by_enabled !== 0
+          : true,
         ncMeta,
       );
     }

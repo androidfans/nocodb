@@ -92,9 +92,10 @@ export function useInfiniteData(args: {
   disableSmartsheet?: boolean
   isPublic?: Ref<boolean>
   groupByColumns?: ComputedRef<{ column: ColumnType; sort: string; order?: number }[]>
+  canvasMode?: ComputedRef<boolean>
 }) {
   const NOCO = 'noco'
-  const { meta, viewMeta, callbacks, where, disableSmartsheet, isPublic, groupByColumns = ref(null) } = args
+  const { meta, viewMeta, callbacks, where, disableSmartsheet, isPublic, groupByColumns = ref(null), canvasMode } = args
 
   const { $api, $ncSocket } = useNuxtApp()
 
@@ -148,6 +149,12 @@ export function useInfiniteData(args: {
         eventBus: useEventBus<SmartsheetStoreEvents>(EventBusEnum.SmartsheetStore),
       }
     : useSmartsheetStoreOrThrow()
+
+  // DOM tables retain their existing behavior. Canvas treats a disabled sort
+  // as absent for client-side cache placement and row-order decisions.
+  const localOperationSorts = computed(() =>
+    canvasMode?.value ? sorts.value.filter((sort) => sort.enabled !== false && sort.enabled !== 0) : sorts.value,
+  )
 
   const { isGroupBy, groupBy } = disableSmartsheet
     ? {
@@ -1084,7 +1091,7 @@ export function useInfiniteData(args: {
     newData: Record<string, any>
     path: Array<number>
   }): boolean => {
-    if (!sorts.value.length) return false
+    if (!localOperationSorts.value.length) return false
 
     const currentIndex = row.rowMeta.rowIndex!
     if (currentIndex === undefined) return true
@@ -1108,7 +1115,7 @@ export function useInfiniteData(args: {
       let shouldBeBefore = false
       let isDifferent = false
 
-      for (const sort of sorts.value) {
+      for (const sort of localOperationSorts.value) {
         const column = columnsById.value[sort.fk_column_id!]
         if (!column?.title) continue
 
@@ -1134,7 +1141,7 @@ export function useInfiniteData(args: {
       let shouldBeAfter = false
       let isDifferent = false
 
-      for (const sort of sorts.value) {
+      for (const sort of localOperationSorts.value) {
         const column = columnsById.value[sort.fk_column_id!]
         if (!column?.title) continue
 
@@ -1180,12 +1187,12 @@ export function useInfiniteData(args: {
 
   const applySorting = (rows: Row | Row[], path: Array<number> = []) => {
     // If there aren't any active sorting criteria, stop
-    if (!sorts.value.length) return
+    if (!localOperationSorts.value.length) return
 
     const dataCache = getDataCache(path)
 
     // Sorts the sort columns by the order property
-    const orderedSorts = sorts.value.sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+    const orderedSorts = [...localOperationSorts.value].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
     const inputRows = Array.isArray(rows) ? rows : [rows]
 
@@ -2007,11 +2014,10 @@ export function useInfiniteData(args: {
         .map((c) => c.title!) || []),
     )
 
-    if (isSortRelevantChange(changedFields, sorts.value, columnsById.value) || row.rowMeta.new) {
+    if (isSortRelevantChange(changedFields, localOperationSorts.value, columnsById.value) || row.rowMeta.new) {
       const needsResorting = willSortOrderChange({
         row,
         newData: data,
-        sorts: sorts.value,
         path,
       })
 
@@ -2346,7 +2352,7 @@ export function useInfiniteData(args: {
           const orderField = orderCol?.title || orderCol?.column_name
           let insertAtIndex = dataCache.totalRows.value
 
-          if (!sorts.value.length && orderField && payload[orderField] != null) {
+          if (!localOperationSorts.value.length && orderField && payload[orderField] != null) {
             // Default sort by nc_order — find the right position
             const payloadOrder = Number(payload[orderField])
             const entries = Array.from(dataCache.cachedRows.value.entries()).sort((a, b) => a[0] - b[0])
@@ -2381,7 +2387,7 @@ export function useInfiniteData(args: {
           dataCache.actualTotalRows.value = Math.max(dataCache.actualTotalRows.value || 0, dataCache.totalRows.value)
 
           // If explicit sorts exist, apply them (nc_order handled above)
-          if (sorts.value.length) {
+          if (localOperationSorts.value.length) {
             applySorting(newRow)
           }
 

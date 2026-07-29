@@ -98,7 +98,10 @@ export class PublicMetasService {
         if (!column) return false;
 
         return (
-          (c instanceof GridViewColumn && c.group_by) ||
+          (c instanceof GridViewColumn &&
+            c.group_by &&
+            c.group_by_enabled !== false &&
+            c.group_by_enabled !== 0) ||
           c.show ||
           (column.rqd && !column.cdf && !column.ai) ||
           column.pk ||
