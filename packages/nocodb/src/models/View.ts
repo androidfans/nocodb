@@ -563,6 +563,7 @@ export default class View implements ViewType {
             'fk_column_id',
             'fk_level_id',
             'direction',
+            'enabled',
             'base_id',
             'source_id',
             'order',
@@ -606,6 +607,7 @@ export default class View implements ViewType {
             'base_id',
             'source_id',
             'order',
+            'enabled',
           ]);
           if (filterProps.fk_level_id) {
             filterProps.fk_level_id =
@@ -2511,6 +2513,7 @@ export default class View implements ViewType {
             : [
                 'width',
                 'group_by',
+                'group_by_enabled',
                 'group_by_order',
                 'group_by_sort',
                 'aggregation',
@@ -3028,6 +3031,7 @@ export default class View implements ViewType {
             'fk_column_id',
             'fk_level_id',
             'direction',
+            'enabled',
             'base_id',
             'source_id',
           ]);
@@ -3074,6 +3078,7 @@ export default class View implements ViewType {
               'source_id',
               'order',
               'meta',
+              'enabled',
             ]);
             if (filterProps.fk_level_id) {
               filterProps.fk_level_id =

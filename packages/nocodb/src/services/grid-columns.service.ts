@@ -100,6 +100,7 @@ export class GridColumnsService {
       'label',
       'width',
       'group_by',
+      'group_by_enabled',
       'group_by_order',
       'group_by_sort',
       'aggregation',
@@ -147,6 +148,7 @@ export class GridColumnsService {
       .andWhere('fk_view_id', '=', param.viewId)
       .update({
         group_by: null,
+        group_by_enabled: true,
         group_by_order: null,
         group_by_sort: null,
         aggregation: 'none',

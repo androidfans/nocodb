@@ -25,6 +25,7 @@ export default class GridViewColumn implements GridColumnType {
   source_id?: string;
 
   group_by?: BoolType;
+  group_by_enabled?: BoolType;
   group_by_order?: number;
   group_by_sort?: string;
 
@@ -120,6 +121,7 @@ export default class GridViewColumn implements GridColumnType {
       'label',
       'width',
       'group_by',
+      'group_by_enabled',
       'group_by_order',
       'group_by_sort',
     ]);
@@ -190,6 +192,7 @@ export default class GridViewColumn implements GridColumnType {
       'label',
       'width',
       'group_by',
+      'group_by_enabled',
       'group_by_order',
       'group_by_sort',
       'aggregation',

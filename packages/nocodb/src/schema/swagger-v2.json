@@ -15300,6 +15300,10 @@
             "$ref": "#/components/schemas/Bool",
             "description": "Group By"
           },
+          "group_by_enabled": {
+            "$ref": "#/components/schemas/Bool",
+            "description": "Whether this grouping condition is enabled"
+          },
           "group_by_order": {
             "type": "number",
             "description": "Group By Order",
@@ -15344,6 +15348,10 @@
           "group_by": {
             "$ref": "#/components/schemas/Bool",
             "description": "Group By"
+          },
+          "group_by_enabled": {
+            "$ref": "#/components/schemas/Bool",
+            "description": "Whether this grouping condition is enabled"
           },
           "group_by_order": {
             "type": "number",
@@ -19639,6 +19647,10 @@
             ],
             "example": "desc"
           },
+          "enabled": {
+            "$ref": "#/components/schemas/Bool",
+            "description": "Whether this sort condition is enabled"
+          },
           "order": {
             "type": "number",
             "example": 1
@@ -19761,6 +19773,10 @@
               "desc"
             ],
             "type": "string"
+          },
+          "enabled": {
+            "$ref": "#/components/schemas/Bool",
+            "description": "Whether this sort condition is enabled"
           }
         },
         "x-stoplight": {

@@ -5308,6 +5308,8 @@ export interface GridColumnType {
   help?: StringOrNullType;
   /** Group By */
   group_by?: BoolType;
+  /** Whether this grouping condition is enabled */
+  group_by_enabled?: BoolType;
   /**
    * Group By Order
    * @example 1
@@ -5345,6 +5347,8 @@ export interface GridColumnReqType {
   width?: string;
   /** Group By */
   group_by?: BoolType;
+  /** Whether this grouping condition is enabled */
+  group_by_enabled?: BoolType;
   /**
    * Group By Order
    * @example 1
@@ -6696,6 +6700,8 @@ export interface SortType {
    * @example desc
    */
   direction?: 'asc' | 'desc' | 'count-desc' | 'count-asc';
+  /** Whether this sort condition is enabled */
+  enabled?: BoolType;
   /** @example 1 */
   order?: number;
   /**
@@ -6725,6 +6731,8 @@ export interface SortReqType {
   fk_column_id?: IdType;
   /** Sort direction */
   direction?: 'asc' | 'desc';
+  /** Whether this sort condition is enabled */
+  enabled?: BoolType;
   /** Foreign Key to List View Level */
   fk_level_id?: StringOrNullType;
 }

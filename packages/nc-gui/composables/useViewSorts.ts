@@ -185,6 +185,7 @@ export function useViewSorts(view: Ref<ViewType | undefined>, reloadData?: () =>
         data = {
           fk_column_id: column!.id,
           direction,
+          enabled: true,
         }
       } else {
         data = await $api.internal.postOperation(
@@ -307,6 +308,7 @@ export function useViewSorts(view: Ref<ViewType | undefined>, reloadData?: () =>
       {
         fk_column_id: column?.id,
         direction: 'asc',
+        enabled: true,
       },
     ]
 
