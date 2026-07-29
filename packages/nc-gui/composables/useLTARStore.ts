@@ -494,10 +494,14 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       const exactId = getExactLinkRecordId(query)
       const primaryKeyColumn = getRelatedTablePrimaryKeyColumn()
       if (exactId && primaryKeyColumn) {
-        return `(${primaryKeyColumn.title},eq,${exactId})`
+        // Column IDs are valid filter aliases and cannot collide with xwhere syntax,
+        // unlike user-defined titles containing commas or parentheses.
+        return `(${primaryKeyColumn.id},eq,${exactId})`
       }
 
-      // Date/DateTime display value: keep single-column exact date search (used with date picker input)
+      // Date display values deliberately keep their native picker. `#ID` search is
+      // limited to the text-input path used by current workflows to avoid a second,
+      // rarely used search mode with ambiguous intermediate input.
       if (isDateOrDateTimeCol(displayCol)) {
         return `(${displayCol.title},eq,exactDate,${query})`
       }
