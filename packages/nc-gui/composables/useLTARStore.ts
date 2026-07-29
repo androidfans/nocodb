@@ -27,6 +27,8 @@ interface ReloadRowDataParams {
   path?: Array<number>
 }
 
+const getExactLinkRecordId = (query?: string) => query?.trim().match(/^#(\d+)$/)?.[1]
+
 /** Store for managing Link to another cells */
 const [useProvideLTARStore, useLTARStore] = useInjectionState(
   (
@@ -459,6 +461,15 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
 
       const displayCol = relatedTableDisplayValueColumn.value
 
+      // A complete `#<number>` query is an explicit record-ID lookup. Resolve
+      // the actual primary-key column from the related table instead of
+      // assuming that it is visible or named "Id".
+      const exactId = getExactLinkRecordId(query)
+      const primaryKeyColumn = relatedTableMeta.value?.columns?.find((col) => col.pk)
+      if (exactId && primaryKeyColumn) {
+        return `(${primaryKeyColumn.title},eq,${exactId})`
+      }
+
       // Date/DateTime display value: keep single-column exact date search (used with date picker input)
       if (isDateOrDateTimeCol(displayCol)) {
         return `(${displayCol.title},eq,exactDate,${query})`
@@ -656,12 +667,18 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         if (isNewRow?.value || !rowId.value) {
           const colTitle = column.value?.title || ''
           const rawList = newRowState.state?.[colTitle] ?? []
-          const query = childrenListPagination.query.toLocaleLowerCase()
-          const list = query
-            ? rawList.filter((record: Record<string, any>) =>
-                `${record[relatedTableDisplayValueProp.value] ?? ''}`.toLocaleLowerCase().includes(query),
-              )
-            : rawList
+          const query = childrenListPagination.query.trim()
+          const exactId = getExactLinkRecordId(query)
+          const primaryKeyColumn = relatedTableMeta.value?.columns?.find((col) => col.pk)
+          const normalizedExactId = exactId?.replace(/^0+(?=\d)/, '')
+          const list =
+            exactId && primaryKeyColumn
+              ? rawList.filter((record: Record<string, any>) => `${record[primaryKeyColumn.title] ?? ''}` === normalizedExactId)
+              : query
+              ? rawList.filter((record: Record<string, any>) =>
+                  `${record[relatedTableDisplayValueProp.value] ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
+                )
+              : rawList
           childrenList.value = {
             list,
             pageInfo: {
