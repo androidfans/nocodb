@@ -28,6 +28,21 @@ const { openedViewsTab } = storeToRefs(viewsStore)
 
 const { isMobileMode } = storeToRefs(useConfigStore())
 
+const route = useRoute()
+
+const showTopbarReloadFallback = computed(() => {
+  if (openedViewsTab.value !== 'view') return false
+
+  // ViewTabList is desktop-only, and the old reload control was therefore
+  // desktop-only too. This fallback preserves that existing availability for
+  // desktop views that have no toolbar; it does not introduce a mobile action.
+  return (
+    route.query.disableToolbar === 'true' ||
+    activeView.value?.type === ViewTypes.FORM ||
+    activeView.value?.type === ViewTypes.TIMELINE
+  )
+})
+
 const scrollContainerRef = ref<HTMLElement>()
 const viewListRef = ref<HTMLElement>()
 
@@ -207,7 +222,7 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
-    <div v-if="openedViewsTab === 'view'" class="nc-view-tab-reload">
+    <div v-if="showTopbarReloadFallback" class="flex-none">
       <LazySmartsheetToolbarReload />
     </div>
   </div>
@@ -248,9 +263,5 @@ onBeforeUnmount(() => {
 
 .nc-view-tab-title {
   @apply max-w-32;
-}
-
-.nc-view-tab-reload {
-  @apply flex-none;
 }
 </style>
