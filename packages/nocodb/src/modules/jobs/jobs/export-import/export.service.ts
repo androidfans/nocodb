@@ -431,6 +431,10 @@ export class ExportService {
         await view.getColumns(context);
         await view.getFilters(context);
         await view.getSorts(context);
+        // Product decision: Base export/import is rarely used in this
+        // deployment and does not preserve custom condition-toggle state.
+        // Keep the known limitation instead of expanding this feature into
+        // ID remapping and concurrent view-meta migration work.
         if (view.filter) {
           const export_filters = [];
           for (const fl of view.filter.children) {

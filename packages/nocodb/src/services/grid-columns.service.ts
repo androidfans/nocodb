@@ -100,6 +100,7 @@ export class GridColumnsService {
       'label',
       'width',
       'group_by',
+      'group_by_enabled',
       'group_by_order',
       'group_by_sort',
       'aggregation',
@@ -141,6 +142,13 @@ export class GridColumnsService {
     param: { viewId: string; viewWebhookManager?: ViewWebhookManager },
     ncMeta = Noco.ncMeta,
   ) {
+    const disabledGroupColumns = (
+      await GridViewColumn.list(context, param.viewId, ncMeta)
+    ).filter(
+      (column) =>
+        column.group_by &&
+        (column.group_by_enabled === false || column.group_by_enabled === 0),
+    );
     const qb = ncMeta
       .knex(MetaTable.GRID_VIEW_COLUMNS)
       .where('base_id', '=', context.base_id)
@@ -175,6 +183,16 @@ export class GridColumnsService {
       CacheDelDirection.PARENT_TO_CHILD,
     );
     const result = await qb;
+    for (const column of disabledGroupColumns) {
+      await View.setConditionEnabled(
+        context,
+        param.viewId,
+        'groupBy',
+        column.fk_column_id,
+        true,
+        ncMeta,
+      );
+    }
     if (viewWebhookManager) {
       (
         await viewWebhookManager.withNewViewId(viewWebhookManager.getViewId())

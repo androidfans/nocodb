@@ -8,7 +8,6 @@ import utc from 'dayjs/plugin/utc.js';
 import timezone from 'dayjs/plugin/timezone.js';
 import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import { isDateMonthFormat } from '~/lib/dateTimeHelper';
-import { buildFilterTree } from '~/lib/filterHelpers';
 import { parseProp } from '~/lib/helperFunctions';
 import UITypes, { isBtLikeV2Junction } from '~/lib/UITypes';
 import { getLookupColumnType } from '~/lib/columnHelper/utils/get-lookup-column-type';
@@ -16,6 +15,7 @@ import { getNodejsTimezone } from '~/lib/timezoneUtils';
 import { ColumnHelper } from '~/lib/columnHelper/column-helper';
 import { CURRENT_USER_TOKEN } from '~/lib/globals';
 import { getMetaWithCompositeKey } from '~/lib/helpers/metaHelpers';
+import { getEffectiveFilterTree } from '~/lib/filter/filterUtils';
 
 extend(utc);
 extend(timezone);
@@ -61,15 +61,16 @@ export class RowFilterValidator {
       return true;
     }
 
-    const filters: (FilterType & { meta?: any })[] = buildFilterTree(_filters);
+    const filters: (FilterType & { meta?: any })[] =
+      getEffectiveFilterTree(_filters);
+    if (!filters.length) {
+      return true;
+    }
 
     let isValid: boolean | null = null;
     for (const filter of filters) {
       let res;
-      // if filter is disabled, it is valid
-      if (filter.enabled === false || (filter.enabled as any) === 0) {
-        res = true;
-      } else if (filter.is_group && filter.children?.length) {
+      if (filter.is_group && filter.children?.length) {
         res = validateRowFilters({
           filters: filter.children,
           data: data,
@@ -623,7 +624,7 @@ export class RowFilterValidator {
           isValid = isValid || !!res;
           break;
         case 'not':
-          isValid = isValid && !res;
+          isValid = (isValid ?? true) && !res;
           break;
         case 'and':
         default:

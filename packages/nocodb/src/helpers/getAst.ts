@@ -235,6 +235,8 @@ const getAst = async (
         ...o,
         [c.fk_column_id]:
           c.show ||
+          // Product decision: this deployment is local-only and does not
+          // expose shared views, so disabled-group AST parity is out of scope.
           (c instanceof GridViewColumn && c.group_by) ||
           (c instanceof KanbanViewColumn &&
             c.fk_column_id === kanbanGroupColumnId),

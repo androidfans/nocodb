@@ -636,7 +636,7 @@ const [useProvideViewColumns, useViewColumns] = useInjectionState(
     const updateGridViewColumn = async (id: string, props: Partial<GridColumnReqType>, undo = false) => {
       if (!undo) {
         const oldProps = Object.keys(props).reduce<Partial<GridColumnReqType>>((o: any, k) => {
-          if (gridViewCols.value[id][k as keyof GridColumnType]) {
+          if (gridViewCols.value[id][k as keyof GridColumnType] !== undefined) {
             if (k === 'width') o[k] = `${resizingColOldWith.value}px`
             else o[k] = gridViewCols.value[id][k as keyof GridColumnType]
           }
@@ -700,6 +700,8 @@ const [useProvideViewColumns, useViewColumns] = useInjectionState(
       if (evt === 'view_column_update') {
         const col = gridViewCols.value?.[payload.fk_column_id]
         if (col) {
+          // Product decision: only one user edits this deployment, so remote
+          // group_by_enabled changes do not need a collaborator data reload.
           const reloadNeeded = payload?.group_by !== col?.group_by || (!col.show && payload?.show)
 
           Object.assign(col, payload)

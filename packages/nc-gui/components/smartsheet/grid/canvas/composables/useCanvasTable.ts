@@ -13,6 +13,7 @@ import {
 import type {
   ButtonType,
   ColumnType,
+  FilterType,
   FormulaType,
   GridType,
   LinkToAnotherRecordType,
@@ -319,9 +320,27 @@ export function useCanvasTable({
 
   const isOrderColumnExists = computed(() => (meta.value?.columns ?? []).some((col) => isOrderCol(col)))
 
-  const isInsertBelowDisabled = computed(() => !!allFilters.value?.length || !!sorts.value?.length || isPublicView.value)
+  const activeSorts = computed(() => sorts.value.filter((sort) => sort.enabled !== false && sort.enabled !== 0))
 
-  const isRowReorderDisabled = computed(() => sorts.value?.length || isPublicView.value || !isPrimaryKeyAvailable.value)
+  const hasActiveFilters = computed(() => {
+    const filtersById = new Map(allFilters.value.filter((filter) => filter.id).map((filter) => [filter.id, filter]))
+
+    return allFilters.value.some((filter) => {
+      if (filter.is_group) return false
+
+      let current: FilterType | undefined = filter
+      while (current) {
+        if (current.enabled === false || current.enabled === 0) return false
+        current = current.fk_parent_id ? filtersById.get(current.fk_parent_id) : undefined
+      }
+
+      return true
+    })
+  })
+
+  const isInsertBelowDisabled = computed(() => hasActiveFilters.value || !!activeSorts.value.length || isPublicView.value)
+
+  const isRowReorderDisabled = computed(() => activeSorts.value.length || isPublicView.value || !isPrimaryKeyAvailable.value)
 
   const isDataEditAllowed = computed(() => isUIAllowed('dataEdit') && !isSqlView.value && !isPublicView.value)
 

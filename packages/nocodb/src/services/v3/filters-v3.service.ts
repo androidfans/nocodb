@@ -280,6 +280,13 @@ export class FiltersV3Service {
       const hasParentInGroup =
         'parent_id' in groupOrFilter && groupOrFilter.parent_id;
       if (!hasParentInGroup) {
+        // The outer V3 group only carries the root logical operator; unlike
+        // nested groups, it has no persisted Filter row to store `enabled`.
+        if ('enabled' in groupOrFilter) {
+          NcError.get(context).badRequest(
+            'The virtual root filter group cannot be enabled or disabled.',
+          );
+        }
         // Root group handling when parent_id is not provided in groupOrFilter
         const existingRootFilters = await Filter.rootFilterList(
           context,
@@ -313,6 +320,9 @@ export class FiltersV3Service {
         const rootGroupResponse = await Filter.insert(
           context,
           {
+            ...('enabled' in groupOrFilter
+              ? { enabled: groupOrFilter.enabled }
+              : {}),
             is_group: true,
             fk_parent_id: null, // Root groups have no parent
             logical_op: extractLogicalOp(logicalOp),
@@ -331,6 +341,9 @@ export class FiltersV3Service {
       const rootGroupResponse = await Filter.insert(
         context,
         {
+          ...('enabled' in groupOrFilter
+            ? { enabled: groupOrFilter.enabled }
+            : {}),
           is_group: true,
           fk_parent_id: parentId, // Root groups have no parent
           logical_op: extractLogicalOp(logicalOp),
@@ -522,6 +535,15 @@ export class FiltersV3Service {
           logicalOp: extractLogicalOp(
             (param.filter as FilterGroupV3Type).group_operator,
           ),
+        });
+      }
+
+      if ('enabled' in param.filter) {
+        await this.filtersService.filterUpdate(context, {
+          filterId: param.filterId,
+          filter: { enabled: param.filter.enabled } as FilterReqType,
+          user: param.user,
+          req: param.req,
         });
       }
     } else {

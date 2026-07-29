@@ -721,10 +721,11 @@ export const columnV3ToV2Builder = builderGenerator<FieldV3Type, ColumnType>({
 });
 
 export const sortBuilder = builderGenerator<SortType>({
-  allowed: ['id', 'fk_column_id', 'direction'],
+  allowed: ['id', 'fk_column_id', 'direction', 'enabled'],
   mappings: {
     fk_column_id: 'field_id',
   },
+  booleanProps: ['enabled'],
 });
 
 export const filterBuilder = builderGenerator<FilterType>({
@@ -740,6 +741,7 @@ export const filterBuilder = builderGenerator<FilterType>({
     'is_group',
     'fk_related_col_id',
     'fk_value_col_id',
+    'enabled',
   ],
   mappings: {
     fk_column_id: 'field_id',
@@ -749,7 +751,7 @@ export const filterBuilder = builderGenerator<FilterType>({
     comparison_sub_op: 'sub_operator',
   },
   excludeNullProps: true,
-  booleanProps: ['is_group'],
+  booleanProps: ['is_group', 'enabled'],
 });
 
 export const filterRevBuilder = builderGenerator<
@@ -766,6 +768,7 @@ export const filterRevBuilder = builderGenerator<
     'sub_operator',
     'value',
     'is_group',
+    'enabled',
   ],
   mappings: {
     field_id: 'fk_column_id',
@@ -773,6 +776,7 @@ export const filterRevBuilder = builderGenerator<
     operator: 'comparison_op',
     sub_operator: 'comparison_sub_op',
   },
+  booleanProps: ['enabled'],
 });
 
 export const viewColumnBuilder = builderGenerator<

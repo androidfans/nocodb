@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnType, GridType, LinkToAnotherRecordType } from 'nocodb-sdk'
+import type { BoolType, ColumnType, GridType, LinkToAnotherRecordType } from 'nocodb-sdk'
 import {
   RelationTypes,
   UITypes,
@@ -50,6 +50,7 @@ interface Group {
   fk_column_id?: string
   sort: string
   order: number
+  enabled?: BoolType
 }
 
 const _groupBy = ref<Group[]>([])
@@ -63,6 +64,7 @@ const syncedGroupByEntries = computed<Group[]>(() => {
         fk_column_id: col.fk_column_id,
         sort: col.group_by_sort || 'asc',
         order: col.group_by_order || 1,
+        enabled: col.group_by_enabled,
       })
     }
   })
@@ -139,11 +141,18 @@ const saveGroupBy = async () => {
       for (const gby of _groupBy.value) {
         if (!gby.fk_column_id) continue
         const col = gridViewCols.value[gby.fk_column_id]
-        if (col && (!col.group_by || col.group_by_order !== gby.order || col.group_by_sort !== gby.sort)) {
+        if (
+          col &&
+          (!col.group_by ||
+            col.group_by_order !== gby.order ||
+            col.group_by_sort !== gby.sort ||
+            col.group_by_enabled !== gby.enabled)
+        ) {
           await updateGridViewColumn(gby.fk_column_id, {
             group_by: true,
             group_by_order: gby.order,
             group_by_sort: gby.sort,
+            group_by_enabled: gby.enabled !== false && gby.enabled !== 0,
           })
         }
       }
@@ -176,6 +185,7 @@ const saveGroupBy = async () => {
         column: allColumns.find((c) => c.id === g.fk_column_id)!,
         sort: g.sort,
         order: i + 1,
+        enabled: g.enabled,
       }))
       .filter((g) => g.column)
 
@@ -194,7 +204,7 @@ const saveGroupBy = async () => {
 }
 
 const addFieldToGroupBy = (column: ColumnType) => {
-  _groupBy.value.push({ fk_column_id: column.id, sort: 'asc', order: _groupBy.value.length + 1 })
+  _groupBy.value.push({ fk_column_id: column.id, sort: 'asc', order: _groupBy.value.length + 1, enabled: true })
   saveGroupBy()
   showCreateGroupBy.value = false
 }
@@ -214,10 +224,16 @@ const removeFieldFromGroupBy = async (group: Group) => {
 
 watch(open, () => {
   if (open.value) {
-    // Always show the persisted (synced) state. Restricted editors can't
-    // modify the view, so they see the saved state as-is. Full editors work
-    // directly on the synced state via saveGroupBy → updateGridViewColumn.
-    _groupBy.value = [...syncedGroupByEntries.value]
+    if (!isRestrictedEditor.value && localGroupBy.value !== null) {
+      _groupBy.value = localGroupBy.value.map((group, index) => ({
+        fk_column_id: group.column.id,
+        sort: group.sort || 'asc',
+        order: group.order || index + 1,
+        enabled: group.enabled,
+      }))
+    } else {
+      _groupBy.value = [...syncedGroupByEntries.value]
+    }
   } else {
     showCreateGroupBy.value = false
   }
@@ -258,6 +274,11 @@ const onMove = async (event: { moved: { newIndex: number; oldIndex: number } }) 
 
   _groupBy.value = [...updatedGroups]
 
+  await saveGroupBy()
+}
+
+const onGroupEnabledChange = async (group: Group, value: boolean | Event) => {
+  group.enabled = typeof value === 'boolean' ? value : (value.target as HTMLInputElement)?.checked
   await saveGroupBy()
 }
 
@@ -383,6 +404,13 @@ const getFieldsToGroupBy = (currentGroup: Group) => {
             >
               <template #item="{ element: group }">
                 <div :key="group.fk_column_id" class="flex first:mb-0 !mb-1.5 !last:mb-0 items-center">
+                  <NcCheckbox
+                    :checked="group.enabled !== false && group.enabled !== 0"
+                    size="default"
+                    class="flex-none mr-2 nc-group-enabled-checkbox"
+                    :disabled="isRestrictedEditor"
+                    @change="onGroupEnabledChange(group, $event)"
+                  />
                   <NcButton
                     v-if="appInfo.ee && !hideReorder"
                     type="secondary"

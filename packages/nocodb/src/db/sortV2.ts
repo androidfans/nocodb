@@ -25,7 +25,11 @@ export default async function sortV2(
     return;
   }
 
-  for (const _sort of sortList) {
+  // Disabled view sorts are removed at the shared sort-builder entry so no
+  // downstream column lookup or ORDER BY construction can observe them.
+  const enabledSorts = sortList.filter(Sort.isEnabled);
+
+  for (const _sort of enabledSorts) {
     let sort: Sort;
     if (_sort instanceof Sort) {
       sort = _sort;

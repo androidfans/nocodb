@@ -1,4 +1,5 @@
 import {
+  type BoolType,
   type ColumnType,
   CommonAggregations,
   type GridType,
@@ -16,6 +17,13 @@ import type { Group } from '../lib/types'
 import { findKeyColor, valueToTitle } from '../utils/groupbyUtils'
 
 const excludedGroupingUidt = [UITypes.Attachment, UITypes.QrCode, UITypes.Barcode, UITypes.Button]
+
+interface ViewGroupByCondition {
+  column: ColumnType
+  sort: string
+  order?: number
+  enabled?: BoolType
+}
 
 const [useProvideViewGroupBy, useViewGroupBy] = useInjectionState(
   (
@@ -50,10 +58,10 @@ const [useProvideViewGroupBy, useViewGroupBy] = useInjectionState(
     const { hasPersonalViewPermission } = usePersonalViewPermissions(view)
     const canSyncGroupBy = hasPersonalViewPermission('groupBySync')
 
-    const localGroupBy = ref<{ column: ColumnType; sort: string; order: number }[] | null>(null)
+    const localGroupBy = ref<ViewGroupByCondition[] | null>(null)
 
-    const syncedGroupBy = computed<{ column: ColumnType; sort: string; order?: number }[]>(() => {
-      const tempGroupBy: { column: ColumnType; sort: string; order?: number }[] = []
+    const syncedGroupBy = computed<ViewGroupByCondition[]>(() => {
+      const tempGroupBy: ViewGroupByCondition[] = []
       Object.values(gridViewCols.value).forEach((col) => {
         if (col.group_by) {
           const column = meta?.value?.columns?.find((f) => f.id === col.fk_column_id)
@@ -62,6 +70,7 @@ const [useProvideViewGroupBy, useViewGroupBy] = useInjectionState(
               column,
               sort: col.group_by_sort || 'asc',
               order: col.group_by_order || 1,
+              enabled: col.group_by_enabled,
             })
           }
         }
@@ -70,16 +79,19 @@ const [useProvideViewGroupBy, useViewGroupBy] = useInjectionState(
       return tempGroupBy
     })
 
-    const groupBy = computed<{ column: ColumnType; sort: string; order?: number }[]>(() => {
+    const groupBy = computed<ViewGroupByCondition[]>(() => {
       // null = no override (use synced), [] = override with empty (no grouping)
       if (localGroupBy.value !== null) {
-        return localGroupBy.value.map((e, i) => ({
-          column: e.column,
-          sort: e.sort,
-          order: e.order || i + 1,
-        }))
+        return localGroupBy.value
+          .filter((entry) => entry.enabled !== false && entry.enabled !== 0)
+          .map((e, i) => ({
+            column: e.column,
+            sort: e.sort,
+            order: e.order || i + 1,
+            enabled: e.enabled,
+          }))
       }
-      return syncedGroupBy.value
+      return syncedGroupBy.value.filter((entry) => entry.enabled !== false && entry.enabled !== 0)
     })
 
     const isGroupBy = computed(() => !!groupBy.value.length)

@@ -38,6 +38,37 @@ import { handleCurrentUserFilter } from '~/helpers/conditionHelpers';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+const isConditionEnabled = (filter: Pick<FilterType, 'enabled'>) =>
+  filter.enabled !== false && filter.enabled !== 0;
+
+const filterOutDisabledConditions = <T extends Filter | FilterType>(
+  filters: T[],
+): T[] => {
+  const filtersById = new Map(
+    filters
+      .filter((filter) => filter.id)
+      .map((filter) => [filter.id as string, filter]),
+  );
+
+  return filters.filter((filter) => {
+    if (!isConditionEnabled(filter)) return false;
+
+    const visited = new Set<string>();
+    let parentId = filter.fk_parent_id;
+    while (parentId) {
+      if (visited.has(parentId)) break;
+      visited.add(parentId);
+
+      const parent = filtersById.get(parentId);
+      if (!parent) break;
+      if (!isConditionEnabled(parent)) return false;
+      parentId = parent.fk_parent_id;
+    }
+
+    return true;
+  });
+};
+
 // tod: tobe fixed
 // extend(customParseFormat);
 
@@ -51,14 +82,28 @@ export default async function conditionV2(
   if (!conditionObj || typeof conditionObj !== 'object') {
     return;
   }
+
+  // Disabled view conditions are intentionally removed at this boundary so
+  // validation, SQL generation, and every downstream handler see only the
+  // effective filter tree.
+  const supportToggle = await Filter.supportToggle(baseModelSqlv2.context);
+  const activeConditionObj = supportToggle
+    ? removeDisabledConditions(conditionObj)
+    : conditionObj;
+  if (
+    !activeConditionObj ||
+    (Array.isArray(activeConditionObj) && !activeConditionObj.length)
+  )
+    return;
+
   await FieldHandler.fromBaseModel(baseModelSqlv2).verifyFilters(
-    Array.isArray(conditionObj)
-      ? (conditionObj as Filter[])
-      : ([conditionObj] as Filter[]),
+    Array.isArray(activeConditionObj)
+      ? (activeConditionObj as Filter[])
+      : ([activeConditionObj] as Filter[]),
   );
   const filterOperationResult = await parseConditionV2(
     baseModelSqlv2,
-    conditionObj,
+    activeConditionObj,
     { count: 0 },
     alias,
     undefined,
@@ -68,6 +113,26 @@ export default async function conditionV2(
   filterOperationResult.clause(qb);
   filterOperationResult.rootApply?.(qb);
 }
+
+const removeDisabledConditions = (
+  conditionObj: Filter | FilterType | FilterType[] | Filter[],
+): Filter | FilterType | FilterType[] | Filter[] | null => {
+  if (Array.isArray(conditionObj)) {
+    return filterOutDisabledConditions(conditionObj).map(
+      (filter) => removeDisabledConditions(filter) as Filter | FilterType,
+    );
+  }
+
+  if (!isConditionEnabled(conditionObj)) return null;
+  if (!conditionObj.children?.length) return conditionObj;
+
+  return new Filter({
+    ...conditionObj,
+    children: filterOutDisabledConditions(conditionObj.children)
+      .map((filter) => removeDisabledConditions(filter))
+      .filter((filter): filter is Filter | FilterType => !!filter),
+  });
+};
 
 function getLogicalOpMethod(filter: Filter) {
   switch (filter.logical_op?.toLowerCase()) {
@@ -1223,10 +1288,10 @@ const parseConditionV2 = async (
                 const inValues = Array.isArray(val)
                   ? val
                   : typeof val === 'string'
-                    ? val.split(',')
-                    : val === null || val === undefined
-                      ? []
-                      : [val];
+                  ? val.split(',')
+                  : val === null || val === undefined
+                  ? []
+                  : [val];
                 qb = qb.whereIn(field, inValues);
               }
               break;

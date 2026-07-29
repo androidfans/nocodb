@@ -23,6 +23,10 @@ const { isFeatureEnabled } = useBetaFeatureToggle()
 
 const { blockExternalSourceRecordVisibility, showUpgradeToSeeMoreRecordsModal } = useEeConfig()
 
+const isInfiniteScrollingEnabled = computed(() => isFeatureEnabled(FEATURE_FLAG.INFINITE_SCROLLING))
+
+const isCanvasTableEnabled = computed(() => !ncIsPlaywright())
+
 const bulkUpdateDlg = ref(false)
 
 const routeQuery = computed(() => route.value.query as Record<string, string>)
@@ -81,7 +85,7 @@ const {
   clearGroupCache,
   toggleExpandAll,
   groupDataCache,
-} = useGridViewData(meta, view, xWhere, reloadVisibleDataHook)
+} = useGridViewData(meta, view, xWhere, reloadVisibleDataHook, isCanvasTableEnabled)
 
 const rowHeight = computed(() => {
   const gridView = view.value?.view as GridType
@@ -292,10 +296,6 @@ const updateViewWidth = () => {
   }
   viewWidth.value = windowSize.value - leftSidebarWidth.value
 }
-
-const isInfiniteScrollingEnabled = computed(() => isFeatureEnabled(FEATURE_FLAG.INFINITE_SCROLLING))
-
-const isCanvasTableEnabled = computed(() => !ncIsPlaywright())
 
 const isCanvasGroupByTableEnabled = computed(
   () => !ncIsPlaywright() && !blockExternalSourceRecordVisibility(isExternalSource.value),

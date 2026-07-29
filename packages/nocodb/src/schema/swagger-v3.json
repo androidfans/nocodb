@@ -9357,12 +9357,17 @@
               "desc"
             ],
             "description": "Sorting direction, either 'asc' (ascending) or 'desc' (descending)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this sort condition is enabled."
           }
         },
         "required": [
           "id",
           "field_id",
-          "direction"
+          "direction",
+          "enabled"
         ]
       },
       "SortCreate": {
@@ -9379,6 +9384,10 @@
               "desc"
             ],
             "description": "Sorting direction, either 'asc' (ascending) or 'desc' (descending)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this sort condition is enabled. Defaults to true."
           }
         },
         "required": [
@@ -9404,6 +9413,10 @@
               "desc"
             ],
             "description": "Sorting direction, either 'asc' (ascending) or 'desc' (descending)."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this sort condition is enabled."
           }
         },
         "required": [
@@ -12358,6 +12371,10 @@
               "null"
             ],
             "description": "Value for comparison."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this filter condition is enabled. Defaults to true."
           }
         },
         "required": [
@@ -12391,6 +12408,10 @@
             ],
             "description": "Logical operator for the group."
           },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this filter group is enabled. Defaults to true."
+          },
           "filters": {
             "type": "array",
             "items": {
@@ -12414,6 +12435,10 @@
               "OR"
             ],
             "description": "Logical operator for the group."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this filter group is enabled. Defaults to true."
           },
           "filters": {
             "type": "array",
@@ -12492,6 +12517,10 @@
               "OR"
             ],
             "description": "Logical operator for combining filters in the group."
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether this filter group is enabled."
           },
           "filters": {
             "type": "array",

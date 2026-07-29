@@ -59,7 +59,7 @@ export const useEeConfig = createSharedComposable(() => {
 
   const blockRowColoring = computed(() => true)
 
-  const blockToggleFilter = computed(() => true)
+  const blockToggleFilter = computed(() => false)
 
   const blockPinnedFilter = computed(() => true)
 

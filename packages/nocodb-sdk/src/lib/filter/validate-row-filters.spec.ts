@@ -2,6 +2,7 @@ import {
   RowFilterValidator,
   validateRowFilters,
 } from '~/lib/filter/validate-row-filters';
+import { getPlaceholderNewRow } from '~/lib/filter/filterUtils';
 import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import UITypes from '~/lib/UITypes';
 import { LinksVersion, RelationTypes } from '~/lib/globals';
@@ -75,6 +76,282 @@ describe('validateRowFilters', () => {
       metas: mockMetas,
     });
     expect(result).toBe(true);
+  });
+
+  it('should remove disabled OR filters before evaluating the row', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'active-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+        },
+        {
+          id: 'disabled-filter',
+          fk_column_id: '2',
+          comparison_op: 'eq',
+          logical_op: 'or',
+          value: '42',
+          enabled: false,
+        },
+      ],
+      data: { Name: 'Bob', Age: 42 },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('should remove disabled NOT filters before evaluating the row', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'active-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+        },
+        {
+          id: 'disabled-filter',
+          fk_column_id: '2',
+          comparison_op: 'eq',
+          logical_op: 'not',
+          value: '42',
+          enabled: 0,
+        },
+      ],
+      data: { Name: 'Alice', Age: 42 },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should treat an entirely disabled filter list as no filters', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'disabled-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+          enabled: false,
+        },
+      ],
+      data: { Name: 'Bob' },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should treat a group with only disabled descendants as no filters', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'active-group',
+          is_group: true,
+          fk_parent_id: null,
+        },
+        {
+          id: 'disabled-child',
+          fk_parent_id: 'active-group',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+          enabled: false,
+        },
+      ],
+      data: { Name: 'Bob' },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should evaluate a leading NOT after disabled predecessors are removed', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'disabled-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+          enabled: false,
+        },
+        {
+          id: 'active-filter',
+          fk_column_id: '2',
+          comparison_op: 'eq',
+          logical_op: 'not',
+          value: '42',
+        },
+      ],
+      data: { Name: 'Alice', Age: 41 },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should seed from a leading OR after disabled predecessors are removed', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'disabled-filter',
+        fk_column_id: '2',
+        comparison_op: 'eq',
+        value: '42',
+        enabled: false,
+      },
+      {
+        id: 'active-filter',
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        logical_op: 'or',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({
+      Name: 'Alice',
+    });
+  });
+
+  it('should not seed when OR still connects two effective filters', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'first-filter',
+        fk_column_id: '2',
+        comparison_op: 'eq',
+        value: '42',
+      },
+      {
+        id: 'second-filter',
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        logical_op: 'or',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({});
+  });
+
+  it('should seed from the first effective OR condition in a nested group', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'active-group',
+        is_group: true,
+        fk_parent_id: null,
+      },
+      {
+        id: 'disabled-child',
+        fk_parent_id: 'active-group',
+        fk_column_id: '2',
+        comparison_op: 'eq',
+        value: '42',
+        enabled: false,
+      },
+      {
+        id: 'active-child',
+        fk_parent_id: 'active-group',
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        logical_op: 'or',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({
+      Name: 'Alice',
+    });
+  });
+
+  it('should ignore an empty effective group before a root OR condition', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'empty-group',
+        is_group: true,
+        fk_parent_id: null,
+      },
+      {
+        id: 'disabled-child',
+        fk_parent_id: 'empty-group',
+        fk_column_id: '2',
+        comparison_op: 'eq',
+        value: '42',
+        enabled: false,
+      },
+      {
+        id: 'active-root-filter',
+        fk_parent_id: null,
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        logical_op: 'or',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({
+      Name: 'Alice',
+    });
+  });
+
+  it('should not seed when OR connects two effective nested filters', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'active-group',
+        is_group: true,
+        fk_parent_id: null,
+      },
+      {
+        id: 'first-child',
+        fk_parent_id: 'active-group',
+        fk_column_id: '2',
+        comparison_op: 'eq',
+        value: '42',
+      },
+      {
+        id: 'second-child',
+        fk_parent_id: 'active-group',
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        logical_op: 'or',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({});
+  });
+
+  it('should not seed new rows from disabled filters or their descendants', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'disabled-group',
+        is_group: true,
+        enabled: false,
+      },
+      {
+        id: 'disabled-child',
+        fk_parent_id: 'disabled-group',
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({});
   });
 
   // Test cases for basic comparisons (eq, neq, like, nlike)

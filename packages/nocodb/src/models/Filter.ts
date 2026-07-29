@@ -74,7 +74,7 @@ export default class Filter implements FilterType {
   }
 
   static async supportToggle(_context: NcContext) {
-    return false;
+    return true;
   }
 
   public async getModel(

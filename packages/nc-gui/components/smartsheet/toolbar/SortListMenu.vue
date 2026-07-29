@@ -172,6 +172,11 @@ watch(open, () => {
 
 const getSortIndex = (sort: any) => sorts.value.findIndex((s) => s === sort)
 
+const onSortEnabledChange = async (sort: any, value: boolean | Event) => {
+  sort.enabled = typeof value === 'boolean' ? value : (value.target as HTMLInputElement)?.checked
+  await saveOrUpdate(sort, getSortIndex(sort))
+}
+
 watch(
   () => view?.value?.id,
   (viewId) => {
@@ -260,6 +265,12 @@ watch(
                 :key="sort.id || sort.fk_column_id"
                 class="flex first:mb-0 !mb-1.5 !last:mb-0 items-center"
               >
+                <NcCheckbox
+                  :checked="sort.enabled !== false && sort.enabled !== 0"
+                  size="default"
+                  class="flex-none mr-2 nc-sort-enabled-checkbox"
+                  @change="onSortEnabledChange(sort, $event)"
+                />
                 <SmartsheetToolbarFieldListAutoCompleteDropdown
                   v-model="sort.fk_column_id"
                   class="flex caption nc-sort-field-select !w-44 flex-grow"
@@ -324,6 +335,12 @@ watch(
                 :key="`existing-${i}`"
                 class="flex first:mb-0 !mb-1.5 !last:mb-0 items-center opacity-70"
               >
+                <NcCheckbox
+                  :checked="sort.enabled !== false && sort.enabled !== 0"
+                  size="default"
+                  disabled
+                  class="flex-none mr-2 nc-sort-enabled-checkbox"
+                />
                 <SmartsheetToolbarFieldListAutoCompleteDropdown
                   :model-value="sort.fk_column_id"
                   class="flex caption nc-sort-field-select !w-44 flex-grow"
