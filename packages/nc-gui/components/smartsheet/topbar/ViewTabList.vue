@@ -24,7 +24,22 @@ const { activeView, views, viewsByTable } = storeToRefs(viewsStore)
 
 const { navigateToView, updateView } = viewsStore
 
+const { openedViewsTab } = storeToRefs(viewsStore)
+
 const { isMobileMode } = storeToRefs(useConfigStore())
+
+const route = useRoute()
+
+const showTopbarReloadFallback = computed(() => {
+  if (openedViewsTab.value !== 'view') return false
+
+  return (
+    route.query.disableToolbar === 'true' ||
+    activeView.value?.type === ViewTypes.FORM ||
+    activeView.value?.type === ViewTypes.TIMELINE ||
+    (activeView.value?.type === ViewTypes.CALENDAR && isMobileMode.value)
+  )
+})
 
 const scrollContainerRef = ref<HTMLElement>()
 const viewListRef = ref<HTMLElement>()
@@ -204,6 +219,9 @@ onBeforeUnmount(() => {
           class="flex-none w-3 h-3 opacity-60"
         />
       </div>
+    </div>
+    <div v-if="showTopbarReloadFallback" class="flex-none">
+      <LazySmartsheetToolbarReload />
     </div>
   </div>
 </template>

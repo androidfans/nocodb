@@ -8,6 +8,7 @@ import {
   isDateOrDateTimeCol,
   isLinkV2,
   isLinksOrLTAR,
+  isNumericCol,
   isSystemColumn,
   parseStringDateTime,
   timeFormats,
@@ -248,6 +249,32 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       return relatedTableDisplayValueColumn.value?.title || ''
     })
 
+    const getRelatedTablePrimaryKeyColumn = () => {
+      const primaryKeyColumns = relatedTableMeta.value?.columns?.filter((col) => col.pk) ?? []
+
+      // `#<number>` cannot uniquely represent a composite key, so the shortcut
+      // deliberately applies only to tables with one primary-key column.
+      return primaryKeyColumns.length === 1 ? primaryKeyColumns[0] : undefined
+    }
+
+    const filterLocalLinkedRecords = (records: Record<string, any>[], searchQuery: string) => {
+      const query = searchQuery.trim()
+      if (!query) return records
+
+      const exactId = getExactLinkRecordId(query)
+      const primaryKeyColumn = getRelatedTablePrimaryKeyColumn()
+      if (exactId && primaryKeyColumn) {
+        const comparableId = isNumericCol(primaryKeyColumn) ? exactId.replace(/^0+(?=\d)/, '') : exactId
+
+        return records.filter((record) => `${record[primaryKeyColumn.title] ?? ''}` === comparableId)
+      }
+
+      const normalizedQuery = query.toLocaleLowerCase()
+      return records.filter((record) =>
+        `${record[relatedTableDisplayValueProp.value] ?? ''}`.toLocaleLowerCase().includes(normalizedQuery),
+      )
+    }
+
     // todo: temp fix, handle in backend
     const relatedTableDisplayValuePropId = computed(() => {
       return relatedTableDisplayValueColumn.value?.id || ''
@@ -465,7 +492,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       // the actual primary-key column from the related table instead of
       // assuming that it is visible or named "Id".
       const exactId = getExactLinkRecordId(query)
-      const primaryKeyColumn = relatedTableMeta.value?.columns?.find((col) => col.pk)
+      const primaryKeyColumn = getRelatedTablePrimaryKeyColumn()
       if (exactId && primaryKeyColumn) {
         return `(${primaryKeyColumn.title},eq,${exactId})`
       }
@@ -667,18 +694,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         if (isNewRow?.value || !rowId.value) {
           const colTitle = column.value?.title || ''
           const rawList = newRowState.state?.[colTitle] ?? []
-          const query = childrenListPagination.query.trim()
-          const exactId = getExactLinkRecordId(query)
-          const primaryKeyColumn = relatedTableMeta.value?.columns?.find((col) => col.pk)
-          const normalizedExactId = exactId?.replace(/^0+(?=\d)/, '')
-          const list =
-            exactId && primaryKeyColumn
-              ? rawList.filter((record: Record<string, any>) => `${record[primaryKeyColumn.title] ?? ''}` === normalizedExactId)
-              : query
-              ? rawList.filter((record: Record<string, any>) =>
-                  `${record[relatedTableDisplayValueProp.value] ?? ''}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()),
-                )
-              : rawList
+          const list = filterLocalLinkedRecords(rawList, childrenListPagination.query)
           childrenList.value = {
             list,
             pageInfo: {
@@ -1147,12 +1163,7 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
         // Client-side filtering for new rows
         const colTitle = column.value?.title || ''
         const rawList = newRowState.state?.[colTitle] ?? []
-        const query = childrenListPagination.query.toLocaleLowerCase()
-        const list = query
-          ? rawList.filter((record: Record<string, any>) =>
-              `${record[relatedTableDisplayValueProp.value] ?? ''}`.toLocaleLowerCase().includes(query),
-            )
-          : rawList
+        const list = filterLocalLinkedRecords(rawList, childrenListPagination.query)
         return {
           list: list.slice(offset, offset + limit),
           pageInfo: { totalRows: list.length },
