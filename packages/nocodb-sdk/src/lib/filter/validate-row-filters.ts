@@ -626,7 +626,7 @@ export class RowFilterValidator {
           isValid = isValid || !!res;
           break;
         case 'not':
-          isValid = isValid && !res;
+          isValid = (isValid ?? true) && !res;
           break;
         case 'and':
         default:

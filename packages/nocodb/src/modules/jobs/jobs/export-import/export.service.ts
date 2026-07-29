@@ -133,7 +133,6 @@ export class ExportService {
               comparison_op: fl.comparison_op,
               comparison_sub_op: fl.comparison_sub_op,
               value: fl.value,
-              enabled: fl.enabled,
             };
 
             if (tempFl.is_group) {
@@ -414,7 +413,6 @@ export class ExportService {
                 comparison_op: fl.comparison_op,
                 comparison_sub_op: fl.comparison_sub_op,
                 value: fl.value,
-                enabled: fl.enabled,
               };
               if (tempFl.is_group) {
                 delete tempFl.comparison_op;
@@ -449,7 +447,6 @@ export class ExportService {
               comparison_sub_op: fl.comparison_sub_op,
               value: fl.value,
               meta: fl.meta,
-              enabled: fl.enabled,
             };
             if (tempFl.is_group) {
               delete tempFl.comparison_op;
@@ -467,7 +464,6 @@ export class ExportService {
             const tempSr = {
               fk_column_id: idMap.get(sr.fk_column_id),
               direction: sr.direction,
-              enabled: sr.enabled,
             };
             export_sorts.push(tempSr);
           }
@@ -594,7 +590,6 @@ export class ExportService {
                 comparison_op: fl.comparison_op,
                 comparison_sub_op: fl.comparison_sub_op,
                 value: fl.value,
-                enabled: fl.enabled,
               };
               if (tempFl.is_group) {
                 delete tempFl.comparison_op;
@@ -735,9 +730,7 @@ export class ExportService {
           id: idMap.get(view.id),
           type: view.type,
           meta: RowColorViewHelpers.withContext(context).mapMetaColumn({
-            // Sort and group states are exported on their owning records. The
-            // meta copy contains source IDs that cannot survive an import.
-            meta: View.withoutConditionToggles(view.meta),
+            meta: view.meta,
             idMap,
           }),
           is_default: (view as any).is_default,

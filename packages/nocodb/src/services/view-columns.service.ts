@@ -453,6 +453,9 @@ export class ViewColumnsService {
         }
       }
 
+      // Product decision: the normal single-user UI toggles one group at a
+      // time. Rare bulk/import updates of multiple group toggles may race in
+      // view meta; keep parallel column updates and document that limitation.
       await Promise.all(updateOrInsertOptions);
 
       await ncMeta.commit();

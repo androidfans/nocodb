@@ -900,7 +900,9 @@ export const getPlaceholderNewRow = (
 ) => {
   filters = filterOutDisabledFilters(filters);
 
-  if (filters.some((filter) => filter.logical_op === 'or')) {
+  // The first effective condition has no predecessor, so its stored connector
+  // must not prevent default generation after earlier conditions are disabled.
+  if (filters.slice(1).some((filter) => filter.logical_op === 'or')) {
     return {};
   }
   const placeholderNewRow: Record<string, any> = {};
