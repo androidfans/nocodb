@@ -24,8 +24,6 @@ const { activeView, views, viewsByTable } = storeToRefs(viewsStore)
 
 const { navigateToView, updateView } = viewsStore
 
-const { openedViewsTab } = storeToRefs(viewsStore)
-
 const { isMobileMode } = storeToRefs(useConfigStore())
 
 const scrollContainerRef = ref<HTMLElement>()
@@ -207,9 +205,6 @@ onBeforeUnmount(() => {
         />
       </div>
     </div>
-    <div v-if="openedViewsTab === 'view'" class="nc-view-tab-reload">
-      <LazySmartsheetToolbarReload />
-    </div>
   </div>
 </template>
 
@@ -248,9 +243,5 @@ onBeforeUnmount(() => {
 
 .nc-view-tab-title {
   @apply max-w-32;
-}
-
-.nc-view-tab-reload {
-  @apply flex-none;
 }
 </style>
