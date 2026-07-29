@@ -30,6 +30,9 @@ interface ReloadRowDataParams {
 
 const getExactLinkRecordId = (query?: string) => query?.trim().match(/^#(\d+)$/)?.[1]
 
+const isPrecisionSafeExactLinkRecordId = (id: string, column: ColumnType) =>
+  !isNumericCol(column) || Number.isSafeInteger(Number(id))
+
 /** Store for managing Link to another cells */
 const [useProvideLTARStore, useLTARStore] = useInjectionState(
   (
@@ -264,6 +267,10 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       const exactId = getExactLinkRecordId(query)
       const primaryKeyColumn = getRelatedTablePrimaryKeyColumn()
       if (exactId && primaryKeyColumn) {
+        // Server-side numeric filters coerce values to JavaScript numbers.
+        // Refuse unsafe integers rather than rounding to a different record ID.
+        if (!isPrecisionSafeExactLinkRecordId(exactId, primaryKeyColumn)) return []
+
         const comparableId = isNumericCol(primaryKeyColumn) ? exactId.replace(/^0+(?=\d)/, '') : exactId
 
         return records.filter((record) => `${record[primaryKeyColumn.title] ?? ''}` === comparableId)
@@ -494,6 +501,12 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       const exactId = getExactLinkRecordId(query)
       const primaryKeyColumn = getRelatedTablePrimaryKeyColumn()
       if (exactId && primaryKeyColumn) {
+        // A primary key cannot be blank, so this deliberately returns no rows
+        // when the numeric filter pipeline cannot represent the requested ID.
+        if (!isPrecisionSafeExactLinkRecordId(exactId, primaryKeyColumn)) {
+          return `(${primaryKeyColumn.id},blank)`
+        }
+
         // Column IDs are valid filter aliases and cannot collide with xwhere syntax,
         // unlike user-defined titles containing commas or parentheses.
         return `(${primaryKeyColumn.id},eq,${exactId})`
