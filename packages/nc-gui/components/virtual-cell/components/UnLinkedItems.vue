@@ -480,6 +480,17 @@ const onFilterChange = () => {
 
 const isSearchInputFocused = ref(false)
 
+const isDateDisplaySearch = computed(
+  () => relatedTableDisplayValueColumn.value && isDateOrDateTimeCol(relatedTableDisplayValueColumn.value),
+)
+
+const isExactIdSearch = computed(() => childrenExcludedListPagination.query.trimStart().startsWith('#'))
+
+const activateExactIdSearch = () => {
+  childrenExcludedListPagination.query = '#'
+  nextTick(() => filterQueryRef.value?.focus())
+}
+
 const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     if (!childrenExcludedListPagination.query) emit('escape')
@@ -512,7 +523,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
           <div class="flex-1 nc-dropdown-link-record-search-wrapper flex items-center rounded-md">
             <!-- Utilize SmartsheetToolbarFilterInput component to filter the records for Date or DateTime column -->
             <SmartsheetToolbarFilterInput
-              v-if="relatedTableDisplayValueColumn && isDateOrDateTimeCol(relatedTableDisplayValueColumn)"
+              v-if="isDateDisplaySearch && !isExactIdSearch"
               class="nc-filter-value-select rounded-md min-w-34"
               :column="relatedTableDisplayValueColumn"
               :filter="{
@@ -523,6 +534,16 @@ const handleKeyDown = (e: KeyboardEvent) => {
               @update-filter-value="childrenExcludedListPagination.query = $event"
               @click.stop
             />
+            <NcTooltip v-if="isDateDisplaySearch && !isExactIdSearch" placement="bottom">
+              <template #title>Search by record ID</template>
+              <button
+                type="button"
+                class="flex-none px-1.5 h-6 rounded text-nc-content-gray-muted hover:(bg-nc-bg-gray-medium text-nc-content-gray-emphasis)"
+                @click.stop="activateExactIdSearch"
+              >
+                #
+              </button>
+            </NcTooltip>
             <a-input
               v-else
               ref="filterQueryRef"

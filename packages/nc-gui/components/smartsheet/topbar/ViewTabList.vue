@@ -33,11 +33,13 @@ const route = useRoute()
 const showTopbarReloadFallback = computed(() => {
   if (openedViewsTab.value !== 'view') return false
 
+  // ViewTabList is desktop-only, and the old reload control was therefore
+  // desktop-only too. This fallback preserves that existing availability for
+  // desktop views that have no toolbar; it does not introduce a mobile action.
   return (
     route.query.disableToolbar === 'true' ||
     activeView.value?.type === ViewTypes.FORM ||
-    activeView.value?.type === ViewTypes.TIMELINE ||
-    (activeView.value?.type === ViewTypes.CALENDAR && isMobileMode.value)
+    activeView.value?.type === ViewTypes.TIMELINE
   )
 })
 
