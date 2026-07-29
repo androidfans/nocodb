@@ -843,6 +843,51 @@ export const comparisonSubOpList = (
   ];
 };
 
+export const isFilterEnabled = (filter: Pick<FilterType, 'enabled'>) =>
+  filter.enabled !== false && filter.enabled !== 0;
+
+/**
+ * Removes disabled filters before they enter evaluation or default generation.
+ * Descendants of a disabled group are removed as well, including flat filter
+ * lists where ancestry is represented through fk_parent_id.
+ */
+export const filterOutDisabledFilters = <T extends FilterType>(
+  filters: T[]
+): T[] => {
+  const filtersById = new Map(
+    filters
+      .filter((filter) => filter.id)
+      .map((filter) => [filter.id as string, filter])
+  );
+  const enabledById = new Map<string, boolean>();
+
+  const isEnabledWithAncestors = (filter: T): boolean => {
+    if (!isFilterEnabled(filter)) return false;
+
+    const visited = new Set<string>();
+    let parentId = filter.fk_parent_id;
+    while (parentId) {
+      if (visited.has(parentId)) break;
+      visited.add(parentId);
+
+      const parent = filtersById.get(parentId);
+      if (!parent) break;
+
+      const cached = enabledById.get(parentId);
+      if (cached === false || !isFilterEnabled(parent)) return false;
+      parentId = parent.fk_parent_id;
+    }
+
+    return true;
+  };
+
+  return filters.filter((filter) => {
+    const enabled = isEnabledWithAncestors(filter);
+    if (filter.id) enabledById.set(filter.id, enabled);
+    return enabled;
+  });
+};
+
 export const getPlaceholderNewRow = (
   filters: Filter[],
   columns: ColumnType[],
@@ -853,6 +898,8 @@ export const getPlaceholderNewRow = (
     };
   }
 ) => {
+  filters = filterOutDisabledFilters(filters);
+
   if (filters.some((filter) => filter.logical_op === 'or')) {
     return {};
   }

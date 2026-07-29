@@ -313,6 +313,9 @@ export class FiltersV3Service {
         const rootGroupResponse = await Filter.insert(
           context,
           {
+            ...('enabled' in groupOrFilter
+              ? { enabled: groupOrFilter.enabled }
+              : {}),
             is_group: true,
             fk_parent_id: null, // Root groups have no parent
             logical_op: extractLogicalOp(logicalOp),
@@ -331,6 +334,9 @@ export class FiltersV3Service {
       const rootGroupResponse = await Filter.insert(
         context,
         {
+          ...('enabled' in groupOrFilter
+            ? { enabled: groupOrFilter.enabled }
+            : {}),
           is_group: true,
           fk_parent_id: parentId, // Root groups have no parent
           logical_op: extractLogicalOp(logicalOp),
@@ -522,6 +528,15 @@ export class FiltersV3Service {
           logicalOp: extractLogicalOp(
             (param.filter as FilterGroupV3Type).group_operator,
           ),
+        });
+      }
+
+      if ('enabled' in param.filter) {
+        await this.filtersService.filterUpdate(context, {
+          filterId: param.filterId,
+          filter: { enabled: param.filter.enabled } as FilterReqType,
+          user: param.user,
+          req: param.req,
         });
       }
     } else {

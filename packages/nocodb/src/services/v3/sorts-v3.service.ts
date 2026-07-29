@@ -23,10 +23,11 @@ export class SortsV3Service {
     SortCreateV3Type | SortUpdateV3Type,
     SortType
   >({
-    allowed: ['id', 'field_id', 'direction'],
+    allowed: ['id', 'field_id', 'direction', 'enabled'],
     mappings: {
       field_id: 'fk_column_id',
     },
+    booleanProps: ['enabled'],
   });
 
   constructor(protected readonly sortsService: SortsService) {}

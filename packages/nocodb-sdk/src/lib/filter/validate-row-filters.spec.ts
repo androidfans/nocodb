@@ -2,6 +2,7 @@ import {
   RowFilterValidator,
   validateRowFilters,
 } from '~/lib/filter/validate-row-filters';
+import { getPlaceholderNewRow } from '~/lib/filter/filterUtils';
 import { ColumnType, FilterType, LinkToAnotherRecordType } from '~/lib/Api';
 import UITypes from '~/lib/UITypes';
 import { LinksVersion, RelationTypes } from '~/lib/globals';
@@ -75,6 +76,79 @@ describe('validateRowFilters', () => {
       metas: mockMetas,
     });
     expect(result).toBe(true);
+  });
+
+  it('should remove disabled OR filters before evaluating the row', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'active-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+        },
+        {
+          id: 'disabled-filter',
+          fk_column_id: '2',
+          comparison_op: 'eq',
+          logical_op: 'or',
+          value: '42',
+          enabled: false,
+        },
+      ],
+      data: { Name: 'Bob', Age: 42 },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(false);
+  });
+
+  it('should remove disabled NOT filters before evaluating the row', () => {
+    const result = validateRowFilters({
+      filters: [
+        {
+          id: 'active-filter',
+          fk_column_id: '1',
+          comparison_op: 'eq',
+          value: 'Alice',
+        },
+        {
+          id: 'disabled-filter',
+          fk_column_id: '2',
+          comparison_op: 'eq',
+          logical_op: 'not',
+          value: '42',
+          enabled: 0,
+        },
+      ],
+      data: { Name: 'Alice', Age: 42 },
+      columns: mockColumns,
+      client: mockClient,
+      metas: mockMetas,
+    });
+
+    expect(result).toBe(true);
+  });
+
+  it('should not seed new rows from disabled filters or their descendants', () => {
+    const filters: FilterType[] = [
+      {
+        id: 'disabled-group',
+        is_group: true,
+        enabled: false,
+      },
+      {
+        id: 'disabled-child',
+        fk_parent_id: 'disabled-group',
+        fk_column_id: '1',
+        comparison_op: 'eq',
+        value: 'Alice',
+      },
+    ];
+
+    expect(getPlaceholderNewRow(filters, mockColumns)).toEqual({});
   });
 
   // Test cases for basic comparisons (eq, neq, like, nlike)

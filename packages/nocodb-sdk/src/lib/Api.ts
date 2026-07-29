@@ -2073,6 +2073,8 @@ export interface FilterGroupV3Type {
   parent_id?: string;
   /** Logical operator for combining filters in the group. */
   group_operator: 'AND' | 'OR';
+  /** Whether this filter group is enabled. */
+  enabled?: boolean;
   /** Nested filters or filter groups. */
   filters: (
     | FilterV3Type
@@ -2084,6 +2086,8 @@ export interface FilterGroupV3Type {
 export interface FilterGroupLevel1V3Type {
   /** Logical operator for the group. */
   group_operator: 'AND' | 'OR';
+  /** Whether this filter group is enabled. Defaults to true. */
+  enabled?: boolean;
   /** List of filters or nested filter groups at level 2. */
   filters: (FilterV3Type | FilterGroupLevel2V3Type)[];
 }
@@ -2091,6 +2095,8 @@ export interface FilterGroupLevel1V3Type {
 export interface FilterGroupLevel2V3Type {
   /** Logical operator for the group. */
   group_operator: 'AND' | 'OR';
+  /** Whether this filter group is enabled. Defaults to true. */
+  enabled?: boolean;
   /** List of filters or nested filter groups at level 3. */
   filters: (FilterV3Type | FilterGroupLevel3V3Type)[];
 }
@@ -2098,6 +2104,8 @@ export interface FilterGroupLevel2V3Type {
 export interface FilterGroupLevel3V3Type {
   /** Logical operator for the group. */
   group_operator: 'AND' | 'OR';
+  /** Whether this filter group is enabled. Defaults to true. */
+  enabled?: boolean;
   /** List of filters in this group. */
   filters: FilterV3Type[];
 }
@@ -2120,6 +2128,8 @@ export interface FilterV3Type {
   sub_operator?: string | null;
   /** Value for comparison. */
   value?: string | number | boolean | null;
+  /** Whether this filter condition is enabled. Defaults to true. */
+  enabled?: boolean;
 }
 
 export type FieldUpdateV3Type = FieldBaseV3Type &
@@ -3633,6 +3643,8 @@ export interface SortUpdateV3Type {
   field_id?: string;
   /** Sorting direction, either 'asc' (ascending) or 'desc' (descending). */
   direction?: 'asc' | 'desc';
+  /** Whether this sort condition is enabled. */
+  enabled?: boolean;
 }
 
 export interface SortCreateV3Type {
@@ -3640,6 +3652,8 @@ export interface SortCreateV3Type {
   field_id: string;
   /** Sorting direction, either 'asc' (ascending) or 'desc' (descending). */
   direction?: 'asc' | 'desc';
+  /** Whether this sort condition is enabled. Defaults to true. */
+  enabled?: boolean;
 }
 
 export interface SortV3Type {
@@ -3652,6 +3666,8 @@ export interface SortV3Type {
   field_id: string;
   /** Sorting direction, either 'asc' (ascending) or 'desc' (descending). */
   direction: 'asc' | 'desc';
+  /** Whether this sort condition is enabled. */
+  enabled: boolean;
 }
 
 export type TableUpdateV3Type = {

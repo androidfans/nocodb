@@ -16,6 +16,7 @@ import { getNodejsTimezone } from '~/lib/timezoneUtils';
 import { ColumnHelper } from '~/lib/columnHelper/column-helper';
 import { CURRENT_USER_TOKEN } from '~/lib/globals';
 import { getMetaWithCompositeKey } from '~/lib/helpers/metaHelpers';
+import { filterOutDisabledFilters } from '~/lib/filter/filterUtils';
 
 extend(utc);
 extend(timezone);
@@ -61,15 +62,14 @@ export class RowFilterValidator {
       return true;
     }
 
-    const filters: (FilterType & { meta?: any })[] = buildFilterTree(_filters);
+    const filters: (FilterType & { meta?: any })[] = buildFilterTree(
+      filterOutDisabledFilters(_filters)
+    );
 
     let isValid: boolean | null = null;
     for (const filter of filters) {
       let res;
-      // if filter is disabled, it is valid
-      if (filter.enabled === false || (filter.enabled as any) === 0) {
-        res = true;
-      } else if (filter.is_group && filter.children?.length) {
+      if (filter.is_group && filter.children?.length) {
         res = validateRowFilters({
           filters: filter.children,
           data: data,
