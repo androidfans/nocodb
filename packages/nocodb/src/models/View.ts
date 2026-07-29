@@ -204,7 +204,7 @@ export default class View implements ViewType {
       { meta: JSON.stringify(meta) },
       viewId,
     );
-    ncMeta.knex.attachToTransaction(async () => {
+    await ncMeta.knex.attachToTransaction(async () => {
       await NocoCache.update(context, `${CacheScope.VIEW}:${viewId}`, { meta });
       await NocoCache.del(
         { workspace_id: RootScopes.BYPASS, base_id: RootScopes.BYPASS },

@@ -259,7 +259,9 @@ export default class GridViewColumn implements GridColumnType {
         viewColumn.fk_view_id,
         'groupBy',
         viewColumn.fk_column_id,
-        'group_by_enabled' in body
+        body.group_by === false || body.group_by === 0 || body.group_by === null
+          ? true
+          : 'group_by_enabled' in body
           ? body.group_by_enabled !== false && body.group_by_enabled !== 0
           : true,
         ncMeta,
