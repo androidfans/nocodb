@@ -1,6 +1,7 @@
 import UITypes, { isNumericCol, numericUITypes } from '~/lib/UITypes';
 import type { Api, ColumnType, FilterType } from '~/lib/Api';
 import { isDateMonthFormat } from '~/lib/dateTimeHelper';
+import { buildFilterTree } from '~/lib/filterHelpers';
 import { parseProp } from '~/lib/helperFunctions';
 
 export interface ComparisonOpUiType {
@@ -888,6 +889,17 @@ export const filterOutDisabledFilters = <T extends FilterType>(
   });
 };
 
+const pruneEmptyFilterGroups = (filters: FilterType[]): FilterType[] =>
+  filters.flatMap((filter) => {
+    if (!filter.is_group) return [filter];
+
+    const children = pruneEmptyFilterGroups(filter.children ?? []);
+    return children.length ? [{ ...filter, children }] : [];
+  });
+
+export const getEffectiveFilterTree = (filters: FilterType[]) =>
+  pruneEmptyFilterGroups(buildFilterTree(filterOutDisabledFilters(filters)));
+
 export const getPlaceholderNewRow = (
   filters: Filter[],
   columns: ColumnType[],
@@ -898,13 +910,18 @@ export const getPlaceholderNewRow = (
     };
   }
 ) => {
-  filters = filterOutDisabledFilters(filters);
+  const hasEffectiveOr = (siblings: FilterType[]): boolean =>
+    siblings.some(
+      (filter, index) =>
+        (index > 0 && filter.logical_op === 'or') ||
+        hasEffectiveOr(filter.children ?? [])
+    );
 
-  // The first effective condition has no predecessor, so its stored connector
-  // must not prevent default generation after earlier conditions are disabled.
-  if (filters.slice(1).some((filter) => filter.logical_op === 'or')) {
+  if (hasEffectiveOr(getEffectiveFilterTree(filters))) {
     return {};
   }
+
+  filters = filterOutDisabledFilters(filters);
   const placeholderNewRow: Record<string, any> = {};
   for (const eachFilter of filters) {
     if (
