@@ -1,8 +1,8 @@
 <script lang="ts" setup>
 const route = useRoute()
 const TAB_SPLIT_PERCENT_DEFAULT = 40
-const TAB_SPLIT_PERCENT_MIN = 20
-const TAB_SPLIT_PERCENT_MAX = 80
+const TAB_SPLIT_SECTION_MIN_WIDTH_PX = 160
+const TAB_SPLIT_HANDLE_WIDTH_PX = 16
 const TAB_SPLIT_STORAGE_KEY = 'nc:smartsheet:topbar:tab-split:v1'
 
 const { isUIAllowed } = useRoles()
@@ -38,15 +38,25 @@ const showTabSections = computed(
   () => !isPublic.value && !activeScriptId.value && !activeDashboardId.value && !activeWorkflowId.value && !isMobileMode.value,
 )
 
-const tabSplitPercent = ref(TAB_SPLIT_PERCENT_DEFAULT)
+const tabSplitWidthPx = ref<number>()
 const isDraggingSplit = ref(false)
 const tabSplitAreaRef = ref<HTMLElement>()
 const isTabSplitInitialized = ref(false)
 
-const normalizeTabSplitPercent = (value: unknown) => {
+const { width: tabSplitAreaWidth } = useElementSize(tabSplitAreaRef)
+
+const normalizeTabSplitWidthPx = (value: unknown) => {
   const num = Number(value)
-  if (!Number.isFinite(num)) return TAB_SPLIT_PERCENT_DEFAULT
-  return Math.min(TAB_SPLIT_PERCENT_MAX, Math.max(TAB_SPLIT_PERCENT_MIN, num))
+  if (!Number.isFinite(num)) return undefined
+  return Math.max(TAB_SPLIT_SECTION_MIN_WIDTH_PX, num)
+}
+
+const clampTabSplitWidthPx = (value: number, areaWidth: number) => {
+  if (!areaWidth) return Math.max(TAB_SPLIT_SECTION_MIN_WIDTH_PX, value)
+
+  const maxWidth = Math.max(0, areaWidth - TAB_SPLIT_SECTION_MIN_WIDTH_PX - TAB_SPLIT_HANDLE_WIDTH_PX)
+  const minWidth = Math.min(TAB_SPLIT_SECTION_MIN_WIDTH_PX, maxWidth)
+  return Math.min(maxWidth, Math.max(minWidth, value))
 }
 
 const tabSplitStorageScope = computed(() => {
@@ -58,7 +68,11 @@ const tabSplitStorageScope = computed(() => {
 
 const tabSectionStyle = computed(() => {
   if (!showTabSections.value) return undefined
-  return { width: `${tabSplitPercent.value}%` }
+  if (tabSplitWidthPx.value === undefined) return { width: `${TAB_SPLIT_PERCENT_DEFAULT}%` }
+
+  // Clamp only the rendered width so a temporarily narrow viewport does not
+  // overwrite the user's left-anchored position for wider screens.
+  return { width: `${clampTabSplitWidthPx(tabSplitWidthPx.value, tabSplitAreaWidth.value)}px` }
 })
 
 const getTabSplitStorage = () => {
@@ -86,16 +100,16 @@ const setTabSplitStorage = (next: Record<string, unknown>) => {
 watch(
   tabSplitStorageScope,
   (scope) => {
-    tabSplitPercent.value = normalizeTabSplitPercent(getTabSplitStorage()[scope])
+    tabSplitWidthPx.value = normalizeTabSplitWidthPx(getTabSplitStorage()[scope])
     isTabSplitInitialized.value = true
   },
   { immediate: true },
 )
 
-const persistTabSplitPercent = () => {
-  if (!isTabSplitInitialized.value) return
+const persistTabSplitWidth = () => {
+  if (!isTabSplitInitialized.value || tabSplitWidthPx.value === undefined) return
   const next = getTabSplitStorage()
-  next[tabSplitStorageScope.value] = normalizeTabSplitPercent(tabSplitPercent.value)
+  next[tabSplitStorageScope.value] = tabSplitWidthPx.value
   setTabSplitStorage(next)
 }
 
@@ -107,13 +121,12 @@ const onSplitDragStart = (e: MouseEvent) => {
     const splitAreaEl = tabSplitAreaRef.value
     if (!splitAreaEl) return
     const rect = splitAreaEl.getBoundingClientRect()
-    const pct = ((ev.clientX - rect.left) / rect.width) * 100
-    tabSplitPercent.value = normalizeTabSplitPercent(pct)
+    tabSplitWidthPx.value = clampTabSplitWidthPx(ev.clientX - rect.left, rect.width)
   }
 
   const onUp = () => {
     isDraggingSplit.value = false
-    persistTabSplitPercent()
+    persistTabSplitWidth()
     document.removeEventListener('mousemove', onMove)
     document.removeEventListener('mouseup', onUp)
   }
