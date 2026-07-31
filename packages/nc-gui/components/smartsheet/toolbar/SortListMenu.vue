@@ -274,6 +274,7 @@ watch(
                 <SmartsheetToolbarFieldListAutoCompleteDropdown
                   v-model="sort.fk_column_id"
                   class="flex caption nc-sort-field-select !w-44 flex-grow"
+                  :class="{ 'opacity-40': sort.enabled === false || sort.enabled === 0 }"
                   :columns="columns"
                   is-sort
                   :meta="meta"
@@ -285,6 +286,7 @@ watch(
                 <NcSelect
                   v-model:value="sort.direction"
                   class="flex flex-grow-1 w-full nc-sort-dir-select"
+                  :class="{ 'opacity-40': sort.enabled === false || sort.enabled === 0 }"
                   :label="$t('labels.operation')"
                   dropdown-class-name="sort-dir-dropdown nc-dropdown-sort-dir !rounded-lg"
                   :disabled="false"
