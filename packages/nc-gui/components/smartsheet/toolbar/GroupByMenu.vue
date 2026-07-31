@@ -416,6 +416,7 @@ const getFieldsToGroupBy = (currentGroup: Group) => {
                     type="secondary"
                     size="small"
                     class="!border-r-transparent !rounded-r-none"
+                    :class="{ 'opacity-40': group.enabled === false || group.enabled === 0 }"
                     :shadow="false"
                     :disabled="isLocked"
                   >
@@ -424,7 +425,10 @@ const getFieldsToGroupBy = (currentGroup: Group) => {
                   <LazySmartsheetToolbarFieldListAutoCompleteDropdown
                     v-model="group.fk_column_id"
                     class="caption nc-group-field-select !w-36"
-                    :class="!appInfo.ee || hideReorder ? 'nc-disable-reorder' : ''"
+                    :class="[
+                      !appInfo.ee || hideReorder ? 'nc-disable-reorder' : '',
+                      { 'opacity-40': group.enabled === false || group.enabled === 0 },
+                    ]"
                     :columns="getFieldsToGroupBy(group)"
                     :allow-empty="true"
                     :meta="meta"
@@ -436,6 +440,7 @@ const getFieldsToGroupBy = (currentGroup: Group) => {
                     ref=""
                     v-model:value="group.sort"
                     class="flex flex-grow-1 w-full nc-group-sort-dir-select"
+                    :class="{ 'opacity-40': group.enabled === false || group.enabled === 0 }"
                     :label="$t('labels.operation')"
                     dropdown-class-name="sort-dir-dropdown nc-dropdown-group-sort-dir"
                     :disabled="!group.fk_column_id || isLocked"
