@@ -14,6 +14,7 @@ import {
   timeFormats,
 } from 'nocodb-sdk'
 import type { ComputedRef, Ref } from 'vue'
+import { normalizeLocalLinkedRecords } from '~/utils/linkRecordUtils'
 
 interface DataApiResponse {
   list: Record<string, any>[]
@@ -260,7 +261,11 @@ const [useProvideLTARStore, useLTARStore] = useInjectionState(
       return primaryKeyColumns.length === 1 ? primaryKeyColumns[0] : undefined
     }
 
-    const filterLocalLinkedRecords = (records: Record<string, any>[], searchQuery: string) => {
+    const filterLocalLinkedRecords = (value: unknown, searchQuery: string) => {
+      // New rows store single-target relations as one object and multi-target
+      // relations as an array. Normalize at the local-list boundary so every
+      // downstream consumer can safely use array operations.
+      const records = normalizeLocalLinkedRecords(value)
       const query = searchQuery.trim()
       if (!query) return records
 
