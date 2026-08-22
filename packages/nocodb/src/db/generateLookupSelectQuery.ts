@@ -616,12 +616,9 @@ export default async function generateLookupSelectQuery({
       if (baseModelSqlv2.isPg) {
         // alternate approach with array_agg
         return {
-          // Ignore linked rows with NULL lookup values so group/sort keys
-          // reflect visible values rather than the number of linked rows.
           builder: knex
             .select(knex.raw('json_agg(??)::text', [lookupColumn.id]))
-            .from(selectQb.as(subQueryAlias))
-            .whereNotNull(lookupColumn.id),
+            .from(selectQb.as(subQueryAlias)),
           applyCte,
         };
         /*
@@ -648,8 +645,7 @@ export default async function generateLookupSelectQuery({
             .select(
               knex.raw('cast(JSON_ARRAYAGG(??) as NCHAR)', [lookupColumn.id]),
             )
-            .from(selectQb.as(subQueryAlias))
-            .whereNotNull(lookupColumn.id),
+            .from(selectQb.as(subQueryAlias)),
           applyCte,
         };
 
@@ -675,8 +671,7 @@ export default async function generateLookupSelectQuery({
                 LOOKUP_VAL_SEPARATOR,
               ]),
             )
-            .from(selectQb.as(subQueryAlias))
-            .whereNotNull(lookupColumn.id),
+            .from(selectQb.as(subQueryAlias)),
           applyCte,
         };
       }
