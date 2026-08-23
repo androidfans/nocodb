@@ -10,6 +10,39 @@ import type { FormulaColumn } from '~/models';
 import formulaQueryBuilderv2 from '~/db/formulav2/formulaQueryBuilderv2';
 import { Column, Filter } from '~/models';
 
+type GroupByFilter = Filter & { groupby?: boolean };
+
+const DATE_TIME_UIDTS = new Set<string>([
+  UITypes.DateTime,
+  UITypes.CreatedTime,
+  UITypes.LastModifiedTime,
+]);
+
+function normalizeArrayGroupValue(value: unknown, referencedUidt?: string) {
+  let parsedValue = value;
+
+  if (typeof value === 'string') {
+    try {
+      parsedValue = JSON.parse(value);
+    } catch {
+      return value;
+    }
+  }
+
+  if (!Array.isArray(parsedValue)) return value;
+
+  if (!referencedUidt || !DATE_TIME_UIDTS.has(referencedUidt)) {
+    return parsedValue;
+  }
+
+  return parsedValue.map((item) => {
+    if (typeof item !== 'string') return item;
+
+    const date = new Date(item);
+    return Number.isNaN(date.getTime()) ? item : date;
+  });
+}
+
 export class FormulaGeneralHandler extends ComputedFieldHandler {
   override async filter(
     knex: CustomKnex,
@@ -36,15 +69,23 @@ export class FormulaGeneralHandler extends ComputedFieldHandler {
       })
     ).builder;
     const parsedTree: ParsedFormulaNode = formula.getParsedTree();
+    const filterValue =
+      parsedTree?.dataType === FormulaDataTypes.ARRAY &&
+      (filter as GroupByFilter).groupby
+        ? normalizeArrayGroupValue(
+            filter.value,
+            parsedTree.referencedColumn?.uidt,
+          )
+        : filter.value;
     const value =
       parsedTree?.dataType === FormulaDataTypes.DATE
-        ? filter.value
+        ? filterValue
         : knex.raw('?', [
             // convert value to number if formulaDataType if numeric
             parsedTree?.dataType === FormulaDataTypes.NUMERIC &&
-            !isNaN(+filter.value)
-              ? +filter.value
-              : filter.value ?? null, // in gp_null value is undefined
+            !isNaN(+filterValue)
+              ? +filterValue
+              : filterValue ?? null, // in gp_null value is undefined
           ]);
     return parseConditionV2(
       baseModelSqlv2,

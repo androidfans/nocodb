@@ -644,7 +644,7 @@ async function saveHeaderDisplayName() {
   if (nextLabel === initialHeaderLabel.value) return
 
   try {
-    await updateGridViewColumn(column.value.id, { label: nextLabel || null })
+    await updateGridViewColumn(column.value.id, { label: nextLabel })
     initialHeaderLabel.value = nextLabel
   } catch (e) {
     message.error((await extractSdkResponseErrorMsg(e)) || 'Failed to update header display name')
