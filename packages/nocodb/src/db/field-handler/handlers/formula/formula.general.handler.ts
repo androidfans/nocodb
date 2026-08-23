@@ -12,37 +12,17 @@ import { Column, Filter } from '~/models';
 
 type GroupByFilter = Filter & { groupby?: boolean };
 
-// Date arrays remain strings so PostgreSQL infers date[] without introducing
-// timezone shifts; only timestamp-like values need conversion from UTC ISO.
-const DATE_TIME_UIDTS = new Set<string>([
-  UITypes.DateTime,
-  UITypes.CreatedTime,
-  UITypes.LastModifiedTime,
-]);
-
-function normalizeArrayGroupValue(value: unknown, referencedUidt?: string) {
-  let parsedValue = value;
-
+function normalizeArrayGroupValue(value: unknown) {
   if (typeof value === 'string') {
     try {
-      parsedValue = JSON.parse(value);
+      const parsedValue = JSON.parse(value);
+      return Array.isArray(parsedValue) ? parsedValue : value;
     } catch {
       return value;
     }
   }
 
-  if (!Array.isArray(parsedValue)) return value;
-
-  if (!referencedUidt || !DATE_TIME_UIDTS.has(referencedUidt)) {
-    return parsedValue;
-  }
-
-  return parsedValue.map((item) => {
-    if (typeof item !== 'string') return item;
-
-    const date = new Date(item);
-    return Number.isNaN(date.getTime()) ? item : date;
-  });
+  return value;
 }
 
 export class FormulaGeneralHandler extends ComputedFieldHandler {
@@ -76,10 +56,7 @@ export class FormulaGeneralHandler extends ComputedFieldHandler {
     const filterValue =
       parsedTree?.dataType === FormulaDataTypes.ARRAY &&
       (filter as GroupByFilter).groupby
-        ? normalizeArrayGroupValue(
-            filter.value,
-            parsedTree.referencedColumn?.uidt,
-          )
+        ? normalizeArrayGroupValue(filter.value)
         : filter.value;
     const value =
       parsedTree?.dataType === FormulaDataTypes.DATE
