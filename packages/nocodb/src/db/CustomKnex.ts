@@ -15,20 +15,42 @@ const pgTypes = {
   FLOAT8: 701,
   DATE: 1082,
   TIMESTAMP: 1114,
+  TIMESTAMP_ARRAY: 1115,
   TIMESTAMPTZ: 1184,
+  TIMESTAMPTZ_ARRAY: 1185,
   NUMERIC: 1700,
 };
+
+type PgArrayParser = {
+  create: (
+    source: string,
+    transform: (entry: string) => unknown,
+  ) => { parse: () => unknown[] };
+};
+
+const parseTimestamp = (val: string) =>
+  dayjs.utc(val).format('YYYY-MM-DD HH:mm:ssZ');
+const parseTimestampTz = (val: string) =>
+  dayjs(val).utc().format('YYYY-MM-DD HH:mm:ssZ');
+const parsePgArray = (val: string, transform: (entry: string) => unknown) =>
+  (types.arrayParser as unknown as PgArrayParser)
+    .create(val, transform)
+    .parse();
 
 // override parsing date column to Date()
 types.setTypeParser(pgTypes.DATE, (val) => val);
 // override timestamp
-types.setTypeParser(pgTypes.TIMESTAMP, (val) => {
-  return dayjs.utc(val).format('YYYY-MM-DD HH:mm:ssZ');
-});
+types.setTypeParser(pgTypes.TIMESTAMP, parseTimestamp);
+// pg-types keeps independent parsers for scalar and array OIDs, so scalar
+// overrides do not automatically apply to timestamp arrays.
+types.setTypeParser(pgTypes.TIMESTAMP_ARRAY, (val) =>
+  parsePgArray(val, parseTimestamp),
+);
 // override timestampz
-types.setTypeParser(pgTypes.TIMESTAMPTZ, (val) => {
-  return dayjs(val).utc().format('YYYY-MM-DD HH:mm:ssZ');
-});
+types.setTypeParser(pgTypes.TIMESTAMPTZ, parseTimestampTz);
+types.setTypeParser(pgTypes.TIMESTAMPTZ_ARRAY, (val) =>
+  parsePgArray(val, parseTimestampTz),
+);
 
 const parseFloatVal = (val: string) => {
   return parseFloat(val);
