@@ -12,6 +12,8 @@ import { Column, Filter } from '~/models';
 
 type GroupByFilter = Filter & { groupby?: boolean };
 
+// Date arrays remain strings so PostgreSQL infers date[] without introducing
+// timezone shifts; only timestamp-like values need conversion from UTC ISO.
 const DATE_TIME_UIDTS = new Set<string>([
   UITypes.DateTime,
   UITypes.CreatedTime,
@@ -69,6 +71,8 @@ export class FormulaGeneralHandler extends ComputedFieldHandler {
       })
     ).builder;
     const parsedTree: ParsedFormulaNode = formula.getParsedTree();
+    // MySQL and SQLite reject every array formula function during validation,
+    // so array group-value normalization is only reachable on PostgreSQL.
     const filterValue =
       parsedTree?.dataType === FormulaDataTypes.ARRAY &&
       (filter as GroupByFilter).groupby
