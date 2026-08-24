@@ -3665,6 +3665,11 @@ export function useCanvasRender({
         val = group.value
       }
 
+      // Formula values with a configured display type must use the same renderer
+      // as regular Canvas cells. Rendering them as plain text bypasses DateTime
+      // timezone/format handling and makes the group title disagree with its rows.
+      const hasFormulaDisplayType = group.column.uidt === UITypes.Formula && Boolean(group.column.extra?.display_type)
+
       renderCell(ctx, group.column, {
         value: val,
         x: x - 11,
@@ -3685,7 +3690,7 @@ export function useCanvasRender({
         relatedTableMeta: group.relatedTableMeta,
         mousePosition,
         skipRender: false,
-        renderAsPlainCell: true,
+        renderAsPlainCell: !hasFormulaDisplayType,
         fontFamily: '700 13px Inter',
         isGroupHeader: true,
       })
