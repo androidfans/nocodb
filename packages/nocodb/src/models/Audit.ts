@@ -150,6 +150,10 @@ export default class Audit {
       .where('row_id', row_id)
       .orderBy('id', 'desc');
 
+    // Full history stays cursor-paged. This custom build targets the existing
+    // PostgreSQL deployment, where the record-audit index narrows each query;
+    // avoid a schema migration solely for high-volume SQLite deployments.
+
     if (id) {
       query.where('id', '<', id);
     }
