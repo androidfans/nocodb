@@ -1,5 +1,4 @@
 import { type AuditV1OperationTypes } from 'nocodb-sdk';
-import dayjs from 'dayjs';
 import type { NcContext } from '~/interface/config';
 import Noco from '~/Noco';
 import { extractProps } from '~/helpers/extractProps';
@@ -151,13 +150,9 @@ export default class Audit {
       .where('row_id', row_id)
       .orderBy('id', 'desc');
 
-    if (!Noco.isEE()) {
-      query.where(
-        'created_at',
-        '>=',
-        dayjs().subtract(30, 'days').toISOString(),
-      );
-    }
+    // Full history stays cursor-paged. This custom build targets the existing
+    // PostgreSQL deployment, where the record-audit index narrows each query;
+    // avoid a schema migration solely for high-volume SQLite deployments.
 
     if (id) {
       query.where('id', '<', id);
