@@ -157,7 +157,20 @@ export const extractCorrespondingLinkColumn = async (
  * broadcasting operations to run independently.
  */
 
+export const getRelatedBaseModelDriver = (
+  baseModel: Pick<IBaseModelSqlV2, 'dbDriver' | 'knex'>,
+) => ({
+  dbDriver: baseModel.knex,
+  transaction:
+    baseModel.dbDriver === baseModel.knex ? undefined : baseModel.dbDriver,
+});
+
 export const addOrRemoveLinks = (baseModel: IBaseModelSqlV2) => {
+  // Related models must retain both driver layers separately. V3 LTAR bulk
+  // updates pass a transaction-backed BaseModel here; storing that transaction
+  // as dbDriver would make getNonTransactionalClone() reuse it after commit.
+  const relatedBaseModelDriver = getRelatedBaseModelDriver(baseModel);
+
   const validateRefIds = (
     refIds: (string | number | Record<string, any>)[],
     refModel: Model,
@@ -236,12 +249,12 @@ export const addOrRemoveLinks = (baseModel: IBaseModelSqlV2) => {
 
     const childBaseModel = await Model.getBaseModelSQL(childContext, {
       model: childTable,
-      dbDriver: baseModel.dbDriver,
+      ...relatedBaseModelDriver,
     });
 
     const parentBaseModel = await Model.getBaseModelSQL(parentContext, {
       model: parentTable,
-      dbDriver: baseModel.dbDriver,
+      ...relatedBaseModelDriver,
     });
 
     const childTn = childBaseModel.getTnPath(childTable);
@@ -338,7 +351,7 @@ export const addOrRemoveLinks = (baseModel: IBaseModelSqlV2) => {
 
           const assocBaseModel = await Model.getBaseModelSQL(mmContext, {
             model: vTable,
-            dbDriver: baseModel.dbDriver,
+            ...relatedBaseModelDriver,
           });
 
           const refBaseModel = parentBaseModel;
@@ -971,12 +984,12 @@ export const addOrRemoveLinks = (baseModel: IBaseModelSqlV2) => {
 
     const childBaseModel = await Model.getBaseModelSQL(childContext, {
       model: childTable,
-      dbDriver: baseModel.dbDriver,
+      ...relatedBaseModelDriver,
     });
 
     const parentBaseModel = await Model.getBaseModelSQL(parentContext, {
       model: parentTable,
-      dbDriver: baseModel.dbDriver,
+      ...relatedBaseModelDriver,
     });
 
     const childTn = childBaseModel.getTnPath(childTable);
@@ -1040,7 +1053,7 @@ export const addOrRemoveLinks = (baseModel: IBaseModelSqlV2) => {
 
           const assocBaseModel = await Model.getBaseModelSQL(mmContext, {
             model: vTable,
-            dbDriver: baseModel.dbDriver,
+            ...relatedBaseModelDriver,
           });
           const refBaseModel = parentBaseModel;
 

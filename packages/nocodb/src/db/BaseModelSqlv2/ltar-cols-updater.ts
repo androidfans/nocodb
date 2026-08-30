@@ -30,7 +30,7 @@ export const LTARColsUpdater = (param: {
     const trxBaseModel = await Model.getBaseModelSQL(baseModel.context, {
       model: baseModel.model,
       transaction: trx,
-      dbDriver: baseModel.dbDriver,
+      dbDriver: baseModel.knex,
     });
 
     try {
