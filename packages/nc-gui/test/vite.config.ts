@@ -29,6 +29,7 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, '../'),
       '~': path.resolve(__dirname, '../'),
+      'assets': path.resolve(__dirname, '../assets'),
       '#app': path.resolve(__dirname, '../node_modules/nuxt/dist/app'),
       '#imports': path.resolve(__dirname, '../.nuxt/imports'),
     },

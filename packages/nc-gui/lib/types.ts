@@ -474,6 +474,7 @@ interface CellRendererOptions {
     tagPaddingRight?: number
     tagPaddingY?: number
     tagHeight?: number
+    tagMaxLines?: number
     tagRadius?: number
     tagBgColor?: string
     tagSpacing?: number

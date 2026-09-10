@@ -2,11 +2,13 @@ import type { ColumnType, LinkToAnotherRecordType, TableType } from 'nocodb-sdk'
 import { defaultOffscreen2DContext, isBoxHovered, renderIconButton, renderSingleLineText } from '../../utils/canvas'
 import { PlainCellRenderer } from '../Plain'
 import { renderAsCellLookupOrLtarValue } from '../../utils/cell'
+import { layoutChipLines, minChipTextSafeWidth } from '../../utils/chipLayout'
 import type { UseExpandedFormDetachedProps } from '~/composables/useExpandedFormDetached'
 import { getRelatedRecordView, useExpandedFormSiblingNavigation } from '~/composables/useExpandedFormSiblingNavigation'
 
 const ellipsisWidth = 15
 const buttonSize = 20
+const chipHeight = 24
 
 export const ManyToManyCellRenderer: CellRenderer = {
   render: (ctx, props) => {
@@ -43,7 +45,8 @@ export const ManyToManyCellRenderer: CellRenderer = {
     const cells = (ncIsArray(value) ? value : []).reduce((acc, curr) => {
       if (!relatedTableDisplayValueProp) return acc
 
-      const value = curr[relatedTableDisplayValueProp]
+      // Lookup-of-Links may retain column-ID keys, just like the BT renderer.
+      const value = curr[relatedTableDisplayValueProp] ?? (m2mColumn.id ? curr[m2mColumn.id] : undefined)
 
       acc.push({ value, item: curr })
 
@@ -83,7 +86,7 @@ export const ManyToManyCellRenderer: CellRenderer = {
       tag: {
         renderAsTag: true,
         tagBgColor: getColor(themeV4Colors.brand['50'], 'var(--nc-bg-gray-light)'),
-        tagHeight: 24,
+        tagHeight: chipHeight,
         // 轻量化 tag 内外间距，和 Teable 风格更接近，同时不改变交互模型。
         tagPaddingX: 6,
         tagSpacing: 2,
@@ -107,8 +110,6 @@ export const ManyToManyCellRenderer: CellRenderer = {
     // 对 point.x 做微小补偿，修正部分渲染器返回值偏保守导致的视觉断层。
     const chipEndCompensation = 4
     // 保证 chip 在最窄场景也尽量保留至少 1 个字符，不退化成纯色块。
-    const minChipTextSafeWidth = 72
-    const chipSpacing = 2
     const measureMaxWidth = Math.max(initialWidth, 1200)
     const chipIdealWidths = cells.map((cell) => {
       const p = measureCellRenderer({
@@ -118,126 +119,34 @@ export const ManyToManyCellRenderer: CellRenderer = {
         y: 0,
         width: measureMaxWidth,
       })
-      return Math.max(minChipTextSafeWidth, p?.x ?? minChipTextSafeWidth)
+      // p.x is a painted endpoint, not an input-box width. Include the cell's
+      // horizontal padding budget so renderer-side truncation has enough room.
+      return Math.max(minChipTextSafeWidth, (p?.x ?? 0) + renderProps.padding * 2)
     })
-    const flexShrinkWidths = (idealWidths: number[], containerWidth: number, minWidth: number) => {
-      if (!idealWidths.length) return []
-
-      const widths = [...idealWidths]
-      let total = widths.reduce((acc, w) => acc + w, 0)
-      if (total <= containerWidth) return widths
-
-      let overflow = total - containerWidth
-      const frozen = new Array(widths.length).fill(false)
-
-      while (overflow > 0.1) {
-        let activeWeight = 0
-        for (let i = 0; i < widths.length; i++) {
-          if (!frozen[i]) activeWeight += widths[i]!
-        }
-        if (activeWeight <= 0) break
-
-        let consumed = 0
-        for (let i = 0; i < widths.length; i++) {
-          if (frozen[i]) continue
-          const current = widths[i]!
-          const shrink = overflow * (current / activeWeight)
-          const next = Math.max(minWidth, current - shrink)
-          consumed += current - next
-          widths[i] = next
-        }
-
-        overflow -= consumed
-        if (consumed <= 0.1) break
-
-        for (let i = 0; i < widths.length; i++) {
-          if (!frozen[i] && widths[i]! <= minWidth + 0.1) {
-            frozen[i] = true
-            widths[i] = minWidth
-          }
-        }
-      }
-
-      total = widths.reduce((acc, w) => acc + w, 0)
-      if (total > containerWidth) {
-        let extra = total - containerWidth
-        for (let i = widths.length - 1; i >= 0 && extra > 0; i--) {
-          const current = widths[i]!
-          if (current <= minWidth) continue
-          const reducible = current - minWidth
-          const cut = Math.min(reducible, extra)
-          widths[i] = current - cut
-          extra -= cut
-        }
-      }
-
-      return widths
-    }
 
     let flag = false
     let hasHiddenItems = false
     let cellIndex = 0
 
-    for (let line = 1; line <= maxLines && cellIndex < cells.length; line++) {
-      const isLastLine = line === maxLines
-      const remainingLines = maxLines - line + 1
-      const lineY = y + (rowHeightInPx['1'] === height ? 0 : 2) + (line - 1) * 28
-      const remaining = cells.length - cellIndex
-
-      let reserveEllipsisWidth = 0
-      const maxChipsPerLine = Math.max(1, Math.floor((initialWidth + chipSpacing) / (minChipTextSafeWidth + chipSpacing)))
-      let lineCellsCount = 1
-
-      if (isLastLine) {
-        const lastLineCapacityNoEllipsis = Math.max(
-          1,
-          Math.floor((initialWidth + chipSpacing) / (minChipTextSafeWidth + chipSpacing)),
-        )
-        if (remaining > lastLineCapacityNoEllipsis) {
-          reserveEllipsisWidth = ellipsisWidth + 1
-        }
-        const lastLineCapacity = Math.max(
-          1,
-          Math.floor((Math.max(0, initialWidth - reserveEllipsisWidth) + chipSpacing) / (minChipTextSafeWidth + chipSpacing)),
-        )
-        lineCellsCount = Math.min(remaining, lastLineCapacity)
-      } else {
-        // 非最后一行：在“容量上限”基础上，用 balance 软阈值控制分行，避免所有 chip 挤在第一行。
-        const maxCountByFeasibility = Math.max(1, remaining - (remainingLines - 1))
-        const hardLimit = Math.max(1, Math.min(maxChipsPerLine, maxCountByFeasibility))
-        // 平衡下限：尽量把剩余 chip 均摊到剩余行，避免出现 1-1-4 这类“前瘦后胖”分布。
-        const balancedMinCount = Math.max(1, Math.min(hardLimit, Math.ceil(remaining / remainingLines)))
-        const remainingIdealTotal = chipIdealWidths
-          .slice(cellIndex)
-          .reduce((acc, w, idx) => acc + w + (idx > 0 ? chipSpacing : 0), 0)
-        const softLineWidth =
-          remainingLines > 1
-            ? Math.max(minChipTextSafeWidth, Math.min(initialWidth, remainingIdealTotal / remainingLines))
-            : initialWidth
-
-        let lineIdealWidth = 0
-        let count = 0
-        while (count < hardLimit) {
-          const w = chipIdealWidths[cellIndex + count]!
-          const nextWidth = lineIdealWidth + (count > 0 ? chipSpacing : 0) + w
-          if (count > 0 && nextWidth > softLineWidth) break
-          lineIdealWidth = nextWidth
-          count++
-        }
-        lineCellsCount = Math.max(balancedMinCount, count)
-      }
-
-      const chipRightBoundary = rightBoundary - reserveEllipsisWidth
-      const availableLineWidth = Math.max(minChipTextSafeWidth, chipRightBoundary - initialX)
-      const lineIdealWidths = chipIdealWidths.slice(cellIndex, cellIndex + lineCellsCount)
-      const lineAssignedWidths = flexShrinkWidths(lineIdealWidths, availableLineWidth, minChipTextSafeWidth)
+    const chipLines = layoutChipLines(chipIdealWidths, initialWidth, maxLines, ellipsisWidth)
+    for (const [lineIndex, layout] of chipLines.entries()) {
+      const isLastLine = lineIndex === chipLines.length - 1
+      const lineY = y + (rowHeightInPx['1'] === height ? 0 : 2) + lineIndex * 28
+      const lineAssignedWidths = layout.widths
+      const lineCellsCount = lineAssignedWidths.length
+      const chipRightBoundary = rightBoundary - layout.reserveEllipsisWidth
 
       currentX = initialX
       currentY = lineY
 
       for (let j = 0; j < lineCellsCount; j++) {
         const cell = cells[cellIndex + j]!
-        const widthCap = Math.max(minChipTextSafeWidth, lineAssignedWidths[j] ?? minChipTextSafeWidth)
+        // The preferred 72px minimum must not exceed the physical space of a
+        // narrow column (or the final line's reserved overflow marker).
+        const widthCap = Math.min(
+          Math.max(minChipTextSafeWidth, lineAssignedWidths[j] ?? minChipTextSafeWidth),
+          Math.max(0, chipRightBoundary - currentX),
+        )
         const point = cellRenderer({
           ...renderProps,
           value: cell.value,
@@ -251,24 +160,25 @@ export const ManyToManyCellRenderer: CellRenderer = {
           ? Math.min(point.x + chipEndCompensation, cellRightBoundary)
           : Math.min(currentX + widthCap, cellRightBoundary)
 
+        // Display renderers do not agree on the meaning of returned y (some
+        // return the origin). These chips always occupy a single tag row.
+        const chipBounds = {
+          x: currentX + 4,
+          y: currentY + 4,
+          width: Math.max(0, boundedPointX - (currentX + 4)),
+          height: chipHeight,
+        }
         returnData.push({
-          oldX: currentX + 4,
-          oldY: currentY + 4,
+          oldX: chipBounds.x,
+          oldY: chipBounds.y,
           x: boundedPointX,
-          y: point?.y ?? currentY + 24,
-          width: boundedPointX - (currentX + 4),
-          height: point?.y ? point.y - (currentY + 4) : 24,
+          y: chipBounds.y + chipBounds.height,
+          width: chipBounds.width,
+          height: chipBounds.height,
           value: cell.item,
         })
 
-        if (
-          !readonly &&
-          selected &&
-          isBoxHovered(
-            { x: currentX, y: currentY, width: boundedPointX - currentX, height: point?.y ? point.y - currentY : 24 },
-            mousePosition,
-          )
-        ) {
+        if (!readonly && selected && isBoxHovered(chipBounds, mousePosition)) {
           setCursor('pointer')
         }
 
@@ -289,14 +199,16 @@ export const ManyToManyCellRenderer: CellRenderer = {
       const ellipsisX = rightBoundary
       renderSingleLineText(ctx, {
         x: ellipsisX,
-        y,
+        // Only the last chip line reserves this area; earlier lines can have
+        // record hitboxes here, so the marker must follow that reserved line.
+        y: currentY,
         text: '...',
         maxWidth: ellipsisWidth,
         textAlign: 'right',
         verticalAlign: 'middle',
         fontFamily: '500 13px Inter',
         fillStyle: '#666',
-        height,
+        height: rowHeightInPx['1']!,
       })
     }
 

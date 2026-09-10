@@ -11,6 +11,7 @@ interface Props {
   rowIndex?: number
   active?: boolean
   virtual?: boolean
+  autoExpand?: boolean
   path?: Array<number>
   isAllowed?: boolean
 }
@@ -387,7 +388,12 @@ const cellClassName = computed(() => {
       </div>
       <CellNull v-else-if="showNullComponent" />
       <CellAI v-else-if="cellType === 'ai'" v-model="vModel" @save="emitSave" />
-      <CellTextArea v-else-if="cellType === 'textarea'" v-model="vModel" :virtual="props.virtual" />
+      <CellTextArea
+        v-else-if="cellType === 'textarea'"
+        v-model="vModel"
+        :virtual="props.virtual"
+        :auto-expand="props.autoExpand"
+      />
 
       <CellGeoData v-else-if="cellType === 'geoData'" v-model="vModel" />
 

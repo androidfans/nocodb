@@ -6,6 +6,7 @@ const props = defineProps<{
   modelValue?: string | number
   isFocus?: boolean
   virtual?: boolean
+  autoExpand?: boolean
   isAi?: boolean
   aiMeta?: AIRecordType
   isAiEdited?: boolean
@@ -211,6 +212,25 @@ const richTextContent = computedAsync(async () => {
 const onExpand = () => {
   isVisible.value = true
 }
+
+// Canvas single-target Lookup can hand off directly to this existing readonly
+// viewer. Watch the request so asynchronously loaded metadata/value works too.
+watch(
+  () => props.autoExpand,
+  (shouldOpen, _previous, onCleanup) => {
+    if (!shouldOpen) return
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+    // Canvas mounts the viewer during mouseup. Let that gesture's click finish
+    // before opening, otherwise onClickOutside immediately dismisses it.
+    forcedNextTick(() => {
+      if (!cancelled) onExpand()
+    })
+  },
+  { immediate: true },
+)
 
 const onMouseMove = (e: MouseEvent) => {
   if (!isDragging.value) return
