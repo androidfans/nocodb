@@ -189,14 +189,16 @@ export const ManyToManyCellRenderer: CellRenderer = {
       const ellipsisX = rightBoundary
       renderSingleLineText(ctx, {
         x: ellipsisX,
-        y,
+        // Only the last chip line reserves this area; earlier lines can have
+        // record hitboxes here, so the marker must follow that reserved line.
+        y: currentY,
         text: '...',
         maxWidth: ellipsisWidth,
         textAlign: 'right',
         verticalAlign: 'middle',
         fontFamily: '500 13px Inter',
         fillStyle: '#666',
-        height,
+        height: rowHeightInPx['1']!,
       })
     }
 

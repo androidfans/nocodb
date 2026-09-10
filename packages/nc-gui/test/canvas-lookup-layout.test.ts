@@ -196,6 +196,22 @@ describe('Lookup record chips', () => {
     expect(await click(props, { x: 277, y: 116 })).not.toHaveBeenCalled()
   })
 
+  it.each([60, 90, 120])('places overflow in the final reserved row at height %s', async (height) => {
+    const props = makeProps(
+      Array.from({ length: 12 }, (_, i) => ({ Id: i + 1, Name: 'Long record label '.repeat(6) })),
+      height,
+      190,
+    )
+    LookupCellRenderer.render(context as any, props)
+    // The final paint is the right-aligned overflow marker (the mock font may
+    // itself truncate its dots); use its actual painted coordinates.
+    const [, ellipsisX, ellipsisY] = context.fillText.mock.calls.at(-1)!
+    expect(await click(props, { x: ellipsisX - 10, y: ellipsisY })).not.toHaveBeenCalled()
+    const lastChip = props.cellRenderStore.ltar.at(-1)
+    expect(ellipsisY).toBeGreaterThan(lastChip.oldY)
+    expect(ellipsisY).toBeLessThan(lastChip.oldY + lastChip.height)
+  })
+
   it('drops stale targets while linked-table metadata reloads', () => {
     const props = makeProps(records)
     LookupCellRenderer.render(context as any, props)
