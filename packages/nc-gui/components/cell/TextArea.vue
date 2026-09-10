@@ -217,8 +217,17 @@ const onExpand = () => {
 // viewer. Watch the request so asynchronously loaded metadata/value works too.
 watch(
   () => props.autoExpand,
-  (shouldOpen) => {
-    if (shouldOpen) onExpand()
+  (shouldOpen, _previous, onCleanup) => {
+    if (!shouldOpen) return
+    let cancelled = false
+    onCleanup(() => {
+      cancelled = true
+    })
+    // Canvas mounts the viewer during mouseup. Let that gesture's click finish
+    // before opening, otherwise onClickOutside immediately dismisses it.
+    forcedNextTick(() => {
+      if (!cancelled) onExpand()
+    })
   },
   { immediate: true },
 )

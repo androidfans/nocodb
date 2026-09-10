@@ -220,6 +220,14 @@ describe('Lookup record chips', () => {
     expect(props.cellRenderStore.ltar).toEqual([])
     expect(props.tableMetaLoader.getTableMeta).toHaveBeenCalledWith('records', 'base')
   })
+
+  it.each([50, 60, 70])('fits the painted chip and text truncation inside a %spx column', (width) => {
+    const props = makeProps([{ Id: 1, Name: 'A long linked record name' }], 32, width)
+    LookupCellRenderer.render(context as any, props)
+    const paintedTags = context.roundRect.mock.calls.filter(([x, y]) => x >= props.x && y >= props.y)
+    expect(paintedTags).toHaveLength(1)
+    for (const [x, , tagWidth] of paintedTags) expect(x + tagWidth).toBeLessThanOrEqual(props.x + width)
+  })
 })
 
 describe('Long Text lookup tags', () => {

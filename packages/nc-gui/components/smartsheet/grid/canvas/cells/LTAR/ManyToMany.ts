@@ -137,7 +137,12 @@ export const ManyToManyCellRenderer: CellRenderer = {
 
       for (let j = 0; j < lineCellsCount; j++) {
         const cell = cells[cellIndex + j]!
-        const widthCap = Math.max(minChipTextSafeWidth, lineAssignedWidths[j] ?? minChipTextSafeWidth)
+        // The preferred 72px minimum must not exceed the physical space of a
+        // narrow column (or the final line's reserved overflow marker).
+        const widthCap = Math.min(
+          Math.max(minChipTextSafeWidth, lineAssignedWidths[j] ?? minChipTextSafeWidth),
+          Math.max(0, chipRightBoundary - currentX),
+        )
         const point = cellRenderer({
           ...renderProps,
           value: cell.value,

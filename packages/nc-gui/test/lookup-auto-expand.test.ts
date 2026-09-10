@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
 import * as vue from 'vue'
-import { useVModel } from '@vueuse/core'
+import { onClickOutside, useVModel } from '@vueuse/core'
 import TextArea from '../components/cell/TextArea.vue'
 import Lookup from '../components/virtual-cell/Lookup.vue'
 import { isSingleBtLongTextLookup } from '../utils/lookupUtils'
+import { forcedNextTick } from '../utils/browserUtils'
 
 vi.mock('../helpers/tiptap', () => ({ NcMarkdownParser: { parse: vi.fn(() => '') } }))
 
@@ -47,6 +48,15 @@ const keys = [
 ]
 let wrappers: ReturnType<typeof shallowMount>[] = []
 const selectCell = vi.fn()
+let frameCallbacks: FrameRequestCallback[] = []
+
+async function flushExpandFrames() {
+  for (let i = 0; i < 2; i++) {
+    const callbacks = frameCallbacks.splice(0)
+    for (const callback of callbacks) callback(0)
+    await vue.nextTick()
+  }
+}
 
 function mountOptions(extraProvide = {}) {
   return {
@@ -83,10 +93,13 @@ function mountOptions(extraProvide = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  frameCallbacks = []
   for (const key of keys) vi.stubGlobal(key, key)
   for (const [key, value] of Object.entries({
     ...vue,
     useVModel,
+    forcedNextTick,
+    requestAnimationFrame: (cb: FrameRequestCallback) => frameCallbacks.push(cb),
     useGlobal: () => ({ showNull: vue.ref(false), user: vue.ref(null), isMobileMode: vue.ref(false) }),
     useSmartsheetRowStoreOrThrow: () => ({ currentRow: vue.ref({ row: {}, rowMeta: {} }) }),
     useNocoAi: () => ({
@@ -177,6 +190,7 @@ describe('existing Long Text viewer auto-open', () => {
   it('opens on the first handoff without a second click or key event', async () => {
     const wrapper = shallowMount(TextArea, { ...mountOptions(), props: { modelValue: 'Text', virtual: true, autoExpand: true } })
     wrappers.push(wrapper)
+    await flushExpandFrames()
     expect(wrapper.findComponent({ name: 'AModal' }).exists()).toBe(true)
     wrapper.findComponent({ name: 'AModal' }).vm.$emit('update:visible', false)
     await vue.nextTick()
@@ -188,6 +202,45 @@ describe('existing Long Text viewer auto-open', () => {
     wrappers.push(wrapper)
     expect(wrapper.findComponent({ name: 'AModal' }).exists()).toBe(false)
     await wrapper.setProps({ autoExpand: true })
+    await flushExpandFrames()
     expect(wrapper.findComponent({ name: 'AModal' }).exists()).toBe(true)
+  })
+
+  it('cancels the deferred open if the single-value request is withdrawn', async () => {
+    const wrapper = shallowMount(TextArea, { ...mountOptions(), props: { modelValue: 'Text', virtual: true, autoExpand: true } })
+    wrappers.push(wrapper)
+    await wrapper.setProps({ autoExpand: false })
+    await flushExpandFrames()
+    expect(wrapper.findComponent({ name: 'AModal' }).exists()).toBe(false)
+  })
+
+  it('survives the Canvas click following the mouseup that mounted it', async () => {
+    vi.stubGlobal('onClickOutside', onClickOutside)
+    const options = mountOptions()
+    options.global.stubs.AModal.template = '<div class="viewer"><slot /></div>'
+    const canvas = document.createElement('canvas')
+    document.body.appendChild(canvas)
+    const wrapper = shallowMount(TextArea, {
+      ...options,
+      attachTo: document.body,
+      props: { modelValue: 'Text', virtual: true, autoExpand: true },
+    })
+    wrappers.push(wrapper)
+    try {
+      await vue.nextTick()
+      // In the Canvas path mounting happens in mouseup, before its click.
+      canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 2 }))
+      await vue.nextTick()
+      await flushExpandFrames()
+      expect(wrapper.findComponent({ name: 'AModal' }).exists()).toBe(true)
+      expect(selectCell).not.toHaveBeenCalled()
+
+      canvas.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+      canvas.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
+      await vue.nextTick()
+      expect(wrapper.findComponent({ name: 'AModal' }).exists()).toBe(false)
+    } finally {
+      canvas.remove()
+    }
   })
 })
