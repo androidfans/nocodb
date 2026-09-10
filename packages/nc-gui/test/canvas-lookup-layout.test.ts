@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LookupCellRenderer } from '../components/smartsheet/grid/canvas/cells/Lookup'
 import { LongTextCellRenderer } from '../components/smartsheet/grid/canvas/cells/LongText'
+import { SingleSelectCellRenderer } from '../components/smartsheet/grid/canvas/cells/SingleSelect'
 import { renderTagLabel } from '../components/smartsheet/grid/canvas/utils/canvas'
 import { layoutChipLines } from '../components/smartsheet/grid/canvas/utils/chipLayout'
 
@@ -27,7 +28,7 @@ vi.mock('../components/smartsheet/grid/canvas/utils/safeCanvas', () => ({ getSaf
 vi.mock('../components/smartsheet/grid/canvas/loaders/markdownLoader', () => ({ markdownTextCache: new Map() }))
 vi.mock('../composables/useExpandedFormSiblingNavigation', () => ({}))
 vi.mock('../components/smartsheet/grid/canvas/utils/cell', () => ({
-  renderAsCellLookupOrLtarValue: ['LinkToAnotherRecord', 'Links'],
+  renderAsCellLookupOrLtarValue: ['LinkToAnotherRecord', 'Links', 'SingleSelect'],
   getRelatedBaseId: (_column: unknown, baseId: string) => baseId,
 }))
 
@@ -96,6 +97,9 @@ function makeProps(value: unknown, height = 60, width = 200) {
       if (column.uidt === 'LongText') {
         return LongTextCellRenderer.render(context as any, { ...props, cellRenderStore: stores.get(column.id) })
       }
+      if (column.uidt === 'SingleSelect') {
+        return SingleSelectCellRenderer.render(context as any, { ...props, cellRenderStore: stores.get(column.id) })
+      }
       return renderTagLabel(context as any, { ...props, cellRenderStore: stores.get(column.id), text: String(props.value) })
     },
   } as any
@@ -134,6 +138,7 @@ beforeEach(() => {
       gray: { 200: '#ddd', 600: '#666', 700: '#555' },
     },
     parsePlainCellValue: (v: unknown) => String(v ?? ''),
+    getOppositeColorOfBackground: () => '#000',
     extractPkFromRow: (v: any) => String(v.Id),
   }))
     vi.stubGlobal(key, value)
@@ -228,6 +233,20 @@ describe('Lookup record chips', () => {
     expect(paintedTags).toHaveLength(1)
     for (const [x, , tagWidth] of paintedTags) expect(x + tagWidth).toBeLessThanOrEqual(props.x + width)
   })
+
+  it.each([32, 60])('opens a lookup chip with a SingleSelect display field at height %s', async (height) => {
+    const props = makeProps(records, height)
+    props.metas['base:records'] = {
+      ...recordsMeta,
+      columns: recordsMeta.columns.map((c) => (c.pv ? { ...c, uidt: 'SingleSelect' } : c)),
+    }
+    LookupCellRenderer.render(context as any, props)
+    const tag = context.roundRect.mock.calls.filter(([x, y]) => x >= props.x && y >= props.y).at(-1)!
+    const [x, y, width, tagHeight] = tag
+    expect(await click(props, { x: x + width / 2, y: y + tagHeight / 2 })).toHaveBeenCalledWith(
+      expect.objectContaining({ rowId: '2' }),
+    )
+  })
 })
 
 describe('Long Text lookup tags', () => {
@@ -257,6 +276,17 @@ describe('Long Text lookup tags', () => {
     props.metas['base:intermediate'] = { columns: [{ ...target, uidt: 'LongText' }] }
     LookupCellRenderer.render(context as any, props)
     expect(context.fillText.mock.calls.map(([text]) => text)).toEqual(['First line', 'Second line'])
+  })
+
+  it.each([
+    { value: 'One\nTwo\nThree', expected: ['One', 'Two...'] },
+    { value: 'One\nTwo', expected: ['One', 'Two'] },
+  ])('marks hidden newline segments without marking fully visible text: $value', ({ value, expected }) => {
+    const props = makeProps(value, 60)
+    props.metas['base:source'] = { columns: [{ ...relation, colOptions: { ...relation.colOptions, type: 'mo' } }, lookup] }
+    props.metas['base:intermediate'] = { columns: [{ ...target, uidt: 'LongText' }] }
+    LookupCellRenderer.render(context as any, props)
+    expect(context.fillText.mock.calls.map(([text]) => text)).toEqual(expected)
   })
 
   it.each([60, 90, 120])('bounds rich-text wrapping at height %s', (height) => {

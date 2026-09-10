@@ -591,7 +591,7 @@ export const wrapTextToLines = (
       }
 
       // Handle truncation with ellipsis for the last line
-      if (lines.length === maxLines - 1 && remainingText.length > line.length) {
+      if (lines.length === maxLines - 1 && (remainingText.length > line.length || segmentIndex < textSegments.length - 1)) {
         const ellipsis = '...'
         const ellipsisWidth = ctx.measureText(ellipsis).width
 

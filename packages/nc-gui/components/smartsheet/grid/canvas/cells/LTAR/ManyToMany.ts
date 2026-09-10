@@ -8,6 +8,7 @@ import { getRelatedRecordView, useExpandedFormSiblingNavigation } from '~/compos
 
 const ellipsisWidth = 15
 const buttonSize = 20
+const chipHeight = 24
 
 export const ManyToManyCellRenderer: CellRenderer = {
   render: (ctx, props) => {
@@ -84,7 +85,7 @@ export const ManyToManyCellRenderer: CellRenderer = {
       tag: {
         renderAsTag: true,
         tagBgColor: getColor(themeV4Colors.brand['50'], 'var(--nc-bg-gray-light)'),
-        tagHeight: 24,
+        tagHeight: chipHeight,
         // 轻量化 tag 内外间距，和 Teable 风格更接近，同时不改变交互模型。
         tagPaddingX: 6,
         tagSpacing: 2,
@@ -156,24 +157,25 @@ export const ManyToManyCellRenderer: CellRenderer = {
           ? Math.min(point.x + chipEndCompensation, cellRightBoundary)
           : Math.min(currentX + widthCap, cellRightBoundary)
 
+        // Display renderers do not agree on the meaning of returned y (some
+        // return the origin). These chips always occupy a single tag row.
+        const chipBounds = {
+          x: currentX + 4,
+          y: currentY + 4,
+          width: Math.max(0, boundedPointX - (currentX + 4)),
+          height: chipHeight,
+        }
         returnData.push({
-          oldX: currentX + 4,
-          oldY: currentY + 4,
+          oldX: chipBounds.x,
+          oldY: chipBounds.y,
           x: boundedPointX,
-          y: point?.y ?? currentY + 24,
-          width: boundedPointX - (currentX + 4),
-          height: point?.y ? point.y - (currentY + 4) : 24,
+          y: chipBounds.y + chipBounds.height,
+          width: chipBounds.width,
+          height: chipBounds.height,
           value: cell.item,
         })
 
-        if (
-          !readonly &&
-          selected &&
-          isBoxHovered(
-            { x: currentX, y: currentY, width: boundedPointX - currentX, height: point?.y ? point.y - currentY : 24 },
-            mousePosition,
-          )
-        ) {
+        if (!readonly && selected && isBoxHovered(chipBounds, mousePosition)) {
           setCursor('pointer')
         }
 
