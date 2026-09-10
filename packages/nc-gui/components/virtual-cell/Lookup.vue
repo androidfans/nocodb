@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { type ColumnType, type LinkToAnotherRecordType, type LookupType, isBtLikeV2Junction, isMMOrMMLike } from 'nocodb-sdk'
 import { FormulaDataTypes, RelationTypes, UITypes, isVirtualCol } from 'nocodb-sdk'
+import { isSingleBtLongTextLookup } from '~/utils/lookupUtils'
 
 const { getMeta, getMetaByKey } = useMetas()
 
@@ -213,6 +214,17 @@ const cell = computed(() => triggerRef.value?.closest('td, .nc-data-cell'))
 
 const dropdownOverlayRef = ref<HTMLInputElement | null>(null)
 const active = inject(ActiveCellInj, ref(false))
+
+const autoExpandLongText = computed(
+  () =>
+    isCanvasInjected &&
+    isGrid.value &&
+    active.value &&
+    !isUnderLookup.value &&
+    !isExpandedForm.value &&
+    !isForm.value &&
+    isSingleBtLongTextLookup(relationColumn.value, lookupColumn.value, arrValue.value),
+)
 
 function toggleDropdown(e: Event) {
   if (e.type !== 'click') return
@@ -458,6 +470,7 @@ const attachmentUrl = computed(() => getPossibleAttachmentSrc(arrValue.value[0])
                       v-else
                       :model-value="v"
                       :column="lookupColumn"
+                      :auto-expand="autoExpandLongText"
                       :edit-enabled="false"
                       :virtual="true"
                       :read-only="true"

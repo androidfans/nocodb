@@ -12,6 +12,7 @@ import { getRelatedBaseId, getSingleMultiselectColOptions, getUserColOptions, re
 import { defaultOffscreen2DContext, isBoxHovered, renderCellError, renderSingleLineText } from '../utils/canvas'
 import { PlainCellRenderer } from './Plain'
 import { ManyToManyCellRenderer } from './LTAR/ManyToMany'
+import { isSingleBtLongTextLookup } from '~/utils/lookupUtils'
 
 const renderOnly1Row = [UITypes.QrCode, UITypes.Barcode, UITypes.Attachment, UITypes.LinkToAnotherRecord, UITypes.Links]
 
@@ -165,11 +166,7 @@ export const LookupCellRenderer: CellRenderer = {
     ].includes(lookupColumn.uidt)
     const isLongTextLookup = lookupColumn.uidt === UITypes.LongText
     const isMultilineLongTextLookup =
-      isLongTextLookup &&
-      arrValue.length === 1 &&
-      height > rowHeightInPx['1']! &&
-      (relatedColType === RelationTypes.BELONGS_TO ||
-        (isBtLikeV2Junction(relatedColObj) && relatedColType === RelationTypes.MANY_TO_ONE))
+      height > rowHeightInPx['1']! && isSingleBtLongTextLookup(relatedColObj, lookupColumn, arrValue)
     const isCompactLookupTag = Boolean((isTemporalLookup || isLongTextLookup) && arrValue.length === 1)
 
     // Begin clipping
@@ -485,6 +482,7 @@ export const LookupCellRenderer: CellRenderer = {
   async handleKeyDown(ctx) {
     const { e, row, column, makeCellEditable } = ctx
     if (e.key === 'Enter' || isExpandCellKey(e)) {
+      e.preventDefault()
       makeCellEditable(row, column)
       return true
     }
