@@ -45,7 +45,8 @@ export const ManyToManyCellRenderer: CellRenderer = {
     const cells = (ncIsArray(value) ? value : []).reduce((acc, curr) => {
       if (!relatedTableDisplayValueProp) return acc
 
-      const value = curr[relatedTableDisplayValueProp]
+      // Lookup-of-Links may retain column-ID keys, just like the BT renderer.
+      const value = curr[relatedTableDisplayValueProp] ?? (m2mColumn.id ? curr[m2mColumn.id] : undefined)
 
       acc.push({ value, item: curr })
 
@@ -118,7 +119,9 @@ export const ManyToManyCellRenderer: CellRenderer = {
         y: 0,
         width: measureMaxWidth,
       })
-      return Math.max(minChipTextSafeWidth, p?.x ?? minChipTextSafeWidth)
+      // p.x is a painted endpoint, not an input-box width. Include the cell's
+      // horizontal padding budget so renderer-side truncation has enough room.
+      return Math.max(minChipTextSafeWidth, (p?.x ?? 0) + renderProps.padding * 2)
     })
 
     let flag = false

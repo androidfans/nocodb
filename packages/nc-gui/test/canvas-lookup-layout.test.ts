@@ -194,6 +194,20 @@ describe('Lookup record chips', () => {
     )
   })
 
+  it('keeps field-ID-keyed display values returned by a V2 Links lookup', () => {
+    const props = makeProps([{ Id: 1, name: 'By ID' }], 32)
+    props.metas['base:intermediate'] = { columns: [{ ...target, uidt: 'Links' }] }
+    LookupCellRenderer.render(context as any, props)
+    expect(context.fillText.mock.calls.at(-1)?.[0]).toBe('By ID')
+  })
+
+  it.each(['SingleLineText', 'SingleSelect'])('does not truncate a %s display label in a wide column', (uidt) => {
+    const props = makeProps([records[0]], 32, 600)
+    props.metas['base:records'] = { ...recordsMeta, columns: recordsMeta.columns.map((c) => (c.pv ? { ...c, uidt } : c)) }
+    LookupCellRenderer.render(context as any, props)
+    expect(context.fillText.mock.calls.at(-1)?.[0]).toBe(records[0].Name)
+  })
+
   it('does not open hidden records from the ellipsis', async () => {
     const props = makeProps([...records, { Id: 3, Name: 'Third' }], 32, 180)
     LookupCellRenderer.render(context as any, props)
