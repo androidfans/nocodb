@@ -1387,6 +1387,7 @@ export const renderTagLabel = (
     tagPaddingRight = tagPaddingX,
     tagPaddingY = 0,
     tagHeight = 20,
+    tagMaxLines = 1,
     tagRadius = 6,
     tagBgColor = getColor('#f4f4f0', themeV4Colors.base.white),
     tagSpacing = 4,
@@ -1411,6 +1412,48 @@ export const renderTagLabel = (
       borderColor: tagBorderColor,
       borderWidth: tagBorderWidth,
     })
+  }
+
+  if (tagMaxLines > 1) {
+    if (!text) return { x, y }
+
+    // Opt-in for single-target Long Text lookups. Use the row's line budget,
+    // retaining the compact single-line path for all other tag callers.
+    const maxLines = Math.max(1, Math.min(tagMaxLines, Math.floor((height - 12) / 16)))
+    const textProps = {
+      x: x + tagSpacing + tagPaddingLeft,
+      y: y + 8,
+      text,
+      maxWidth: Math.max(0, maxWidth),
+      maxLines,
+      fontFamily: tagFontFamily,
+      fillStyle: textColor,
+      py: 0,
+      renderAsPreTag: true,
+      mousePosition,
+      spriteLoader,
+      markdownLoader,
+      cellRenderStore: props.cellRenderStore,
+      getColor,
+    }
+    const renderText = renderAsMarkdown ? renderMarkdown : renderMultiLineText
+    const measured = renderText(ctx, { ...textProps, render: false })
+    // Markdown's measurement reports blocks, not wrapped visual lines.
+    const textHeight = renderAsMarkdown ? maxLines * 16 : measured.height + 6.5
+    const bubbleHeight = Math.min(height - 8, Math.max(20, textHeight + 8))
+    const bubbleWidth = Math.max(0, measured.width) + tagPaddingLeft + tagPaddingRight
+    renderTag(ctx, {
+      x: x + tagSpacing,
+      y: y + 4,
+      width: bubbleWidth,
+      height: bubbleHeight,
+      radius: tagRadius,
+      fillStyle: tagBgColor,
+      borderColor: tagBorderColor,
+      borderWidth: tagBorderWidth,
+    })
+    renderText(ctx, textProps)
+    return { x: x + tagSpacing + bubbleWidth, y: y + 4 + bubbleHeight }
   }
 
   if (renderAsMarkdown) {

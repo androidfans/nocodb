@@ -11,6 +11,7 @@ import type { ColumnType, LinkToAnotherRecordType, LookupType, TableType } from 
 import { getRelatedBaseId, getSingleMultiselectColOptions, getUserColOptions, renderAsCellLookupOrLtarValue } from '../utils/cell'
 import { defaultOffscreen2DContext, isBoxHovered, renderCellError, renderSingleLineText } from '../utils/canvas'
 import { PlainCellRenderer } from './Plain'
+import { ManyToManyCellRenderer } from './LTAR/ManyToMany'
 
 const renderOnly1Row = [UITypes.QrCode, UITypes.Barcode, UITypes.Attachment, UITypes.LinkToAnotherRecord, UITypes.Links]
 
@@ -37,6 +38,9 @@ export const LookupCellRenderer: CellRenderer = {
       setCursor,
       getColor,
     } = props
+    // Render stores survive reloads; empty/error cells must not retain old record hitboxes.
+    cellRenderStore.ltar = []
+    cellRenderStore.ltarRelatedTableMeta = undefined
     let x = _x
     let y = _y
     // 用固定右边界统一计算剩余宽度，避免多次扣减后出现“右侧空白越来越大”。
@@ -160,6 +164,12 @@ export const LookupCellRenderer: CellRenderer = {
       UITypes.LastModifiedTime,
     ].includes(lookupColumn.uidt)
     const isLongTextLookup = lookupColumn.uidt === UITypes.LongText
+    const isMultilineLongTextLookup =
+      isLongTextLookup &&
+      arrValue.length === 1 &&
+      height > rowHeightInPx['1']! &&
+      (relatedColType === RelationTypes.BELONGS_TO ||
+        (isBtLikeV2Junction(relatedColObj) && relatedColType === RelationTypes.MANY_TO_ONE))
     const isCompactLookupTag = Boolean((isTemporalLookup || isLongTextLookup) && arrValue.length === 1)
 
     // Begin clipping
@@ -194,7 +204,6 @@ export const LookupCellRenderer: CellRenderer = {
     Object.assign(cellRenderStore, {
       // 在 handleHover/handleClick 里复用渲染期结果，避免重新推断数据结构导致命中不一致。
       ltarRelatedTableMeta: lkRelatedTableMeta,
-      lookupArrValue: arrValue,
     })
 
     const renderProps: CellRendererOptions = {
@@ -205,13 +214,14 @@ export const LookupCellRenderer: CellRenderer = {
       isUnderLookup: true,
       readonly: true,
       value: arrValue,
-      height: isAttachment(lookupColumn) ? height : rowHeightInPx['1']!,
+      height: isAttachment(lookupColumn) || isMultilineLongTextLookup ? height : rowHeightInPx['1']!,
       // 单值时间/长文本 lookup 采用紧凑胶囊，目的是修复“右侧明明还有空间却提前省略”。
-      padding: isCompactLookupTag ? 2 : 10,
+      padding: isMultilineLongTextLookup ? 6 : isCompactLookupTag ? 2 : 10,
       tag: {
         renderAsTag: true,
         tagBgColor: getColor(themeV4Colors.base.white),
         tagHeight: 20,
+        tagMaxLines: isMultilineLongTextLookup ? rowHeightTruncateLines(height) : undefined,
         tagBorderColor: getColor(themeV4Colors.gray['200']),
         tagBorderWidth: 1,
         tagPaddingX: isCompactLookupTag ? 2 : 8,
@@ -408,7 +418,21 @@ export const LookupCellRenderer: CellRenderer = {
       }
     }
 
-    if (isVirtualCol(lookupColumn) && ![UITypes.Rollup, UITypes.Formula].includes(lookupColumn.uidt)) {
+    const linkedRecords = isLinksOrLTAR(lookupColumn) ? arrValue.flat(Infinity).filter((v) => ncIsObject(v)) : []
+    if (linkedRecords.length && lkRelatedTableMeta) {
+      // A single-target field can yield many records through Lookup. Render the
+      // whole collection once, keeping its hitboxes on the outer Lookup store.
+      ManyToManyCellRenderer.render(ctx, {
+        ...renderProps,
+        x: _x,
+        y: _y,
+        width: _width,
+        height,
+        value: linkedRecords,
+        selected: false,
+        cellRenderStore,
+      })
+    } else if (isVirtualCol(lookupColumn) && ![UITypes.Rollup, UITypes.Formula].includes(lookupColumn.uidt)) {
       if (
         lookupColumn.uidt !== UITypes.LinkToAnotherRecord ||
         (lookupColumn.uidt === UITypes.LinkToAnotherRecord &&
@@ -452,28 +476,6 @@ export const LookupCellRenderer: CellRenderer = {
             break
           }
         }
-      } else if (relatedTableMeta && ncIsArray(cellRenderStore?.lookupArrValue)) {
-        // lookup 结果只有单个对象且未走 ltar 数组路径时，兜底一个可点击命中框，
-        // 避免“视觉上是 chip，但鼠标不变手型/无法点击”的体验断层。
-        const firstLookupValue = cellRenderStore.lookupArrValue.find((v) => ncIsObject(v))
-        const fallbackChipWidth =
-          typeof cellRenderStore?.x === 'number' ? Math.max(0, cellRenderStore.x - (_x + 4)) : Math.max(0, _width - 8)
-        const chipWidth = Math.max(0, (cellRenderStore?.width as number) || fallbackChipWidth)
-        const chipHeight = Math.max(0, (cellRenderStore?.height as number) || rowHeightInPx['1']! || 24)
-        if (
-          firstLookupValue &&
-          isBoxHovered(
-            {
-              x: _x + 4,
-              y: _y + (rowHeightInPx['1'] === height ? 0 : 2),
-              width: chipWidth,
-              height: chipHeight,
-            },
-            mousePosition,
-          )
-        ) {
-          setCursor('pointer')
-        }
       }
     }
 
@@ -491,7 +493,6 @@ export const LookupCellRenderer: CellRenderer = {
   },
   async handleClick({
     row,
-    value,
     column,
     getCellPosition,
     mousePosition,
@@ -504,7 +505,8 @@ export const LookupCellRenderer: CellRenderer = {
     if (!selected && !isDoubleClick) return false
 
     const rowIndex = row.rowMeta.rowIndex!
-    const { x, y, width, height } = getCellPosition(column, rowIndex)
+    const bounds = getCellPosition(column, rowIndex)
+    if (!isBoxHovered(bounds, mousePosition)) return false
 
     const relatedTableMeta = cellRenderStore?.ltarRelatedTableMeta as TableType | undefined
 
@@ -544,50 +546,8 @@ export const LookupCellRenderer: CellRenderer = {
       }
     }
 
-    const lookupValues = ncIsArray(cellRenderStore?.lookupArrValue)
-      ? cellRenderStore.lookupArrValue
-      : ncIsArray(value)
-      ? value
-      : [value]
-    const firstLookupValue = lookupValues.find((v) => ncIsObject(v))
-    const fallbackChipWidth =
-      typeof cellRenderStore?.x === 'number' ? Math.max(0, cellRenderStore.x - (x + 4)) : Math.max(0, width - 8)
-    const chipWidth = Math.max(0, (cellRenderStore?.width as number) || fallbackChipWidth)
-    const chipHeight = Math.max(0, (cellRenderStore?.height as number) || rowHeightInPx['1']! || 24)
-
-    if (
-      (selected || isDoubleClick) &&
-      ncIsObject(firstLookupValue) &&
-      relatedTableMeta &&
-      // 单值兜底命中：兼容“没有 ltar 渲染元数据但值是对象”的 lookup 场景。
-      isBoxHovered(
-        {
-          x: x + 4,
-          y: y + (rowHeightInPx['1'] === height ? 0 : 2),
-          width: chipWidth,
-          height: chipHeight,
-        },
-        mousePosition,
-      )
-    ) {
-      if (isPublic) return true
-
-      const rowId = extractPkFromRow(firstLookupValue, (relatedTableMeta?.columns || []) as ColumnType[])
-
-      if (rowId) {
-        openDetachedExpandedForm({
-          isOpen: true,
-          row: { row: firstLookupValue, rowMeta: {}, oldRow: { ...firstLookupValue } },
-          meta: relatedTableMeta || ({} as TableType),
-          rowId,
-          useMetaFields: true,
-          maintainDefaultViewOrder: true,
-          loadRow: !isPublic,
-        })
-      }
-
-      return true
-    }
+    // Only painted chip bounds can open records; never fall back to the first
+    // lookup value when clicking a gap or an ellipsis.
 
     return false
   },
