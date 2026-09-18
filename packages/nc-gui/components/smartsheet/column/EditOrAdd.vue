@@ -1515,8 +1515,6 @@ const unique = computed({
 
         <template v-if="!readOnly && isFullUpdateAllowed">
           <div class="nc-column-options-wrapper flex flex-col gap-4">
-            <LazySmartsheetColumnRequiredOptions v-if="!props.hideAdditionalOptions" v-model:value="formState" />
-
             <!-- Unique Constraint Toggle -->
             <div
               v-if="
@@ -1629,7 +1627,8 @@ const unique = computed({
               v-model:is-visible-default-value-input="isVisibleDefaultValueInput"
             />
           </div>
-          <template v-if="easterEgg || (appInfo.ee && isAttachment(formState))">
+          <!-- CE exposes the upstream advanced editor; keep its field/source guards and EE behavior unchanged. -->
+          <template v-if="!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
               v-if="
