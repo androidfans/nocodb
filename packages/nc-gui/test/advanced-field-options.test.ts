@@ -119,7 +119,7 @@ describe('upstream advanced field options in CE', () => {
     expect(state.formState.rqd).toBe(true)
     await checkbox.setValue(false)
     expect(state.formState.rqd).toBe(false)
-    expect(onAlter).toHaveBeenCalledTimes(2)
+    expect(onAlter.mock.calls).toEqual([[], []])
     await wrapper.get('.nc-more-options').trigger('click')
     expect(wrapper.find('.nc-column-checkbox-NN').exists()).toBe(false)
   })
