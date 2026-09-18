@@ -33,6 +33,8 @@ function mountEditor(overrides: Record<string, unknown> = {}) {
     easterEgg: false,
     readOnly: false,
     isFullUpdateAllowed: true,
+    isSystem: false,
+    isSyncedField: false,
     warningVisible: false,
     props: { hideAdditionalOptions: false },
     advancedOptions: vue.ref(false),
@@ -125,6 +127,8 @@ describe('upstream advanced field options in CE', () => {
   it.each([
     { readOnly: true },
     { isFullUpdateAllowed: false },
+    { isSystem: true },
+    { isSyncedField: true },
     { props: { hideAdditionalOptions: true } },
     { formState: { uidt: UITypes.Lookup } },
     { formState: { uidt: UITypes.Formula } },
@@ -160,5 +164,4 @@ describe('upstream advanced field options in CE', () => {
     expect(input.element.disabled).toBe(true)
     expect(onAlter).not.toHaveBeenCalled()
   })
-
 })

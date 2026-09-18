@@ -1631,7 +1631,7 @@ const unique = computed({
             CE exposes the upstream editor for NN. This single-user deployment only uses NN on ordinary, non-synced fields;
             the legacy AI/UN/AU and synced-field behavior is intentionally left unchanged and out of this feature's scope.
           -->
-          <template v-if="!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState))">
+          <template v-if="!isSystem && !isSyncedField && (!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState)))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
               v-if="
