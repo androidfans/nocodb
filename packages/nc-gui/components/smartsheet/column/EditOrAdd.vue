@@ -1515,6 +1515,8 @@ const unique = computed({
 
         <template v-if="!readOnly && isFullUpdateAllowed">
           <div class="nc-column-options-wrapper flex flex-col gap-4">
+            <LazySmartsheetColumnRequiredOptions v-if="!props.hideAdditionalOptions" v-model:value="formState" />
+
             <!-- Unique Constraint Toggle -->
             <div
               v-if="
