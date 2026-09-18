@@ -1627,8 +1627,8 @@ const unique = computed({
               v-model:is-visible-default-value-input="isVisibleDefaultValueInput"
             />
           </div>
-          <!-- CE exposes the upstream advanced editor; keep its field/source guards and EE behavior unchanged. -->
-          <template v-if="!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState))">
+          <!-- CE exposes the upstream editor; synced columns cannot persist schema changes. -->
+          <template v-if="!isSyncedField && (!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState)))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
               v-if="

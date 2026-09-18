@@ -10,7 +10,7 @@ const emit = defineEmits(['update:value'])
 
 const vModel = useVModel(props, 'value', emit)
 
-const { onAlter, onDataTypeChange, validateInfos, sqlUi } = useColumnCreateStoreOrThrow()
+const { onAlter, onDataTypeChange, validateInfos, sqlUi, tableExplorerColumns } = useColumnCreateStoreOrThrow()
 
 // todo: 2nd argument of `getDataTypeListForUiType` is missing!
 const dataTypes = computed(() => sqlUi.value.getDataTypeListForUiType(vModel.value as { uidt: UITypes }, '' as any))
@@ -18,6 +18,17 @@ const dataTypes = computed(() => sqlUi.value.getDataTypeListForUiType(vModel.val
 const { isPg } = useBase()
 
 const meta = inject(MetaInj, ref())
+
+const autoIncrementDisabled = computed(() => {
+  // SQL UI capability checks use `cn`; API metadata and the field editor use `column_name`.
+  const withSqlName = (column: any) => ({ ...column, cn: column.column_name ?? column.cn })
+  return sqlUi.value.colPropAIDisabled(
+    withSqlName(vModel.value),
+    (tableExplorerColumns?.value ?? meta.value?.columns ?? [])
+      .filter((column) => !vModel.value.id || column.id !== vModel.value.id)
+      .map(withSqlName),
+  )
+})
 
 const hideLength = computed(() => {
   return [UITypes.SingleSelect, UITypes.MultiSelect].includes(vModel.value.uidt)
@@ -65,24 +76,34 @@ vModel.value.au = !!vModel.value.au */
           </template>
           <a-checkbox
             v-model:checked="vModel.ai"
-            :disabled="sqlUi.colPropUNDisabled(vModel) || !sqlUi.columnEditable(vModel)"
+            :disabled="autoIncrementDisabled || !sqlUi.columnEditable(vModel)"
             class="nc-column-checkbox-AI"
             @change="onAlter"
           />
         </a-form-item>
 
-        <a-form-item :disabled="sqlUi.colPropUNDisabled(vModel) || !sqlUi.columnEditable(vModel)" @change="onAlter">
+        <a-form-item>
           <template #label>
             <span title="Unsigned">UN</span>
           </template>
-          <a-checkbox v-model:checked="vModel.un" class="nc-column-checkbox-UN" />
+          <a-checkbox
+            v-model:checked="vModel.un"
+            :disabled="sqlUi.colPropUNDisabled(vModel) || !sqlUi.columnEditable(vModel)"
+            class="nc-column-checkbox-UN"
+            @change="onAlter()"
+          />
         </a-form-item>
 
-        <a-form-item :disabled="sqlUi.colPropAuDisabled(vModel) || !sqlUi.columnEditable(vModel)" @change="onAlter">
+        <a-form-item>
           <template #label>
             <span title="Auto Update">AU</span>
           </template>
-          <a-checkbox v-model:checked="vModel.au" class="nc-column-checkbox-AU" />
+          <a-checkbox
+            v-model:checked="vModel.au"
+            :disabled="sqlUi.colPropAuDisabled(vModel) || !sqlUi.columnEditable(vModel)"
+            class="nc-column-checkbox-AU"
+            @change="onAlter()"
+          />
         </a-form-item>
       </div>
 

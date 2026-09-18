@@ -4,7 +4,7 @@ import { parse } from '@vue/compiler-sfc'
 import { Checkbox } from 'ant-design-vue'
 import * as vue from 'vue'
 import { useVModel } from '@vueuse/core'
-import { UITypes, isVirtualCol } from 'nocodb-sdk'
+import { SqlUiFactory, UITypes, isVirtualCol } from 'nocodb-sdk'
 import AdvancedOptions from '../components/smartsheet/column/AdvancedOptions.vue'
 import editorSource from '../components/smartsheet/column/EditOrAdd.vue?raw'
 
@@ -25,6 +25,8 @@ const template = findAdvancedTemplate(descriptor.template!.ast)!
 
 const onAlter = vi.fn()
 const columnEditable = vi.fn(() => true)
+const adapter = vue.shallowRef(SqlUiFactory.create({ client: 'pg' }))
+const tableExplorerColumns = vue.ref<Record<string, unknown>[]>()
 let wrappers: ReturnType<typeof mount>[] = []
 
 function mountEditor(overrides: Record<string, unknown> = {}) {
@@ -33,6 +35,7 @@ function mountEditor(overrides: Record<string, unknown> = {}) {
     easterEgg: false,
     readOnly: false,
     isFullUpdateAllowed: true,
+    isSyncedField: false,
     warningVisible: false,
     props: { hideAdditionalOptions: false },
     advancedOptions: vue.ref(false),
@@ -55,6 +58,7 @@ function mountEditor(overrides: Record<string, unknown> = {}) {
     }),
     {
       global: {
+        provide: { meta: vue.ref(state.meta) },
         components: { LazySmartsheetColumnAdvancedOptions: AdvancedOptions, ACheckbox: Checkbox },
         mocks: { $t: (key: string) => key, iconMap: { check: 'span' } },
         stubs: {
@@ -76,6 +80,8 @@ function mountEditor(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks()
   columnEditable.mockReturnValue(true)
+  adapter.value = SqlUiFactory.create({ client: 'pg' })
+  tableExplorerColumns.value = undefined
   for (const [key, value] of Object.entries({
     ...vue,
     useVModel,
@@ -85,11 +91,13 @@ beforeEach(() => {
       onAlter,
       onDataTypeChange: vi.fn(),
       validateInfos: {},
+      tableExplorerColumns,
       sqlUi: vue.ref({
         columnEditable,
         getDataTypeListForUiType: () => ['text'],
-        colPropUNDisabled: () => true,
-        colPropAuDisabled: () => true,
+        colPropAIDisabled: (column: any, columns: any[]) => adapter.value.colPropAIDisabled(column, columns),
+        colPropUNDisabled: (column: any) => adapter.value.colPropUNDisabled(column),
+        colPropAuDisabled: (column: any) => adapter.value.colPropAuDisabled(column),
         getDefaultLengthIsDisabled: () => false,
         showScale: () => false,
       }),
@@ -125,6 +133,7 @@ describe('upstream advanced field options in CE', () => {
   it.each([
     { readOnly: true },
     { isFullUpdateAllowed: false },
+    { isSyncedField: true },
     { props: { hideAdditionalOptions: true } },
     { formState: { uidt: UITypes.Lookup } },
     { formState: { uidt: UITypes.Formula } },
@@ -159,5 +168,55 @@ describe('upstream advanced field options in CE', () => {
     expect(input.element.checked).toBe(true)
     expect(input.element.disabled).toBe(true)
     expect(onAlter).not.toHaveBeenCalled()
+  })
+
+  it.each(['pg', 'mysql2'])('disables unsupported UN/AU checkboxes on %s text columns', async (client) => {
+    adapter.value = SqlUiFactory.create({ client })
+    const { wrapper } = mountEditor()
+    await wrapper.get('.nc-more-options').trigger('click')
+    for (const name of ['UN', 'AU']) {
+      expect(wrapper.get<HTMLInputElement>(`.nc-column-checkbox-${name} input`).element.disabled).toBe(true)
+    }
+  })
+
+  it('changes a supported UN option through the checkbox', async () => {
+    adapter.value = SqlUiFactory.create({ client: 'mysql2' })
+    const field = vue.reactive({ uidt: UITypes.Number, dt: 'int', column_name: 'amount', un: false })
+    const { wrapper } = mountEditor({ formState: field })
+    await wrapper.get('.nc-more-options').trigger('click')
+    const input = wrapper.get<HTMLInputElement>('.nc-column-checkbox-UN input')
+    expect(input.element.disabled).toBe(false)
+    await input.setValue(true)
+    expect(field.un).toBe(true)
+    expect(onAlter).toHaveBeenCalledWith()
+  })
+
+  it('uses the AI capability rather than UN for a PostgreSQL integer', async () => {
+    const { wrapper } = mountEditor({ formState: { uidt: UITypes.Number, dt: 'int4', column_name: 'sequence' } })
+    await wrapper.get('.nc-more-options').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('.nc-column-checkbox-AI input').element.disabled).toBe(false)
+    expect(wrapper.get<HTMLInputElement>('.nc-column-checkbox-UN input').element.disabled).toBe(true)
+  })
+
+  it.each(['saved metadata', 'table explorer'])('prevents a second MySQL auto-increment using %s', async (source) => {
+    adapter.value = SqlUiFactory.create({ client: 'mysql2' })
+    const columns = [{ id: 'id-column', column_name: 'id', dt: 'int', ai: true }]
+    if (source === 'table explorer') tableExplorerColumns.value = columns
+    const { wrapper } = mountEditor({
+      formState: { uidt: UITypes.Number, dt: 'int', column_name: 'sequence' },
+      meta: { source_id: 'source', columns: source === 'saved metadata' ? columns : [] },
+    })
+    await wrapper.get('.nc-more-options').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('.nc-column-checkbox-AI input').element.disabled).toBe(true)
+  })
+
+  it('does not count the edited auto-increment column itself after renaming', async () => {
+    adapter.value = SqlUiFactory.create({ client: 'mysql2' })
+    const { wrapper } = mountEditor({
+      formState: { id: 'sequence', uidt: UITypes.Number, dt: 'int', column_name: 'new_name', ai: true },
+      meta: { source_id: 'source', columns: [{ id: 'sequence', column_name: 'old_name', ai: true }] },
+    })
+    await wrapper.get('.nc-more-options').trigger('click')
+    expect(wrapper.get<HTMLInputElement>('.nc-column-checkbox-AI input').element.disabled).toBe(false)
   })
 })
