@@ -1627,8 +1627,11 @@ const unique = computed({
               v-model:is-visible-default-value-input="isVisibleDefaultValueInput"
             />
           </div>
-          <!-- CE exposes the upstream editor; synced columns cannot persist schema changes. -->
-          <template v-if="!isSyncedField && (!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState)))">
+          <!--
+            CE exposes the upstream editor for NN. This single-user deployment only uses NN on ordinary, non-synced fields;
+            the legacy AI/UN/AU and synced-field behavior is intentionally left unchanged and out of this feature's scope.
+          -->
+          <template v-if="!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
               v-if="
