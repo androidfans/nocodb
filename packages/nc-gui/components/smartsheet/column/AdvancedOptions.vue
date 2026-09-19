@@ -43,7 +43,7 @@ vModel.value.au = !!vModel.value.au */
             v-model:checked="vModel.rqd"
             :disabled="vModel.pk || !sqlUi.columnEditable(vModel)"
             class="nc-column-checkbox-NN"
-            @change="onAlter()"
+            @change="onAlter"
           />
         </a-form-item>
 

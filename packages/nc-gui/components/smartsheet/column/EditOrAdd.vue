@@ -54,6 +54,7 @@ const {
   onAlter,
   onUidtOrIdTypeChange,
   validateInfos,
+  sqlUi,
   isEdit,
   isSystem,
   disableSubmitBtn,
@@ -870,6 +871,30 @@ const unique = computed({
     }
   },
 })
+
+const showUniqueOption = computed(
+  () =>
+    isXcdbBase(meta.value?.source_id) &&
+    !isVirtualCol(formState.value) &&
+    isUniqueConstraintSupportedType(formState.value.uidt, formState.value.meta) &&
+    !isUUID(formState.value) &&
+    !isAutoNumber(formState.value),
+)
+
+const showNotNullOption = computed(
+  () =>
+    !isSystem.value &&
+    !isSyncedField.value &&
+    !isVirtualCol(formState.value) &&
+    !isAttachment(formState.value) &&
+    !isUUID(formState.value) &&
+    !isAutoNumber(formState.value),
+)
+
+const onNotNullChange = (checked: boolean) => {
+  formState.value.rqd = checked
+  onAlter()
+}
 </script>
 
 <template>
@@ -1515,18 +1540,12 @@ const unique = computed({
 
         <template v-if="!readOnly && isFullUpdateAllowed">
           <div class="nc-column-options-wrapper flex flex-col gap-4">
-            <!-- Unique Constraint Toggle -->
             <div
-              v-if="
-                isXcdbBase(meta?.source_id) &&
-                !isVirtualCol(formState) &&
-                isUniqueConstraintSupportedType(formState.uidt, formState.meta) &&
-                !isUUID(formState) &&
-                !isAutoNumber(formState)
-              "
-              class="flex"
+              v-if="showUniqueOption || showNotNullOption"
+              class="nc-column-constraints-row flex flex-wrap items-center gap-x-6 gap-y-2"
             >
               <NcTooltip
+                v-if="showUniqueOption"
                 :disabled="
                   canEnableUniqueConstraint(formState, isXcdbBase(meta?.source_id)).canEnable || onMouseOverUniqueValuesInfoIcon
                 "
@@ -1571,6 +1590,19 @@ const unique = computed({
                   </div>
                 </NcSwitch>
               </NcTooltip>
+
+              <div v-if="showNotNullOption" class="nc-column-not-null-option flex items-center">
+                <NcSwitch
+                  v-model:checked="formState.rqd"
+                  size="small"
+                  :disabled="formState.pk || !sqlUi.columnEditable(formState)"
+                  class="nc-switch nc-column-switch-NN-inline"
+                  data-testid="nc-column-not-null"
+                  @change="onNotNullChange"
+                >
+                  <div class="text-sm text-nc-content-gray">Not null</div>
+                </NcSwitch>
+              </div>
             </div>
 
             <!--
@@ -1627,11 +1659,7 @@ const unique = computed({
               v-model:is-visible-default-value-input="isVisibleDefaultValueInput"
             />
           </div>
-          <!--
-            CE exposes the upstream editor for NN. This single-user deployment only uses NN on ordinary, non-synced fields;
-            the legacy AI/UN/AU and synced-field behavior is intentionally left unchanged and out of this feature's scope.
-          -->
-          <template v-if="!isSystem && !isSyncedField && (!appInfo.ee || easterEgg || (appInfo.ee && isAttachment(formState)))">
+          <template v-if="easterEgg || (appInfo.ee && isAttachment(formState))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
               v-if="
