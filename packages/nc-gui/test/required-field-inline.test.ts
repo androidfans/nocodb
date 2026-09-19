@@ -89,7 +89,7 @@ describe('inline Not null option', () => {
 
     expect(row.classes()).toEqual(expect.arrayContaining(['flex', 'flex-wrap', 'items-center']))
     expect(row.findAll('input[type="checkbox"]')).toHaveLength(2)
-    expect(row.get('.nc-column-not-null-option').text()).toBe('Not null')
+    expect(row.get('.nc-column-not-null-option').text()).toBe('filterOperation.isNotNull')
   })
 
   it('updates rqd and marks the field altered', async () => {

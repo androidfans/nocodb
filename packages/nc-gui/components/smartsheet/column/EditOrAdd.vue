@@ -1600,7 +1600,7 @@ const onNotNullChange = (checked: boolean) => {
                   data-testid="nc-column-not-null"
                   @change="onNotNullChange"
                 >
-                  <div class="text-sm text-nc-content-gray">Not null</div>
+                  <div class="text-sm text-nc-content-gray">{{ $t('filterOperation.isNotNull') }}</div>
                 </NcSwitch>
               </div>
             </div>
@@ -1659,6 +1659,7 @@ const onNotNullChange = (checked: boolean) => {
               v-model:is-visible-default-value-input="isVisibleDefaultValueInput"
             />
           </div>
+          <!-- Normal CE intentionally exposes only NN inline; legacy advanced DB controls retain the upstream hidden gate. -->
           <template v-if="easterEgg || (appInfo.ee && isAttachment(formState))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
