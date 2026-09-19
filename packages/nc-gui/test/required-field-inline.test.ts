@@ -55,7 +55,7 @@ function mountConstraints(overrides: Record<string, unknown> = {}) {
           props: ['checked', 'disabled'],
           emits: ['change'],
           template:
-            '<input type="checkbox" :checked="checked" :disabled="disabled" @change="$emit(\'change\', $event.target.checked)" />',
+            '<input type="checkbox" :checked="checked === true" :disabled="disabled" @change="$emit(\'change\', $event.target.checked)" />',
         },
         NcTooltip: { template: '<div><slot name="title" /><slot /></div>' },
         GeneralIcon: true,
@@ -101,6 +101,14 @@ describe('inline Not null option', () => {
     await notNullSwitch.setValue(false)
     expect(state.formState.rqd).toBe(false)
     expect(onAlter.mock.calls).toEqual([[], []])
+  })
+
+  it('normalizes a numeric persisted rqd value for the switch', () => {
+    const { wrapper } = mountConstraints({
+      formState: vue.reactive({ uidt: UITypes.SingleLineText, rqd: 1, pk: false }),
+    })
+
+    expect(wrapper.get<HTMLInputElement>('[data-testid="nc-column-not-null"]').element.checked).toBe(true)
   })
 
   it('does not render when the field is ineligible', () => {

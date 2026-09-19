@@ -1593,7 +1593,7 @@ const onNotNullChange = (checked: boolean) => {
 
               <div v-if="showNotNullOption" class="nc-column-not-null-option flex items-center">
                 <NcSwitch
-                  v-model:checked="formState.rqd"
+                  :checked="!!formState.rqd"
                   size="small"
                   :disabled="formState.pk || !sqlUi.columnEditable(formState)"
                   class="nc-switch nc-column-switch-NN-inline"
