@@ -1659,8 +1659,8 @@ const onNotNullChange = (checked: boolean) => {
               v-model:is-visible-default-value-input="isVisibleDefaultValueInput"
             />
           </div>
-          <!-- Normal CE intentionally exposes only NN inline; legacy advanced DB controls retain the upstream hidden gate. -->
-          <template v-if="easterEgg || (appInfo.ee && isAttachment(formState))">
+          <!-- Normal CE intentionally exposes only NN inline; hidden advanced controls must not bypass read-only field guards. -->
+          <template v-if="!isSystem && !isSyncedField && (easterEgg || (appInfo.ee && isAttachment(formState)))">
             <!-- TODO: Refactor the if condition and verify AttachmentOption -->
             <div
               v-if="
