@@ -984,6 +984,7 @@
     "quickNavigation": "快速導覽",
     "recent": "最近",
     "limitRecordSelectionToView": "限定從某檢視選取紀錄",
+    "recordDeleteProtection": "刪除保護",
     "limitRecordSelectionToFilters": "限定從篩選結果選取紀錄",
     "onlyIncludeLinkedRecordsThatMeetSpecificConditions": "僅包含符合特定條件的連結記錄",
     "addedBy": "新增者",
@@ -1800,6 +1801,7 @@
     "goBackHome": "返回首頁"
   },
   "tooltip": {
+    "recordDeleteProtection": "該關聯欄位非空時，禁止刪除目前記錄",
     "includeUserHint": "觸發 webhook 的使用者將作為「user」物件包含於 payload。",
     "crossBase": "從其他 Base 的資料表建立連結記錄",
     "leaveWorkspace": "每個工作區至少需要一位擁有者。在離開前請先指定其他使用者為擁有者；若您是最後一位成員，請考慮刪除工作區。",

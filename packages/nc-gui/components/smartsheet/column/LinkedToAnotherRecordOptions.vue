@@ -62,6 +62,15 @@ const {
   isSyncedField,
 } = useColumnCreateStoreOrThrow()
 
+const showRecordDeleteProtection = computed(() => canConfigureRecordDeleteProtection(vModel.value, isXcdbBase.value))
+
+const recordDeleteProtection = computed({
+  get: () => isRecordDeleteProtectionEnabled(vModel.value),
+  set: (enabled: boolean) => {
+    vModel.value.meta = withRecordDeleteProtection(vModel.value, enabled)
+  },
+})
+
 const baseStore = useBase()
 const { tables } = storeToRefs(baseStore)
 
@@ -867,47 +876,63 @@ const handleScrollIntoView = () => {
     </div>
 
     <div class="flex flex-col gap-2">
-      <NcTooltip :disabled="!isSyncedField && !isLinkedViewPrivate" placement="right">
-        <div class="flex gap-2 items-center">
-          <a-switch
-            v-model:checked="limitRecToView"
-            v-e="['c:link:limit-record-by-view', { status: limitRecToView }]"
-            size="small"
-            :disabled="
-              (!vModel.childId && !(vModel.is_custom_link && vModel.custom?.ref_model_id)) ||
-              isSyncedField ||
-              isLinkedTablePrivate
-            "
-            @change="onLimitRecToViewChange"
-          />
-
-          <span
-            v-e="['c:link:limit-record-by-view', { status: limitRecToView }]"
-            class="cursor-pointer inline-flex items-center gap-1"
-            data-testid="nc-limit-record-view"
-            @click="onViewLabelClick"
-          >
-            {{ $t('labels.limitRecordSelectionToView') }}
-
-            <a
-              href="https://nocodb.com/docs/product-docs/fields/field-types/links-based/links#limit-by-view"
-              target="_blank"
-              class="flex text-nc-content-gray-disabled hover:text-nc-content-gray-subtle"
-              @click.stop
-            >
-              <GeneralIcon icon="ncInfo" class="flex-none w-3.5 h-3.5" /> </a
-          ></span>
+      <div class="flex gap-6 items-center">
+        <div v-if="showRecordDeleteProtection" class="flex gap-2 items-center w-fit">
+          <a-switch v-model:checked="recordDeleteProtection" size="small" data-testid="nc-record-delete-protection" />
+          <span class="cursor-pointer" @click="recordDeleteProtection = !recordDeleteProtection">
+            {{ $t('labels.recordDeleteProtection') }}
+          </span>
+          <NcTooltip placement="right">
+            <GeneralIcon
+              icon="ncInfo"
+              class="flex-none w-3.5 h-3.5 text-nc-content-gray-disabled hover:text-nc-content-gray-subtle"
+            />
+            <template #title>{{ $t('tooltip.recordDeleteProtection') }}</template>
+          </NcTooltip>
         </div>
-        <template #title>
-          {{
-            isSyncedField
-              ? $t('tooltip.optionNotAvailableInSyncTable')
-              : $t('tooltip.notHaveAccess', {
-                  context: $t('objects.view'),
-                })
-          }}
-        </template>
-      </NcTooltip>
+
+        <NcTooltip :disabled="!isSyncedField && !isLinkedViewPrivate" placement="right">
+          <div class="flex gap-2 items-center">
+            <a-switch
+              v-model:checked="limitRecToView"
+              v-e="['c:link:limit-record-by-view', { status: limitRecToView }]"
+              size="small"
+              :disabled="
+                (!vModel.childId && !(vModel.is_custom_link && vModel.custom?.ref_model_id)) ||
+                isSyncedField ||
+                isLinkedTablePrivate
+              "
+              @change="onLimitRecToViewChange"
+            />
+
+            <span
+              v-e="['c:link:limit-record-by-view', { status: limitRecToView }]"
+              class="cursor-pointer inline-flex items-center gap-1"
+              data-testid="nc-limit-record-view"
+              @click="onViewLabelClick"
+            >
+              {{ $t('labels.limitRecordSelectionToView') }}
+
+              <a
+                href="https://nocodb.com/docs/product-docs/fields/field-types/links-based/links#limit-by-view"
+                target="_blank"
+                class="flex text-nc-content-gray-disabled hover:text-nc-content-gray-subtle"
+                @click.stop
+              >
+                <GeneralIcon icon="ncInfo" class="flex-none w-3.5 h-3.5" /> </a
+            ></span>
+          </div>
+          <template #title>
+            {{
+              isSyncedField
+                ? $t('tooltip.optionNotAvailableInSyncTable')
+                : $t('tooltip.notHaveAccess', {
+                    context: $t('objects.view'),
+                  })
+            }}
+          </template>
+        </NcTooltip>
+      </div>
       <a-form-item v-if="limitRecToView" class="!pl-8 flex w-full pb-2 mt-4 space-y-2 nc-ltar-child-view">
         <NcTooltip :disabled="!isLinkedViewPrivate" placement="right">
           <NcSelect

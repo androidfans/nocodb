@@ -20,6 +20,7 @@ import {
 import { NcError } from '~/helpers/catchError';
 import conditionV2 from '~/db/conditionV2';
 import { Column, FileReference, Filter, Model } from '~/models';
+import { DeleteGuard } from '~/db/BaseModelSqlv2/delete-guard';
 
 export type ExecQueryType = (param: {
   trx: Knex.Transaction | CustomKnex;
@@ -559,6 +560,12 @@ export class BaseModelDelete {
       isSoftDelete,
       operationNow,
     } = await this.prepareBulkDeleteAll(params);
+
+    if (!params.args.permanentDelete) {
+      await new DeleteGuard(this.baseModel).assertAllowed({
+        query: qb.clone(),
+      });
+    }
 
     const bulkAuditEvent = isSoftDelete
       ? AuditV1OperationTypes.DATA_BULK_SOFT_DELETE
