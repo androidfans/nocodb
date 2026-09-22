@@ -1012,6 +1012,7 @@ export function useGridViewData(
     } catch (error: any) {
       const errorMessage = await extractSdkResponseErrorMsg(error)
       message.error(`Bulk delete failed: ${errorMessage}`)
+      throw error
     }
   }
 

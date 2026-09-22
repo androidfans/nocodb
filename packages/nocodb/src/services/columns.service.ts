@@ -30,6 +30,7 @@ import {
   PermissionKey,
   ProjectRoles,
   readonlyMetaAllowedTypes,
+  RecordDeleteProtectionMetaProp,
   RelationTypes,
   SqlUiFactory,
   substituteColumnAliasWithIdInFormula,
@@ -71,10 +72,10 @@ import {
   createHmAndBtColumn,
   createOOColumn,
   deleteColumnSystemPropsFromRequest,
-  type OperationSource,
   generateFkName,
   getMMColumnNames,
   getRevType,
+  type OperationSource,
   sanitizeColumnName,
   validateLookupPayload,
   validatePayload,
@@ -141,6 +142,11 @@ const deepClone = rfdc();
 const META_ONLY_COLUMN_PROPS = new Set(['description', 'meta']);
 
 const ALLOWED_DATE_FORMATS = new Set([...dateFormats, ...dateMonthFormats]);
+
+const getRecordDeleteProtectionMeta = (meta: unknown) =>
+  parseProp(meta)?.[RecordDeleteProtectionMetaProp] === true
+    ? { [RecordDeleteProtectionMetaProp]: true }
+    : undefined;
 
 // MySQL stores SingleSelect/MultiSelect as ENUM/SET, which compares members
 // case-insensitively under utf8mb4_*_ci collations. Callers use this to
@@ -7098,6 +7104,7 @@ export class ColumnsService implements IColumnsService {
               fk_target_view_id: hmColOptions.fk_target_view_id,
               fk_display_value_column_id:
                 hmColOptions.fk_display_value_column_id,
+              meta: getRecordDeleteProtectionMeta(hmColumn.meta),
               virtual: isVirtual,
               version: LinksVersion.V2,
               ...crossBaseLinkProps,
@@ -7573,6 +7580,7 @@ export class ColumnsService implements IColumnsService {
             fk_related_model_id: colOptions.fk_related_model_id,
             fk_target_view_id: colOptions.fk_target_view_id,
             fk_display_value_column_id: colOptions.fk_display_value_column_id,
+            meta: getRecordDeleteProtectionMeta(column.meta),
             virtual: colOptions.virtual,
             column_order: mmColumnOrder,
             // Cross-base properties — needed for cross-base relations
