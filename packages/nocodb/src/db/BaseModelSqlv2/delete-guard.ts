@@ -92,6 +92,8 @@ export class DeleteGuard {
     column: Column,
     target: DeleteGuardTarget,
   ): Promise<unknown | undefined> {
+    // Soft-deleted related rows intentionally remain links: restoring them must
+    // not reveal that the protected chain was broken while they were in trash.
     const colOptions = await column.getColOptions<LinkToAnotherRecordColumn>(
       this.baseModel.context,
     );
@@ -139,6 +141,8 @@ export class DeleteGuard {
       this.applyTarget(qb, this.baseModel.model.primaryKey.column_name, target);
     }
 
+    // This first version prevents routine accidental deletion only. It does not
+    // lock relation storage against a concurrent request adding a new link.
     const row = await this.baseModel.execAndParse(qb.limit(1), null, {
       raw: true,
       first: true,
