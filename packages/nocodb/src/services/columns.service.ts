@@ -7104,7 +7104,6 @@ export class ColumnsService implements IColumnsService {
               fk_target_view_id: hmColOptions.fk_target_view_id,
               fk_display_value_column_id:
                 hmColOptions.fk_display_value_column_id,
-              meta: getRecordDeleteProtectionMeta(hmColumn.meta),
               virtual: isVirtual,
               version: LinksVersion.V2,
               ...crossBaseLinkProps,
@@ -7182,6 +7181,7 @@ export class ColumnsService implements IColumnsService {
               fk_target_view_id: hmColOptions.fk_target_view_id,
               fk_display_value_column_id:
                 hmColOptions.fk_display_value_column_id,
+              meta: getRecordDeleteProtectionMeta(hmColumn.meta),
               virtual: isVirtual,
               column_order: columnOrder,
               ...crossBaseLinkProps,

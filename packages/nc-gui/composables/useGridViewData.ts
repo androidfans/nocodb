@@ -994,26 +994,20 @@ export function useGridViewData(
       viewMetaValue?: ViewType
     } = {},
   ): Promise<any> {
-    try {
-      const bulkDeletedRowsData = await $api.internal.postOperation(
-        (metaValue as any).fk_workspace_id!,
-        metaValue!.base_id!,
-        {
-          operation: 'dataDelete',
-          tableId: metaValue?.id as string,
-          viewId: viewMetaValue?.id as string,
-        },
-        rows.length === 1 ? rows[0] : rows,
-      )
+    const bulkDeletedRowsData = await $api.internal.postOperation(
+      (metaValue as any).fk_workspace_id!,
+      metaValue!.base_id!,
+      {
+        operation: 'dataDelete',
+        tableId: metaValue?.id as string,
+        viewId: viewMetaValue?.id as string,
+      },
+      rows.length === 1 ? rows[0] : rows,
+    )
 
-      triggerAggregateReload({ path: [] })
+    triggerAggregateReload({ path: [] })
 
-      return rows.length === 1 && bulkDeletedRowsData ? [bulkDeletedRowsData] : bulkDeletedRowsData
-    } catch (error: any) {
-      const errorMessage = await extractSdkResponseErrorMsg(error)
-      message.error(`Bulk delete failed: ${errorMessage}`)
-      throw error
-    }
+    return rows.length === 1 && bulkDeletedRowsData ? [bulkDeletedRowsData] : bulkDeletedRowsData
   }
 
   async function bulkDeleteAll(path: Array<number> = []) {
@@ -1032,7 +1026,10 @@ export function useGridViewData(
         },
         {},
       )
-    } catch (error) {
+    } catch (error: any) {
+      const errorMessage = await extractSdkResponseErrorMsg(error)
+      message.error(`${t('msg.error.deleteRowFailed')}: ${errorMessage}`)
+      throw error
     } finally {
       clearCache(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY, path)
       await syncCount(path)
