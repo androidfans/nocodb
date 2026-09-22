@@ -14,10 +14,17 @@ describe('record delete protection field option', () => {
   })
 
   it('is available only for standard relations in an internal source', () => {
-    expect(canConfigureRecordDeleteProtection({ meta: {} }, true)).toBe(true)
-    expect(canConfigureRecordDeleteProtection({ meta: {} }, false)).toBe(false)
-    expect(canConfigureRecordDeleteProtection({ is_custom_link: true, meta: {} }, true)).toBe(false)
-    expect(canConfigureRecordDeleteProtection({ meta: { custom: true } }, true)).toBe(false)
+    const singlePrimaryKey = [{ pk: true }, { pk: false }]
+
+    expect(canConfigureRecordDeleteProtection({ meta: {} }, true, singlePrimaryKey)).toBe(true)
+    expect(canConfigureRecordDeleteProtection({ meta: {} }, false, singlePrimaryKey)).toBe(false)
+    expect(canConfigureRecordDeleteProtection({ is_custom_link: true, meta: {} }, true, singlePrimaryKey)).toBe(false)
+    expect(canConfigureRecordDeleteProtection({ meta: { custom: true } }, true, singlePrimaryKey)).toBe(false)
+  })
+
+  it('does not offer the option when the current table lacks a single primary key', () => {
+    expect(canConfigureRecordDeleteProtection({ meta: {} }, true, [])).toBe(false)
+    expect(canConfigureRecordDeleteProtection({ meta: {} }, true, [{ pk: true }, { pk: true }])).toBe(false)
   })
 
   it('defaults to disabled and persists the option in column meta', () => {

@@ -63,7 +63,7 @@ const {
 } = useColumnCreateStoreOrThrow()
 
 const showRecordDeleteProtection = computed(
-  () => !isSyncedField.value && canConfigureRecordDeleteProtection(vModel.value, isXcdbBase.value),
+  () => !isSyncedField.value && canConfigureRecordDeleteProtection(vModel.value, isXcdbBase.value, meta.value?.columns),
 )
 
 const recordDeleteProtection = computed({

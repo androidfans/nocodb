@@ -1,8 +1,8 @@
 import { RecordDeleteProtectionMetaProp, parseProp } from 'nocodb-sdk'
 
-export function canConfigureRecordDeleteProtection(column: any, isXcdbBase: boolean): boolean {
+export function canConfigureRecordDeleteProtection(column: any, isXcdbBase: boolean, tableColumns: any[] = []): boolean {
   const meta = parseProp(column?.meta)
-  return isXcdbBase && !column?.is_custom_link && !meta?.custom
+  return isXcdbBase && tableColumns.filter((candidate) => candidate.pk).length === 1 && !column?.is_custom_link && !meta?.custom
 }
 
 export function isRecordDeleteProtectionEnabled(column: any): boolean {
