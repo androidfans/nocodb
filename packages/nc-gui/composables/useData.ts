@@ -962,6 +962,8 @@ export function useData(args: {
 
       return rows.length === 1 && bulkDeletedRowsData ? [bulkDeletedRowsData] : bulkDeletedRowsData
     } catch (error: any) {
+      // Product decision: custom table behavior is maintained for Canvas only;
+      // keep the legacy DOM grid's existing error handling unchanged.
       message.error(await extractSdkResponseErrorMsg(error))
     }
   }

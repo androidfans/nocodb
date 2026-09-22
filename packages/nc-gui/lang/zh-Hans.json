@@ -984,6 +984,7 @@
     "quickNavigation": "快速导航",
     "recent": "最近",
     "limitRecordSelectionToView": "将记录选择限制为视图",
+    "recordDeleteProtection": "删除保护",
     "limitRecordSelectionToFilters": "将记录选择限制为筛选条件",
     "onlyIncludeLinkedRecordsThatMeetSpecificConditions": "仅包含满足特定条件的关联记录",
     "addedBy": "添加者",
@@ -1800,6 +1801,7 @@
     "goBackHome": "返回首页"
   },
   "tooltip": {
+    "recordDeleteProtection": "该关联字段非空时，禁止删除当前记录",
     "includeUserHint": "触发此 Webhook 的用户将在负载中作为“user”对象包含。",
     "crossBase": "从其他项目的表中关联记录",
     "leaveWorkspace": "每个工作区必须至少有一位所有者。在离开工作区之前，请将其他用户分配为所有者。如果您是最后一名成员，请考虑删除工作区。",

@@ -83,6 +83,7 @@ import type {
 } from '~/models';
 import { LTARColsUpdater } from '~/db/BaseModelSqlv2/ltar-cols-updater';
 import { BaseModelDelete } from '~/db/BaseModelSqlv2/delete';
+import { DeleteGuard } from '~/db/BaseModelSqlv2/delete-guard';
 import { ncIsStringHasValue } from '~/db/field-handler/utils/handlerUtils';
 import { AttachmentUrlUploadPreparator } from '~/db/BaseModelSqlv2/attachment-url-upload-preparator';
 import { FieldHandler } from '~/db/field-handler';
@@ -2722,6 +2723,9 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         getHiddenColumn: true,
         source,
       });
+      await new DeleteGuard(this).assertAllowed({
+        ids: [this.extractPksValues(data)],
+      });
       await this.beforeDelete(id, trx, cookie);
 
       // Detect soft-delete column for meta sources
@@ -3112,7 +3116,7 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
       await this.afterDelete(data, trx, cookie);
       return response;
     } catch (e) {
-      if (!_trx) await trx.rollback();
+      if (!_trx && trx) await trx.rollback();
       await this.errorDelete(e, id, trx, cookie);
       throw e;
     }
@@ -4842,6 +4846,9 @@ class BaseModelSqlv2 implements IBaseModelSqlV2 {
         }
       }
 
+      await new DeleteGuard(this).assertAllowed({
+        ids: deleted.map((record) => this.extractPksValues(record)),
+      });
       await this.beforeBulkDelete(deleted, this.dbDriver, cookie);
 
       const source = await this.getSource();

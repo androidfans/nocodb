@@ -20,6 +20,7 @@ import {
 import { NcError } from '~/helpers/catchError';
 import conditionV2 from '~/db/conditionV2';
 import { Column, FileReference, Filter, Model } from '~/models';
+import { DeleteGuard } from '~/db/BaseModelSqlv2/delete-guard';
 
 export type ExecQueryType = (param: {
   trx: Knex.Transaction | CustomKnex;
@@ -121,13 +122,13 @@ export class BaseModelDelete {
     const isMeta = source.isMeta();
 
     const deletedColumn = columns.find((c) => isDeletedCol(c));
-    const isSoftDelete =
-      !args.permanentDelete &&
+    const isTrashEnabled =
       !!deletedColumn &&
       isMeta &&
       (await this.baseModel.model.isTrashEnabledForWorkspace(
         this.baseModel.context,
       ));
+    const isSoftDelete = !args.permanentDelete && isTrashEnabled;
 
     // Exclude already soft-deleted records from the delete query
     if (isSoftDelete) {
@@ -486,6 +487,8 @@ export class BaseModelDelete {
       qb,
       attachmentColumns,
       filterObj,
+      deletedColumn,
+      isTrashEnabled,
       isSoftDelete,
       operationNow,
     };
@@ -556,9 +559,22 @@ export class BaseModelDelete {
       qb,
       filterObj,
       attachmentColumns,
+      deletedColumn,
+      isTrashEnabled,
       isSoftDelete,
       operationNow,
     } = await this.prepareBulkDeleteAll(params);
+
+    const guardQuery = qb.clone();
+    if (params.args.permanentDelete && isTrashEnabled && deletedColumn) {
+      guardQuery.where(function () {
+        this.whereNull(deletedColumn.column_name).orWhere(
+          deletedColumn.column_name,
+          false,
+        );
+      });
+    }
+    await new DeleteGuard(this.baseModel).assertAllowed({ query: guardQuery });
 
     const bulkAuditEvent = isSoftDelete
       ? AuditV1OperationTypes.DATA_BULK_SOFT_DELETE

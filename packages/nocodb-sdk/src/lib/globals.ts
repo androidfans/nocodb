@@ -309,6 +309,8 @@ export enum COLORING_TYPE {
 
 export const LongTextAiMetaProp = 'ai';
 
+export const RecordDeleteProtectionMetaProp = 'recordDeleteProtection';
+
 export const NO_SCOPE = 'nc';
 
 export const NON_SEAT_ROLES = [
