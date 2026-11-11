@@ -79,6 +79,14 @@ const route = useRoute()
 
 const router = useRouter()
 
+const currentGroupPath = computed(() => {
+  const path = Array.isArray(route.query.path) ? route.query.path[0] : route.query.path
+  if (!path) return
+
+  const parsedPath = path.split('-').map(Number)
+  return parsedPath.length && parsedPath.every(Number.isInteger) ? parsedPath : undefined
+})
+
 // to check if a expanded form which is not yet saved exist or not
 const isUnsavedFormExist = ref(false)
 
@@ -534,8 +542,9 @@ const save = async () => {
     }
 
     if (!props.skipReload) {
-      await reloadTrigger?.trigger()
-      await reloadViewDataTrigger?.trigger()
+      const reloadParams = isUnsavedDuplicatedRecordExist.value ? { path: currentGroupPath.value } : undefined
+      await reloadTrigger?.trigger(reloadParams)
+      await reloadViewDataTrigger?.trigger(reloadParams)
     }
 
     isUnsavedFormExist.value = false
